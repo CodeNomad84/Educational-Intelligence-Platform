@@ -244,3 +244,9 @@ staticfiles/
 .DS_Store
 
 >>>>>>> 9c327ec (Initial commit: Educational Intelligence Platform)
+db.sqlite3
+celerybeat-schedule
+__pycache__/
+*.pyc
+*.xlsx
+*.ods

@@ -210,7 +210,29 @@ class StudentViewSet(viewsets.ModelViewSet):
                 {"error": f"خطا در ارتباط با سرویس هوش مصنوعی: {str(e)}"},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE
             )
-    @action(detail=True, methods=['get'], url_path='predict')
+    @action(detail=True, methods=['get'], url_path='features')
+    def get_features(self, request, pk=None):
+        student = self.get_object()
+        grades = student.grades.all()
+        avg_score = grades.aggregate(Avg('score'))['score__avg'] or 0
+        attendances = student.attendances.all()
+        total_absences = attendances.filter(status='absent').count()
+        total_lates = attendances.filter(status='late').count()
+        total_days = attendances.count()
+        attendance_rate = 1 - (total_absences / (total_days + 1))
+        
+        data = {
+            "grade": student.grade,
+            "attendance_rate": round(attendance_rate, 2),
+            "avg_completion_rate": 0.8,  # از مدل Homework محاسبه شود
+            "avg_exam_score": round(avg_score, 2),
+            "total_absences": total_absences,
+            "total_lates": total_lates,
+            "total_communications": 3,  # از مدل Communication محاسبه شود
+            "completed_homework": 12    # از مدل Homework محاسبه شود
+        }
+        return Response(data)
+    
     def predict_status(self, request, pk=None):
         student = self.get_object()
         

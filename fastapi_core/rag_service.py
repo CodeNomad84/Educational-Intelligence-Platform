@@ -50,7 +50,16 @@ EMBEDDING_DIM = get_embedding_dim()
 logger.info(f"✅ ابعاد بردار تشخیص داده شد: {EMBEDDING_DIM}")
 
 # ---------- اتصال به PostgreSQL ----------
-def get_db_connection():
+DB_USER_READONLY = os.environ.get('DB_USER_READONLY', 'fastapi_user')
+DB_PASSWORD_READONLY = os.environ.get('DB_PASSWORD_READONLY', '')
+
+def get_db_connection(readonly=False):
+    if readonly:
+        user = DB_USER_READONLY
+        password = DB_PASSWORD_READONLY
+    else:
+        user = DB_USER
+        password = DB_PASSWORD
     conn = psycopg2.connect(
         dbname=DB_NAME,
         user=DB_USER,

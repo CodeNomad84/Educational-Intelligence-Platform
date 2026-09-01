@@ -6,12 +6,18 @@ import tempfile
 import logging
 from pathlib import Path
 
+from auth import verify_jwt
 import joblib
 import torch
 import numpy as np
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from pydantic import BaseModel
 from typing import Optional
+from fastapi import APIRouter
+
+
+router_v1 = APIRouter(prefix="/api/v1")
+
 
 from rag_service import (
     chat,
@@ -47,11 +53,13 @@ logger.info("✅ مدل پیش‌بینی ریسک با موفقیت بارگذ�
 # ---------- راه‌اندازی FastAPI و جدول اسناد ----------
 app = FastAPI(title="School AI Platform", description="سرویس یکپارچه هوش مصنوعی مدرسه", version="2.0.0")
 
-try:
-    create_documents_table()
-    logger.info("✅ جدول اسناد با موفقیت ایجاد شد.")
-except Exception as e:
-    logger.error(f"❌ خطا در ایجاد جدول اسناد: {e}", exc_info=True)
+@app.on_event("startup")
+async def startup():
+    try:
+        create_documents_table()
+        logger.info("✅ جدول اسناد با موفقیت ایجاد شد.")
+    except Exception as e:
+        logger.error(f"❌ خطا در ایجاد جدول اسناد: {e}", exc_info=True)
 
 # ---------- مدل‌های Pydantic ----------
 class ChatRequest(BaseModel):
@@ -96,7 +104,8 @@ async def read_root():
     return {"message": "School AI Platform is running!", "status": "healthy"}
 
 @app.post("/predict/")
-async def predict_risk(features: StudentFeatures):
+@router_v1.post("/predict/")
+async def predict_risk(features: StudentFeatures, payload: dict = Depends(verify_jwt)):
     try:
         input_data = np.array([[
             features.grade,
@@ -122,8 +131,10 @@ async def predict_risk(features: StudentFeatures):
     except Exception as e:
         logger.error(f"خطا در پیش‌بینی: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"خطا در پردازش پیش‌بینی: {str(e)}")
+app.include_router(router_v1)
 
 @app.post("/chat/")
+@router_v1.get("/chat/")
 async def chat_endpoint(request: ChatRequest):
     try:
         result = chat(request.query)
@@ -142,7 +153,8 @@ async def add_document_endpoint(request: DocumentRequest):
         raise HTTPException(status_code=500, detail=f"خطا در افزودن سند: {str(e)}")
 
 @app.get("/documents/list/")
-async def list_documents():
+async def list_documents(payload: dict = Depends(verify_jwt)):
+    # فقط کاربران احراز هویت شده می‌توانند لیست اسناد را مشاهده کنند
     try:
         docs = get_all_documents()
         return {"documents": docs}
@@ -242,7 +254,7 @@ async def upload_document(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"خطا در پردازش فایل: {str(e)}")
 
 @app.delete("/documents/{doc_id}")
-async def delete_document_endpoint(doc_id: int):
+async def delete_document_endpoint(doc_id: int, payload: dict = Depends(verify_jwt)):
     try:
         deleted = delete_document(doc_id)
         if deleted:

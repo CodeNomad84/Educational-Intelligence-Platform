@@ -95,18 +95,18 @@ class Attendance(models.Model):
     def __str__(self):
         return f"{self.student} - {self.date} - {self.get_status_display()}"
     
-class Document(models.Model):
-    title = models.CharField(max_length=255, verbose_name="عنوان سند")
-    content = models.TextField(verbose_name="محتوا")
-    file = models.FileField(upload_to='documents/', blank=True, null=True, verbose_name="فایل")
-    metadata = models.JSONField(default=dict, blank=True, verbose_name="متادیتا")
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+# class Document(models.Model):
+#     title = models.CharField(max_length=255, verbose_name="عنوان سند")
+#     content = models.TextField(verbose_name="محتوا")
+#     file = models.FileField(upload_to='documents/', blank=True, null=True, verbose_name="فایل")
+#     metadata = models.JSONField(default=dict, blank=True, verbose_name="متادیتا")
+#     created_at = models.DateTimeField(auto_now_add=True)
+#     updated_at = models.DateTimeField(auto_now=True)
 
-    class Meta:
-        verbose_name = "سند"
-        verbose_name_plural = "اسناد"
-        ordering = ['-created_at']
+#     class Meta:
+#         verbose_name = "سند"
+#         verbose_name_plural = "اسناد"
+#         ordering = ['-created_at']
 
-    def __str__(self):
-        return self.title
+#     def __str__(self):
+#         return self.title
