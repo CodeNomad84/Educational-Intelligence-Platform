@@ -1,0 +1,58 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}افزودن دانش‌آموز جدید{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-header bg-success text-white">
+        <h4>➕ افزودن دانش‌آموز جدید</h4>
+    </div>
+    <div class="card-body">
+        <form method="post">
+            {% csrf_token %}
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    {{ form.first_name.label_tag }}
+                    {{ form.first_name }}
+                </div>
+                <div class="col-md-6 mb-3">
+                    {{ form.last_name.label_tag }}
+                    {{ form.last_name }}
+                </div>
+                <div class="col-md-4 mb-3">
+                    {{ form.national_id.label_tag }}
+                    {{ form.national_id }}
+                </div>
+                <div class="col-md-4 mb-3">
+                    {{ form.grade.label_tag }}
+                    {{ form.grade }}
+                </div>
+                <div class="col-md-4 mb-3">
+                    {{ form.class_name.label_tag }}
+                    {{ form.class_name }}
+                </div>
+                <div class="col-md-6 mb-3">
+                    {{ form.phone_number.label_tag }}
+                    {{ form.phone_number }}
+                </div>
+                <div class="col-md-6 mb-3">
+                    {{ form.parent_user.label_tag }}
+                    {{ form.parent_user }}
+                </div>
+                <div class="col-md-6 mb-3">
+                    {{ form.father_job.label_tag }}
+                    {{ form.father_job }}
+                </div>
+                <div class="col-md-6 mb-3">
+                    {{ form.mother_job.label_tag }}
+                    {{ form.mother_job }}
+                </div>
+            </div>
+            <button type="submit" class="btn btn-success">
+                <i class="bi bi-check-circle"></i> ذخیره
+            </button>
+            <a href="{% url 'dashboard:student_list' %}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> بازگشت
+            </a>
+        </form>
+    </div>
+</div>
+{% endblock %}

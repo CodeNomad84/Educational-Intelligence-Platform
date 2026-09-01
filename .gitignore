@@ -2,6 +2,16 @@
 __pycache__/
 *.py[codz]
 *$py.class
+*.py[cod]
+*.log
+
+# Runtime data & docker volumes
+data/
+data/postgres/
+data/ollama/
+*.sqlite3
+*.db
+>>>>>>> 9c327ec (Initial commit: Educational Intelligence Platform)
 
 # C extensions
 *.so
@@ -149,6 +159,8 @@ activemq-data/
 
 # Environments
 .env
+.env.*
+!.env.example
 .envrc
 .venv
 env/
@@ -216,3 +228,19 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+# Node / React
+node_modules/
+build/
+dist/
+.cache/
+
+# Media & static collected
+media/
+staticfiles/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+
+>>>>>>> 9c327ec (Initial commit: Educational Intelligence Platform)

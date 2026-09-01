@@ -1,0 +1,70 @@
+<!-- dashboard/templates/dashboard/library.html -->
+
+{% extends 'dashboard/base.html' %}
+{% block title %}کتابخانه اسناد{% endblock %}
+{% block content %}
+<div class="row">
+    <!-- بخش آپلود (بدون تغییر) -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5>📤 آپلود سند جدید</h5>
+            </div>
+            <div class="card-body">
+                <form method="post" enctype="multipart/form-data" action="{% url 'dashboard:upload_document' %}">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label">فایل خود را انتخاب کنید (PDF, Word)</label>
+                        <input type="file" name="document_file" class="form-control" accept=".pdf,.docx,.doc" required>
+                        <div class="form-text">حداکثر حجم: ۱۰ مگابایت</div>
+                    </div>
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-upload"></i> آپلود
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- بخش لیست فایل‌ها با parent_id -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">📚 اسناد موجود</h5>
+                <span class="badge bg-light text-dark">{{ documents|length }}</span>
+            </div>
+            <div class="card-body">
+                {% if documents %}
+                    <ul class="list-group">
+                        {% for doc in documents %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>{{ doc.title }}</strong>
+                                <span class="badge bg-info text-dark ms-2">{{ doc.chunks }} بخش</span>
+                                <small class="text-muted d-block">{{ doc.created_at|default:"تاریخ نامشخص" }}</small>
+                            </div>
+                            <div>
+                                <!-- ✅ حذف با parent_id -->
+                                <form method="post" action="{% url 'dashboard:delete_document' %}" 
+                                      onsubmit="return confirm('آیا از حذف این فایل و تمام بخش‌های آن اطمینان دارید؟');" 
+                                      style="display:inline;">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="parent_id" value="{{ doc.parent_id }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="حذف فایل">
+                                        <i class="bi bi-trash3"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> هنوز سندی آپلود نشده است.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

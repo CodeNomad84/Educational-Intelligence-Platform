@@ -1,0 +1,54 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}جزئیات دانش‌آموز{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-header bg-primary text-white">
+        <h4>{{ student.first_name }} {{ student.last_name }} - {{ student.get_grade_display }}</h4>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <p><strong>کد ملی:</strong> {{ student.national_id }}</p>
+                <p><strong>کلاس:</strong> {{ student.class_name }}</p>
+                <p><strong>شغل پدر:</strong> {{ student.father_job|default:"-" }}</p>
+                <p><strong>میانگین نمرات:</strong> {{ avg_score }}</p>
+                <p><strong>تعداد غیبت‌ها:</strong> {{ absences_count }}</p>
+            </div>
+            <div class="col-md-6">
+                <a href="?predict=true" class="btn btn-success w-100">🤖 پیش‌بینی وضعیت با هوش مصنوعی</a>
+                {% if prediction %}
+                    {% if prediction.error %}
+                        <div class="mt-3 alert alert-danger">
+                            <h5>⚠️ خطا</h5>
+                            <p>{{ prediction.error }}</p>
+                        </div>
+                    {% else %}
+                        <div class="mt-3 alert {% if not prediction.is_high_risk %}alert-success{% else %}alert-warning{% endif %}">
+                            <h5>🤖 نتیجه‌ی پیش‌بینی:</h5>
+                            <p><strong>وضعیت:</strong> {{ prediction.message }}</p>
+                            <p><strong>احتمال ریسک:</strong> {{ prediction.risk_probability|floatformat:2 }}%</p>
+                            <p><strong>وضعیت ریسک:</strong> 
+                                {% if prediction.is_high_risk %}
+                                    <span class="badge bg-danger">پرریسک</span>
+                                {% else %}
+                                    <span class="badge bg-success">کم‌ریسک</span>
+                                {% endif %}
+                            </p>
+                            <hr>
+                            <p class="text-muted small">(داده‌های ارسال‌شده به هوش مصنوعی: {{ input_data }})</p>
+                        </div>
+                    {% endif %}
+                {% endif %}
+            </div>
+        </div>
+        <hr>
+        <h5>نمرات</h5>
+        <table class="table table-sm"><tr><th>درس</th><th>نوع</th><th>نمره</th><th>تاریخ</th></tr>
+        {% for g in grades %}<tr><td>{{ g.get_subject_display }}</td><td>{{ g.get_exam_type_display }}</td><td>{{ g.score }}</td><td>{{ g.date }}</td></tr>{% empty %}<tr><td colspan="4">نمره‌ای ثبت نشده</td></tr>{% endfor %}</table>
+        <h5>حضور و غیاب</h5>
+        <table class="table table-sm"><tr><th>تاریخ</th><th>وضعیت</th><th>یادداشت</th></tr>
+        {% for a in attendances %}<tr><td>{{ a.date }}</td><td>{{ a.get_status_display }}</td><td>{{ a.note }}</td></tr>{% empty %}<tr><td colspan="3">غیبتی ثبت نشده</td></tr>{% endfor %}</table>
+    </div>
+</div>
+<a href="{% url 'dashboard:student_list' %}" class="btn btn-secondary mt-2">بازگشت</a>
+{% endblock %}

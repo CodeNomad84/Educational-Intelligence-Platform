@@ -1,0 +1,33 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}داشبورد{% endblock %}
+{% block content %}
+<div class="row">
+    <div class="col-md-3 mb-3">
+        <div class="card card-stats bg-primary text-white">
+            <h5>دانش‌آموزان</h5>
+            <h2>{{ total_students }}</h2>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card card-stats bg-success text-white">
+            <h5>نمرات ثبت‌شده</h5>
+            <h2>{{ total_grades }}</h2>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card card-stats bg-warning text-dark">
+            <h5>حضور و غیاب</h5>
+            <h2>{{ total_attendances }}</h2>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card card-stats bg-info text-white">
+            <h5>میانگین کل</h5>
+            <h2>{{ avg_grade_all }}</h2>
+        </div>
+    </div>
+</div>
+<div class="alert alert-secondary">
+    خوش آمدید {{ user.get_full_name|default:user.username }}! به پلتفرم هوشمند مدرسه خوش آمدید.
+</div>
+{% endblock %}

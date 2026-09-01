@@ -1,0 +1,141 @@
+# services:
+#   django:
+#     build: ./django_core
+#     container_name: django_core
+#     ports:
+#       - "8000:8000"
+#     volumes:
+#       - ./django_core:/app
+#     env_file:
+#       - .env
+
+#   fastapi:
+#     build: ./fastapi_core
+#     container_name: fastapi_core
+#     ports:
+#       - "8001:8001"
+#     volumes:
+#       - ./fastapi_core:/app
+#       - ./data:/data 
+#     env_file:
+#       - .env
+
+
+# سرویس‌های جدید را اضافه کرده و db را جایگزین sqlite می‌کنیم:
+
+
+services:
+  # ========== Django ==========
+  django:
+    build: ./django_core
+    container_name: django_core
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./django_core:/app
+      - ./data/static:/app/staticfiles
+      - ./data/media:/app/media
+    env_file: .env
+    depends_on:
+      - postgres
+      - redis
+      - fastapi
+    command: >
+      sh -c "python manage.py migrate &&
+      python manage.py collectstatic --noinput &&
+      gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 3000"
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.production
+      - USE_POSTGRES=True
+
+  # ========== Celery Worker (پردازش پس‌زمینه) ==========
+  celery:
+    build: ./django_core
+    container_name: celery_worker
+    volumes:
+      - ./django_core:/app
+    env_file: .env
+    depends_on:
+      - postgres
+      - redis
+    command: celery -A config worker -l info
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.production
+
+  # ========== Celery Beat (زمان‌بندی کارها) ==========
+  celery_beat:
+    build: ./django_core
+    container_name: celery_beat
+    volumes:
+      - ./django_core:/app
+    env_file: .env
+    depends_on:
+      - postgres
+      - redis
+      - celery
+    command: celery -A config beat -l info
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.production
+
+  # ========== FastAPI ==========
+  fastapi:
+    build: ./fastapi_core
+    container_name: fastapi_core
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./fastapi_core:/app
+      - ./data:/data
+    env_file: .env
+    command: uvicorn main:app --host 0.0.0.0 --port 8001 --workers 2
+    depends_on:
+      - postgres
+
+  # ========== PostgreSQL (با pgvector برای RAG آینده) ==========
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: postgres_db
+    environment:
+      POSTGRES_DB: school_db
+      POSTGRES_USER: school_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    env_file: .env
+
+  # ========== Redis (کش و بروکر Celery) ==========
+  redis:
+    image: redis:7-alpine
+    container_name: redis_cache
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./data/redis:/data
+
+  # ========== MinIO (ذخیره‌سازی فایل - آماده‌سازی برای فاز ۹) ==========
+  minio:
+    image: minio/minio
+    container_name: minio_storage
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - ./data/minio:/data
+    env_file: .env
+    command: server /data --console-address ":9001"
+  
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama_server
+    ports:
+      - "11434:11434"
+    volumes:
+      - ./data/ollama:/root/.ollama  # ماندگاری مدل‌ها
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_KEEP_ALIVE=5m  # مدل را ۵ دقیقه در حافظه نگه دار
+    restart: unless-stopped
+    command: serve

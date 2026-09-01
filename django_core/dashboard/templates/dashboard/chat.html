@@ -1,0 +1,48 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}چت با هوش مصنوعی{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-header bg-primary text-white">
+        <h4>🤖 چت با هوش مصنوعی (اسناد مدرسه)</h4>
+    </div>
+    <div class="card-body">
+        <form method="post" class="mb-3">
+            {% csrf_token %}
+            <div class="input-group">
+                <input type="text" name="query" class="form-control" placeholder="سؤال خود را بپرسید..." required>
+                <button class="btn btn-primary" type="submit">ارسال</button>
+            </div>
+        </form>
+
+        {% if query %}
+        <div class="mt-3">
+            <div class="alert alert-secondary">
+                <strong>سؤال شما:</strong> {{ query }}
+            </div>
+
+            {% if error %}
+            <div class="alert alert-danger">{{ error }}</div>
+            {% else %}
+            <div class="alert alert-success">
+                <strong>پاسخ:</strong>
+                <p>{{ answer }}</p>
+            </div>
+
+            {% if sources %}
+            <div class="mt-2">
+                <strong>منابع مرتبط:</strong>
+                <ul class="list-group list-group-flush">
+                    {% for source in sources %}
+                    <li class="list-group-item">
+                        {{ source.title }} (شباهت: {{ source.similarity }})
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
