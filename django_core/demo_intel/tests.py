@@ -199,11 +199,23 @@ class StartConfigurationTests(TestCase):
     def test_demo_check_detects_pending_migrations_without_changing_anything(self):
         from django.db.migrations.recorder import MigrationRecorder
 
+        from django.db.migrations.loader import MigrationLoader
+
         Applied = MigrationRecorder.Migration
         self.assertEqual(preflight.pending_migrations(), [])
-        Applied.objects.filter(app="students", name__startswith="0008").delete()  # simulate a stale database
+        # Simulate a database that is exactly one migration behind: forget a migration that NOTHING depends on.
+        # (Removing a record below an applied dependent would make the history inconsistent, and the same-app
+        # leaf is not enough: another app may depend on it. A true leaf has no children at all.) Prefer the
+        # students migration, which is what the guard exists for; fall back to any project-app leaf.
+        graph = MigrationLoader(None, ignore_no_migrations=True).graph
+        true_leaves = sorted(key for key, node in graph.node_map.items() if not node.children
+                             and key[0] not in {"admin", "auth", "contenttypes", "sessions"})
+        self.assertTrue(true_leaves)
+        app, newest = next((k for k in true_leaves if k[0] == "students"), true_leaves[0])
+        expected = [f"{app}.{newest}"]
+        Applied.objects.filter(app=app, name=newest).delete()
         before = sorted(Applied.objects.values_list("app", "name"))
-        self.assertTrue(any(m.startswith("students.0008") for m in preflight.pending_migrations()))
+        self.assertEqual(preflight.pending_migrations(), expected)
         with override_settings(DATABASES=DEMO_DB):
             with self.assertRaises(CommandError) as ctx:
                 call_command("demo_check", verbosity=0)
@@ -216,7 +228,7 @@ class StartConfigurationTests(TestCase):
         self.assertLess(message.index("manage.py migrate"), message.index("--reseed"))  # safe option first
         # read-only: nothing was applied or recorded, and the check still reports the same backlog
         self.assertEqual(sorted(Applied.objects.values_list("app", "name")), before)
-        self.assertTrue(any(m.startswith("students.0008") for m in preflight.pending_migrations()))
+        self.assertEqual(preflight.pending_migrations(), expected)
 
     def test_settings_module_is_the_demo_one(self):
         self.assertEqual(settings.SETTINGS_MODULE if hasattr(settings, "SETTINGS_MODULE") else "config.settings.demo",
