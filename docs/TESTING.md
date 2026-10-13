@@ -2,7 +2,9 @@
 
 **CURRENT (Phase 1, verified 2026-10-12 inside the Docker Compose containers on rebuilt images):** **38 Django tests + 24 FastAPI tests** pass; `manage.py check` clean; `makemigrations --check --dry-run` reports no changes. Stdlib `unittest` / Django `TestCase` only (no new dependency). No CI yet (T-01). pytest remains DECISION REQUIRED (Phase 2).
 Environment of that run: Django 5.2.15, DRF 3.15.2, PyJWT 2.15.1 (Django image), FastAPI 0.111.0, pydantic 2.14.0, PyJWT 2.9.0, torch 2.0.1+cu117, Python 3.10.22, PostgreSQL 16 + pgvector 0.8.5 (Django tests run against PostgreSQL under `config.settings.production`).
-Commands (run from the repository root):
+**Single Django command (Phase 2.0, host virtualenv, SQLite, no Docker):** `scripts/run_tests.sh` runs `check`, `makemigrations --check --dry-run`, `test students dashboard` (development settings) and `test demo_intel` (demo settings), stopping at the first failure. Result 2026-10-13: check clean, no migration changes, 38 + 31 tests OK; `db.sqlite3`/`demo_db.sqlite3` mtimes unchanged. It does **not** cover FastAPI, PostgreSQL or Docker; those, and CI (T-01), stay deferred until the PostgreSQL/FastAPI verification gate.
+
+Docker commands (run from the repository root):
 - `docker compose exec -T django python manage.py check`
 - `docker compose exec -T django python manage.py makemigrations --check --dry-run`
 - `docker compose exec -T django python manage.py test students dashboard`
