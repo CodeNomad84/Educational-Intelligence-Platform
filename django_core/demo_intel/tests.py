@@ -196,6 +196,28 @@ class StartConfigurationTests(TestCase):
                     call_command("demo_check", verbosity=0)
                 call_command("demo_check", "--allow-stale", verbosity=0)
 
+    def test_demo_check_detects_pending_migrations_without_changing_anything(self):
+        from django.db.migrations.recorder import MigrationRecorder
+
+        Applied = MigrationRecorder.Migration
+        self.assertEqual(preflight.pending_migrations(), [])
+        Applied.objects.filter(app="students", name__startswith="0008").delete()  # simulate a stale database
+        before = sorted(Applied.objects.values_list("app", "name"))
+        self.assertTrue(any(m.startswith("students.0008") for m in preflight.pending_migrations()))
+        with override_settings(DATABASES=DEMO_DB):
+            with self.assertRaises(CommandError) as ctx:
+                call_command("demo_check", verbosity=0)
+        message = str(ctx.exception)
+        self.assertIn("unapplied migration", message)
+        self.assertIn("start_demo.sh --reseed", message)
+        self.assertIn("Nothing was changed", message)
+        self.assertIn("nothing will be run for you", message)
+        self.assertIn("DESTRUCTIVE", message)  # --reseed is presented as a data-resetting action, never run
+        self.assertLess(message.index("manage.py migrate"), message.index("--reseed"))  # safe option first
+        # read-only: nothing was applied or recorded, and the check still reports the same backlog
+        self.assertEqual(sorted(Applied.objects.values_list("app", "name")), before)
+        self.assertTrue(any(m.startswith("students.0008") for m in preflight.pending_migrations()))
+
     def test_settings_module_is_the_demo_one(self):
         self.assertEqual(settings.SETTINGS_MODULE if hasattr(settings, "SETTINGS_MODULE") else "config.settings.demo",
                          "config.settings.demo")

@@ -10,6 +10,11 @@ from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
 
+from django.db import IntegrityError, transaction
+from django.db.models import ProtectedError
+
+from schools.models import School, SchoolClass
+
 from .access import ADMIN, PARENT, TEACHER, roles_for, visible_students
 from .models import Student
 
@@ -146,3 +151,158 @@ class StudentApiAuthzTests(TestCase):
     def test_admin_can_manage(self):
         self.client.force_login(self.admin)
         self.assertEqual(self.client.get(self.detail(self.child_b)).status_code, 200)
+
+
+class StudentClassLinkTests(TestCase):
+    """C2 (proposal 0002): school_class is the source of truth; school and class_name are derived.
+
+    REQ: P2-REQ-18 (mirror, no auto-create), P2-REQ-05 (school key).
+    """
+
+    def setUp(self):
+        self.school = School.objects.create(name='School A', code='school-a')
+        self.other_school = School.objects.create(name='School B', code='school-b')
+        self.klass = SchoolClass.objects.create(school=self.school, title='10-A', academic_year='1404')
+        self.klass2 = SchoolClass.objects.create(school=self.school, title='10-B', academic_year='1404')
+        self.foreign = SchoolClass.objects.create(school=self.other_school, title='X-1')
+        self.student = make_student('0000000101')
+
+    def test_unlinked_student_keeps_legacy_free_text(self):
+        self.student.class_name = 'legacy text'
+        self.student.save()
+        self.student.refresh_from_db()
+        self.assertEqual((self.student.class_name, self.student.school_id, self.student.school_class_id),
+                         ('legacy text', None, None))
+
+    def test_linking_derives_school_and_mirrors_title(self):
+        self.student.school_class = self.klass
+        self.student.save()
+        self.student.refresh_from_db()
+        self.assertEqual(self.student.school_id, self.school.pk)
+        self.assertEqual(self.student.class_name, '10-A')
+
+    def test_class_name_text_is_overwritten_when_class_is_set(self):
+        self.student.class_name = 'typed by hand'
+        self.student.school_class = self.klass
+        self.student.save()
+        self.student.refresh_from_db()
+        self.assertEqual(self.student.class_name, '10-A')
+
+    def test_school_cannot_disagree_with_the_class(self):
+        self.student.school = self.other_school
+        self.student.school_class = self.klass
+        self.student.save()
+        self.student.refresh_from_db()
+        self.assertEqual(self.student.school_id, self.school.pk)
+
+    def test_changing_class_updates_both_derived_fields(self):
+        self.student.school_class = self.klass
+        self.student.save()
+        self.student.school_class = self.foreign
+        self.student.save()
+        self.student.refresh_from_db()
+        self.assertEqual((self.student.school_id, self.student.class_name), (self.other_school.pk, 'X-1'))
+
+    def test_clearing_class_keeps_school_and_last_mirror(self):
+        self.student.school_class = self.klass
+        self.student.save()
+        self.student.school_class = None
+        self.student.save()
+        self.student.refresh_from_db()
+        self.assertEqual((self.student.school_class_id, self.student.school_id, self.student.class_name),
+                         (None, self.school.pk, '10-A'))
+
+    def test_update_fields_with_school_class_persists_derived_fields(self):
+        self.student.school_class = self.klass
+        self.student.save(update_fields=['school_class'])
+        self.student.refresh_from_db()
+        self.assertEqual((self.student.school_id, self.student.class_name), (self.school.pk, '10-A'))
+
+    def test_update_fields_without_school_class_leaves_class_data_alone(self):
+        self.student.school_class = self.klass
+        self.student.save()
+        Student.objects.filter(pk=self.student.pk).update(class_name='drifted')
+        self.student.refresh_from_db()
+        self.student.grade = 9
+        self.student.save(update_fields=['grade'])
+        self.student.refresh_from_db()
+        self.assertEqual(self.student.class_name, 'drifted')  # only the requested column was written
+
+    def test_check_constraint_rejects_class_without_school(self):
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            Student.objects.bulk_create([Student(
+                first_name='B', last_name='Bulk', national_id='0000000102', grade=8, phone_number='0',
+                school_class=self.klass)])  # bulk_create bypasses save(): the database must refuse it
+
+    def test_class_and_school_with_students_cannot_be_deleted(self):
+        self.student.school_class = self.klass
+        self.student.save()
+        with self.assertRaises(ProtectedError):
+            self.klass.delete()
+        with self.assertRaises(ProtectedError):
+            self.school.delete()
+
+
+class StudentApiClassTests(TestCase):
+    """REQ: P2-REQ-18. API: class membership is set through school_class only."""
+
+    FIELDS = {'id', 'first_name', 'last_name', 'national_id', 'grade', 'phone_number', 'class_name',
+              'father_job', 'mother_job', 'parent_user', 'school', 'school_class', 'created_at', 'updated_at'}
+
+    def setUp(self):
+        self.admin = make_user('admin_a', ADMIN)
+        self.parent = make_user('parent_a', PARENT)
+        self.school = School.objects.create(name='School A', code='school-a')
+        self.klass = SchoolClass.objects.create(school=self.school, title='10-A')
+        self.closed = SchoolClass.objects.create(school=self.school, title='9-Z', is_active=False)
+        self.student = make_student('0000000201', self.parent)
+
+    def url(self):
+        return f'/api/students/{self.student.pk}/'
+
+    def patch(self, payload):
+        return self.client.patch(self.url(), payload, content_type='application/json')
+
+    def test_admin_sets_class_and_school_is_derived(self):
+        self.client.force_login(self.admin)
+        resp = self.patch({'school_class': self.klass.pk})
+        self.assertEqual(resp.status_code, 200, resp.content)
+        self.assertEqual((resp.json()['school'], resp.json()['class_name']), (self.school.pk, '10-A'))
+
+    def test_class_name_and_school_are_read_only(self):
+        self.client.force_login(self.admin)
+        other = School.objects.create(name='School B', code='school-b')
+        resp = self.patch({'class_name': 'hand typed', 'school': other.pk})
+        self.assertEqual(resp.status_code, 200)
+        self.student.refresh_from_db()
+        self.assertEqual((self.student.class_name, self.student.school_id), ('', None))
+
+    def test_inactive_or_unknown_class_is_rejected(self):
+        self.client.force_login(self.admin)
+        self.assertEqual(self.patch({'school_class': self.closed.pk}).status_code, 400)
+        self.assertEqual(self.patch({'school_class': 999999}).status_code, 400)
+
+    def test_admin_can_clear_class(self):
+        self.client.force_login(self.admin)
+        self.patch({'school_class': self.klass.pk})
+        self.assertEqual(self.patch({'school_class': None}).status_code, 200)
+        self.student.refresh_from_db()
+        self.assertIsNone(self.student.school_class_id)
+
+    def test_create_through_api_can_link_class(self):
+        self.client.force_login(self.admin)
+        resp = self.client.post('/api/students/', {
+            'first_name': 'N', 'last_name': 'New', 'national_id': '0000000202', 'grade': 10,
+            'phone_number': '0', 'school_class': self.klass.pk}, content_type='application/json')
+        self.assertEqual(resp.status_code, 201, resp.content)
+        self.assertEqual(Student.objects.get(national_id='0000000202').school_class_id, self.klass.pk)
+
+    def test_field_set_is_explicit_and_unchanged_plus_new_links(self):
+        self.client.force_login(self.admin)
+        self.assertEqual(set(self.client.get(self.url()).json()), self.FIELDS)
+        self.client.force_login(self.parent)
+        self.assertEqual(set(self.client.get(self.url()).json()), self.FIELDS)
+
+    def test_parent_cannot_change_class(self):
+        self.client.force_login(self.parent)
+        self.assertEqual(self.patch({'school_class': self.klass.pk}).status_code, 403)

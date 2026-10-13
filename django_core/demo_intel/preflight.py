@@ -24,6 +24,20 @@ def configuration_problems():
     return problems
 
 
+def pending_migrations():
+    """Names ('app.migration') of migrations in the code that are not applied to the active database.
+
+    Strictly read-only: it only reads the ``django_migrations`` table and the migration files. It never
+    applies a migration, writes to the database, or reseeds.
+    """
+    from django.db import connection
+    from django.db.migrations.executor import MigrationExecutor
+
+    executor = MigrationExecutor(connection)
+    plan = executor.migration_plan(executor.loader.graph.leaf_nodes())
+    return [f"{migration.app_label}.{migration.name}" for migration, _backwards in plan]
+
+
 def seed_date():
     """The day the demo data was seeded (derived from data: newest exam + smallest exam offset)."""
     newest = Grade.objects.order_by("-date").values_list("date", flat=True).first()

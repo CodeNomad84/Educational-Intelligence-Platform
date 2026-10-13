@@ -19,6 +19,20 @@ class Command(BaseCommand):
         if problems:
             raise CommandError("WRONG CONFIGURATION — refusing to run the demo: " + " ".join(problems))
         try:
+            pending = preflight.pending_migrations()
+        except OperationalError:
+            raise CommandError("Demo database is not initialised. Run: scripts/start_demo.sh --reseed")
+        if pending:
+            shown = ", ".join(pending[:5]) + (f" (+{len(pending) - 5} more)" if len(pending) > 5 else "")
+            raise CommandError(
+                f"DATABASE SCHEMA IS BEHIND THE CODE — {len(pending)} unapplied migration(s): {shown}. "
+                "Nothing was changed and nothing will be run for you. Options (you choose): "
+                "(1) keep the data and only apply the schema: "
+                "DJANGO_SETTINGS_MODULE=config.settings.demo python manage.py migrate ; "
+                "(2) WARNING — DESTRUCTIVE: scripts/start_demo.sh --reseed migrates AND DELETES every student, "
+                "grade, attendance row, observation, counseling note, intervention and demo_* user in "
+                "demo_db.sqlite3, then rebuilds the synthetic demo data.")
+        try:
             st = preflight.status()
         except OperationalError:
             raise CommandError("Demo database is not initialised. Run: scripts/start_demo.sh --reseed")

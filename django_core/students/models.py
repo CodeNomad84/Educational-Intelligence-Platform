@@ -29,6 +29,27 @@ class Student(models.Model):
         verbose_name="والدین (کاربر)"
     )
 
+    # School structure (ADR-0004). ``school_class`` is the source of truth for class membership;
+    # ``school`` is derived from it in save() and ``class_name`` is its deprecated, read-only mirror.
+    # Both are nullable: existing rows stay unlinked until the C3 data migration.
+    school = models.ForeignKey(
+        'schools.School',
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        editable=False,
+        related_name='students',
+        verbose_name="مدرسه",
+    )
+    school_class = models.ForeignKey(
+        'schools.SchoolClass',
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='students',
+        verbose_name="کلاس (ساختار مدرسه)",
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -36,9 +57,34 @@ class Student(models.Model):
         verbose_name = "دانش‌آموز"
         verbose_name_plural = "دانش‌آموزان"
         ordering = ['grade', 'last_name', 'first_name']
+        constraints = [
+            # A class link without a school is never valid. (Equality of school and class.school
+            # is a cross-table rule: enforced in save() and re-checked by the access layer.)
+            models.CheckConstraint(
+                condition=models.Q(school_class__isnull=True) | models.Q(school__isnull=False),
+                name='student_class_requires_school',
+            ),
+        ]
 
     def __str__(self):
         return f"{self.first_name} {self.last_name} - {self.get_grade_display()}"
+
+    def save(self, *args, **kwargs):
+        """Keep ``school`` and the ``class_name`` mirror consistent with ``school_class``.
+
+        With a class: ``school`` = class.school and ``class_name`` = class.title, always overwritten.
+        Without a class: nothing is derived; ``class_name`` keeps its legacy free text.
+        ``update_fields`` is extended so a partial save of ``school_class`` still persists both.
+        Bulk operations (``bulk_create``/``bulk_update``/``update``) bypass this method.
+        """
+        if self.school_class_id is not None:
+            klass = self.school_class
+            self.school_id = klass.school_id
+            self.class_name = klass.title
+            update_fields = kwargs.get('update_fields')
+            if update_fields is not None and {'school_class', 'school_class_id'} & set(update_fields):
+                kwargs['update_fields'] = set(update_fields) | {'school', 'class_name'}
+        super().save(*args, **kwargs)
 
 class Grade(models.Model):
     SUBJECT_CHOICES = [

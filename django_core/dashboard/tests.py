@@ -11,7 +11,9 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from config.service_auth import AUDIENCE, ISSUER, service_headers
+from schools.models import School, SchoolClass
 from students.access import ADMIN, PARENT, TEACHER
+from students.models import Student
 from students.tests import make_student, make_user
 
 
@@ -187,3 +189,58 @@ class ServiceTokenTests(TestCase):
                 resp = self.client.get(reverse('dashboard:library'))
         self.assertEqual(resp.status_code, 200)
         get.assert_not_called()
+
+
+class StudentFormClassSelectorTests(TestCase):
+    """C2: the add-student form selects an existing ACTIVE class; it never creates one.
+
+    REQ: P2-REQ-18.
+    """
+
+    def setUp(self):
+        self.admin = make_user('admin_a', ADMIN)
+        self.school = School.objects.create(name='School A', code='school-a')
+        self.klass = SchoolClass.objects.create(school=self.school, title='10-A')
+        self.closed = SchoolClass.objects.create(school=self.school, title='9-Z', is_active=False)
+        self.url = reverse('dashboard:student_add')
+        self.base = {'first_name': 'N', 'last_name': 'New', 'national_id': '0000000301', 'grade': 10,
+                     'phone_number': '0', 'father_job': '', 'mother_job': ''}
+
+    def test_form_offers_active_classes_only_and_no_free_text(self):
+        self.client.force_login(self.admin)
+        resp = self.client.get(self.url)
+        self.assertEqual(resp.status_code, 200)
+        form = resp.context['form']
+        self.assertNotIn('class_name', form.fields)
+        self.assertEqual(list(form.fields['school_class'].queryset), [self.klass])
+        self.assertFalse(form.fields['school_class'].required)
+
+    def test_create_with_class_derives_school_and_mirror(self):
+        self.client.force_login(self.admin)
+        resp = self.client.post(self.url, {**self.base, 'school_class': self.klass.pk})
+        self.assertEqual(resp.status_code, 302)
+        student = Student.objects.get(national_id='0000000301')
+        self.assertEqual((student.school_class, student.school_id, student.class_name),
+                         (self.klass, self.school.pk, '10-A'))
+
+    def test_create_without_class_is_allowed_and_creates_no_class(self):
+        self.client.force_login(self.admin)
+        before = SchoolClass.objects.count()
+        resp = self.client.post(self.url, {**self.base, 'class_name': 'typed text'})
+        self.assertEqual(resp.status_code, 302)
+        student = Student.objects.get(national_id='0000000301')
+        self.assertEqual((student.school_class_id, student.school_id, student.class_name), (None, None, ''))
+        self.assertEqual(SchoolClass.objects.count(), before)
+
+    def test_inactive_or_unknown_class_is_rejected(self):
+        self.client.force_login(self.admin)
+        for pk in (self.closed.pk, 999999):
+            resp = self.client.post(self.url, {**self.base, 'school_class': pk})
+            self.assertEqual(resp.status_code, 200, pk)  # form re-rendered with errors
+        self.assertFalse(Student.objects.filter(national_id='0000000301').exists())
+
+    def test_non_admin_cannot_create(self):
+        for user in (make_user('t', TEACHER), make_user('p', PARENT)):
+            self.client.force_login(user)
+            self.assertEqual(self.client.post(self.url, {**self.base, 'school_class': self.klass.pk}).status_code, 403)
+        self.assertFalse(Student.objects.filter(national_id='0000000301').exists())

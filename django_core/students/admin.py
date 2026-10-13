@@ -26,11 +26,25 @@ class AttendanceInline(admin.TabularInline):
 
 @admin.register(Student)
 class StudentAdmin(admin.ModelAdmin):
-    list_display = ['first_name', 'last_name', 'national_id', 'grade', 'class_name', 'phone_number', 'created_at']
-    list_filter = ['grade', 'class_name', 'created_at']
+    list_display = ['first_name', 'last_name', 'national_id', 'grade', 'school_class', 'class_name',
+                    'phone_number', 'created_at']
+    list_filter = ['grade', 'school_class', 'class_name', 'created_at']
     search_fields = ['first_name', 'last_name', 'national_id', 'phone_number']
-    readonly_fields = ['created_at', 'updated_at']
-    
+    # class_name is the deprecated mirror of school_class and school is derived: neither is edited by hand.
+    readonly_fields = ['class_name', 'school', 'created_at', 'updated_at']
+
+    def get_form(self, request, obj=None, **kwargs):
+        request._student_being_edited = obj  # lets the class selector keep the current (maybe inactive) class
+        return super().get_form(request, obj, **kwargs)
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == 'school_class':
+            from django.db.models import Q
+            from schools.models import SchoolClass
+            current = getattr(getattr(request, '_student_being_edited', None), 'school_class_id', None)
+            kwargs['queryset'] = SchoolClass.objects.filter(Q(is_active=True) | Q(pk=current))
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
     # ✅ این خطوط را اضافه کنید تا Inlineها در صفحه‌ی دانش‌آموز نمایش داده شوند
     inlines = [GradeInline, AttendanceInline]
 
