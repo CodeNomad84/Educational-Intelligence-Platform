@@ -24,8 +24,12 @@
                 <hr class="bg-light">
                 <a href="{% url 'dashboard:dashboard' %}"><i class="bi bi-speedometer2"></i> داشبورد</a>
                 <a href="{% url 'dashboard:student_list' %}"><i class="bi bi-people"></i> دانش‌آموزان</a>
+                {# DEMO SCOPE begin — chat/library are disabled in Phase 1 (403); hidden in the demo #}
+                {% if not DEMO_MODE %}
                 <a href="{% url 'dashboard:chat' %}"><i class="bi bi-chat-dots"></i> چت با هوش مصنوعی</a>
                 <a href="{% url 'dashboard:library' %}"><i class="bi bi-book"></i> کتابخانه</a>
+                {% endif %}
+                {# DEMO SCOPE end #}
                 {% if user.is_superuser or user.groups.all.0.name == 'Admin' %}
                 <a href="{% url 'dashboard:upload_students' %}"><i class="bi bi-upload"></i> آپلود فایل</a>
                 {% endif %}

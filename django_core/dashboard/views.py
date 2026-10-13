@@ -24,6 +24,11 @@ def login_view(request):
             return redirect('dashboard:dashboard')
         else:
             messages.error(request, 'نام کاربری یا رمز عبور اشتباه است.')
+    # DEMO SCOPE begin — standalone demo login (vendored assets, DEMO banner); original template kept for non-demo runs
+    from django.conf import settings as _demo_settings
+    if getattr(_demo_settings, 'DEMO_MODE', False):
+        return render(request, 'demo_intel/login.html')
+    # DEMO SCOPE end
     return render(request, 'dashboard/login.html')
 
 # خروج از حساب
@@ -40,6 +45,12 @@ def dashboard_view(request):
             # School-wide aggregates are staff-only; parents see their own children.
             return redirect('dashboard:student_list')
         raise PermissionDenied
+    # DEMO SCOPE begin — demo school dashboard (only when config.settings.demo is active)
+    from django.conf import settings as _demo_settings
+    if getattr(_demo_settings, 'DEMO_MODE', False):
+        from demo_intel.views import school_dashboard
+        return school_dashboard(request)
+    # DEMO SCOPE end
     total_students = Student.objects.count()
     total_grades = Grade.objects.count()
     total_attendances = Attendance.objects.count()
@@ -75,6 +86,12 @@ def student_detail_view(request, pk):
     # Object-level access: the lookup is scoped to the students this user may see,
     # so another family's child is a 404 (not a 403, to avoid confirming it exists).
     student = get_object_or_404(visible_students(request.user), pk=pk)
+    # DEMO SCOPE begin — demo intelligence profile for staff (parents keep the original page)
+    from django.conf import settings as _demo_settings
+    if getattr(_demo_settings, 'DEMO_MODE', False) and ADMIN in roles_for(request.user):
+        from demo_intel.views import student_profile
+        return student_profile(request, student)
+    # DEMO SCOPE end
     grades = student.grades.all()
     attendances = student.attendances.all()
     

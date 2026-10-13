@@ -15,7 +15,11 @@
                 <p><strong>تعداد غیبت‌ها:</strong> {{ absences_count }}</p>
             </div>
             <div class="col-md-6">
+                {# DEMO SCOPE begin — no AI prediction button in the demo (FastAPI/ML are out of scope) #}
+                {% if not DEMO_MODE %}
                 <a href="?predict=true" class="btn btn-success w-100">🤖 پیش‌بینی وضعیت با هوش مصنوعی</a>
+                {% endif %}
+                {# DEMO SCOPE end #}
                 {% if prediction %}
                     {% if prediction.error %}
                         <div class="mt-3 alert alert-danger">

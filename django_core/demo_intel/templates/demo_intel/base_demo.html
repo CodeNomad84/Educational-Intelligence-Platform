@@ -1,0 +1,58 @@
+{# DEMO SCOPE — whole file. #}
+{% load static demo_extras %}<!DOCTYPE html>
+<html dir="rtl" lang="fa">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}داشبورد{% endblock %} — پلتفرم هوشمند مدرسه (نمایشی)</title>
+<link href="{% static 'demo_intel/vendor/bootstrap.rtl.min.css' %}" rel="stylesheet">
+<style>
+@font-face{font-family:Vazirmatn;src:url("{% static 'demo_intel/vendor/Vazirmatn-Regular.woff2' %}") format("woff2");font-weight:400}
+@font-face{font-family:Vazirmatn;src:url("{% static 'demo_intel/vendor/Vazirmatn-Bold.woff2' %}") format("woff2");font-weight:700}
+:root{--ink:#1f2a37;--muted:#6b7280;--bg:#f4f6fa;--card:#fff;--line:#e5e9f0;--brand:#2b5fd9;
+--high:#c0392b;--high-bg:#fdecea;--med:#b7791f;--med-bg:#fff4dc;--low:#2e7d4f;--low-bg:#e6f4ea}
+body{font-family:Vazirmatn,Tahoma,sans-serif;background:var(--bg);color:var(--ink)}
+.topbar{background:#12213f;color:#fff}
+.topbar a{color:#cfd8ea;text-decoration:none;padding:.9rem 1rem;display:inline-block;font-size:.95rem}
+.topbar a.active,.topbar a:hover{color:#fff;box-shadow:inset 0 -3px 0 #6aa0ff}
+.demo-banner{background:#fff7d6;border-bottom:1px solid #ecd78a;color:#6a5600;font-size:.85rem;padding:.35rem 1rem;text-align:center}
+.card{border:1px solid var(--line);border-radius:14px;box-shadow:0 1px 3px rgba(20,30,60,.05)}
+.card-header{background:transparent;font-weight:700;border-bottom:1px solid var(--line)}
+.kpi .v{font-size:2rem;font-weight:700;line-height:1.1}.kpi .l{color:var(--muted);font-size:.85rem}
+.lvl{display:inline-block;padding:.15rem .6rem;border-radius:999px;font-size:.8rem;font-weight:700}
+.lvl-HIGH{background:var(--high-bg);color:var(--high)}.lvl-MEDIUM{background:var(--med-bg);color:var(--med)}.lvl-LOW{background:var(--low-bg);color:var(--low)}
+.proto{border:1px dashed #8aa4d6;background:#eef3ff;color:#27428a;border-radius:10px;padding:.5rem .8rem;font-size:.85rem}
+.reason{border-right:4px solid var(--high);background:#fff;padding:.5rem .8rem;margin-bottom:.5rem;border-radius:8px}
+.reason.protective{border-right-color:var(--low)}
+.pts{font-size:.75rem;color:var(--muted)}
+.bar{height:10px;border-radius:6px;background:#e9edf5;overflow:hidden}.bar>span{display:block;height:100%}
+table.table td,table.table th{vertical-align:middle}
+.chartbox{position:relative;height:260px}
+</style>
+</head>
+<body>
+<div class="demo-banner">⚠ نسخهٔ نمایشی — تمام دانش‌آموزان و داده‌ها <strong>مصنوعی</strong> هستند. | DEMO — all data is synthetic</div>
+<div class="topbar">
+ <div class="container-fluid d-flex flex-wrap align-items-center px-4">
+  <strong class="ms-4">🏫 پلتفرم هوشمند مدرسه</strong>
+  <a href="{% url 'dashboard:dashboard' %}" class="{% if active == 'dashboard' %}active{% endif %}">داشبورد مدیریت</a>
+  <a href="{% url 'dashboard:demo_counselor' %}" class="{% if active == 'counselor' %}active{% endif %}">داشبورد مشاور</a>
+  <a href="{% url 'dashboard:demo_students' %}" class="{% if active == 'students' %}active{% endif %}">دانش‌آموزان</a>
+  <a href="{% url 'dashboard:demo_assistant' %}" class="{% if active == 'assistant' %}active{% endif %}">دستیار هوشمند (نمونه)</a>
+  <span class="me-auto"></span>
+  <span class="small text-white-50 ms-3">{{ user.username }}</span>
+  <a href="{% url 'dashboard:logout' %}">خروج</a>
+ </div>
+</div>
+<div class="container-fluid px-4 py-4">
+ {% block content %}{% endblock %}
+ <p class="text-center text-muted small mt-4 mb-0">{{ PROTOTYPE_LABEL_FA }}<br>{{ PROTOTYPE_LABEL_EN }}</p>
+</div>
+<script src="{% static 'demo_intel/vendor/bootstrap.bundle.min.js' %}"></script>
+<script src="{% static 'demo_intel/vendor/chart.umd.min.js' %}"></script>
+<script>
+if (window.Chart) { Chart.defaults.font.family = "Vazirmatn, Tahoma, sans-serif"; Chart.defaults.locale = "fa-IR"; }
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>
