@@ -7,7 +7,7 @@ Current phase: **Phase 2 — MVP productization (compressed roadmap approved by 
 | Sub-phase | Content | Level | Status |
 |---|---|---|---|
 | 2.0 | Preparation: file-mode normalization, single Django test command, dead settings removal, doc reconciliation, lightweight traceability (`TRACEABILITY.md`), ADR-0003/0004 drafts, Phase 2.1 proposal | L1 + docs | IN PROGRESS |
-| 2.1 | `School`, `SchoolClass`, `TeacherAssignment` (assigned in admin UI), Student→class relation, teacher object-level scoping | L3 | NOT STARTED (needs ADR-0003/0004 ACCEPTED + approved proposal) |
+| 2.1 | `School`, `SchoolClass`, `TeacherAssignment` (assigned in admin UI), Student→class relation, teacher object-level scoping | L3 | DESIGN APPROVED 2026-10-13 (ADR-0003/0004 ACCEPTED); C-1 scaffold archived; implementation commits C1–C6 not started; `TEACHER_ACCESS_REVIEW.md` required before C5 |
 | 2.2 | Teacher-scoped Student 360 read view | L2 | NOT STARTED |
 | 2.3 | Deterministic, config-driven rules in a separate `risk` domain | L2 | NOT STARTED |
 | 2.4 | Alert + human review (acknowledge/dismiss with note) + minimal audit entry | L2 | NOT STARTED |

@@ -1,6 +1,6 @@
 # CHANGE PROPOSAL — Phase 2.1: School, classes, teacher assignment, teacher object-level scoping
-Level: **L3** (authorization, schema, tenancy key) · Status: **DRAFT — not approved; nothing implemented** · Date: 2026-10-13
-Depends on: ADR-0003 and ADR-0004 marked ACCEPTED by the owner. Traceability: P2-REQ-02, 03, 04, 05 (`TRACEABILITY.md`).
+Level: **L3** (authorization, schema, tenancy key) · Status: **APPROVED WITH DECISIONS (design review 2026-10-13); implementation not started — see §15, which supersedes the open points in §4, §5 and §14** · Date: 2026-10-13
+Depends on: ADR-0003 and ADR-0004 (ACCEPTED 2026-10-13). Traceability: P2-REQ-02 – 05, 16 – 20 (`TRACEABILITY.md`).
 
 ## 1. Requirement
 A teacher must see only the students of classes assigned to them (list, detail, API), assignments are maintained by an administrator in the admin UI, and a School key exists so a second school can be added without a retrofit. Source: owner approval 2026-10-13; `SECURITY.md` matrix and S-04; ADR-0003/0004 drafts.
@@ -58,3 +58,27 @@ Data migration on messy `class_name` text (spelling variants create duplicate cl
 ## 14. Recommendation
 Approve after ADR-0003/0004 acceptance, in four small commits: 2.1a models + admin + migration (no behavior change); 2.1b data migration + report; 2.1c teacher scoping in `access.py` with tests; 2.1d docs. Alternatives: models inside `students` (smaller diff, weaker domain boundary); UUID keys (ERD alignment, higher cost).
 **DECISION REQUIRED:** (1) ADR-0003/0004 acceptance and the two open cells; (2) PK type; (3) new `schools` app vs `students`; (4) who may edit assignments; (5) subject-level assignment now or later (proposal: optional field, class-level scoping only).
+
+## 15. Final design and owner decisions (2026-10-13)
+**Decisions.** Scaffold preserved on archive branch before rewrite · integer PKs · tracked `schools` app · teachers never receive `national_id`, phone, parents' jobs or `parent_user` · `SchoolClass.is_active` kept · import/forms resolve existing active classes only (no auto-create) · admin staff manage assignments with explicit permissions · `auth.*` stays superuser-only · teacher may view risk indicators for assigned students and acknowledge alerts with notes; final intervention ownership belongs to a future Counselor role · `school_class` is the source of truth, `class_name` a deprecated mirror.
+
+**Models** (app `schools`). `School(name, code unique, timestamps)`; `SchoolClass(school PROTECT, title, academic_year blank, is_active, timestamps; unique school+academic_year+title)`; `TeacherAssignment(teacher → AUTH_USER_MODEL, school_class, subject blank informational, created_by SET_NULL, timestamps; unique teacher+class+subject; clean(): active user in group Teacher, active class)`. `Student` gains nullable `school` and `school_class` (both PROTECT); `save()` derives `school` from the class and mirrors `class_name`.
+
+**Migration.** `schools.0001` → `students` nullable FKs → data migration (default School from `DEFAULT_SCHOOL_NAME`; one class per distinct non-empty `class_name`, exact match after trim/whitespace collapse; near-duplicates reported, never merged; no assignments created) → read-only `check_class_links`. Rollback: `migrate students <prev>`, `migrate schools zero`, revert code; `class_name` untouched.
+
+**Commit boundaries.**
+| # | Commit | Behavior change |
+|---|---|---|
+| C-1 | archive branch `archive/scaffold-apps-2026-10-13` (`45218a7`) | none — DONE |
+| C0 | docs: ADR-0003/0004 ACCEPTED, decisions, traceability, roadmap | none |
+| C1 | `schools` app: models, migration, admin + validation, model tests | none |
+| C2 | `students`: nullable FKs, `save()` mirror, explicit serializer field lists, form/admin class selector | none for visibility |
+| C3 | data migration, `check_class_links`, import resolves existing classes, migration tests | none (no assignments) |
+| C4 | permission-grant command + admin-site tests | none |
+| **gate** | **`docs/TEACHER_ACCESS_REVIEW.md` written and reviewed by the owner** | — |
+| C5 | access change: `visible_students` Teacher branch, teacher serializer/templates/landing, permission tests, `/security-review` | **teacher scoping** |
+| C6 | docs: `SECURITY.md` matrix and S-04, MODULE_MAP, CHANGE_GUIDE `Verified-at`, TRACEABILITY tests, TESTING | none |
+
+Each commit is green on `scripts/run_tests.sh` and `makemigrations --check`. Teacher access appears only in C5, so C1–C4 revert cleanly.
+
+**Findings that shaped the design (CURRENT, 2026-10-13 inspection).** Login redirects a teacher to a 403 dashboard; `StudentSerializer` uses `fields='__all__'`; `search_fields` includes `national_id`; `base.html` tests only the first group; `student_list.html` shows the add-student button to every role; Django admin bypasses `visible_students()`; import and `StudentForm` only write `class_name`; no unscoped `Student.objects` path is reachable by a teacher; existing teacher tests (unassigned teacher) remain valid unchanged.

@@ -5,7 +5,7 @@ Rule: none of these is to be done unless it becomes required by a failing test o
 
 | # | Item | Why deferred | Revisit when |
 |---|---|---|---|
-| 1 | **Scaffold apps (C5)**: `academics`, `accounts`, `behavior`, `core`, `governance`, `interventions`, `risk`, `schools` | Present locally but untracked; not in `INSTALLED_APPS`; nothing imports them. | Phase 2 domain modelling, per an approved L2/L3 proposal. |
+| 1 | **Scaffold apps (C5)**: `academics`, `accounts`, `behavior`, `core`, `governance`, `interventions`, `risk`, `schools` | Present locally but untracked; not in `INSTALLED_APPS`; nothing imports them. | Phase 2 domain modelling, per an approved L2/L3 proposal. **2026-10-13:** all eight preserved verbatim on branch `archive/scaffold-apps-2026-10-13` (commit `45218a7`); `schools` is rewritten as a tracked app in 2.1 (C1), `risk` is activated in 2.3; the others stay inactive. |
 | 2 | **PostgreSQL verification** | Dev/demo run on SQLite. Migrations and FastAPI DB-role behaviour (`FASTAPI_DB_ROLE.md`) have not been verified against PostgreSQL in this pass. `NOT VERIFIED`. | Before any non-demo deployment. |
 | 3 | **FastAPI venv rebuild** | The existing FastAPI environment was not rebuilt or re-validated from `requirements.txt`. `NOT VERIFIED`. | Before the next FastAPI dependency change or deployment. |
 | 4 | **Dead `django_core/config/settings.py`** | A module and a `settings/` package share the name `config.settings`; the package wins, so the module is dead config. Left in place (no silent deletion). | **DONE in Phase 2.0** (`48e8e1f`): nothing referenced it; the package already won at import. |
