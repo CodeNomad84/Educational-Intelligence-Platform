@@ -30,7 +30,7 @@ Reported in `TESTING.md` from the 2026-10-12 Docker Compose run (NOT re-run toda
 ## Known limitations
 - FastAPI tests, PostgreSQL and Docker bring-up were not re-run in this closing pass (NOT VERIFIED today).
 - No CI (T-01). No real student data allowed until `SECURITY.md` exit criteria are met.
-- Teacher object-level scoping not implemented; dead `config/settings.py` still present.
+- Teacher object-level scoping not implemented. (Dead `config/settings.py` was removed afterwards in Phase 2.0, `48e8e1f`.)
 - Local dataset CSVs are blanked/unmatched to the official source; model is advisory-only.
 - Working notes and audit files remain untracked locally (`DEMO_STATUS`, `DEMO_READINESS_REVIEW`, `PHASE1_FINAL_VERIFICATION`, etc.).
 

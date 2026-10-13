@@ -1,13 +1,13 @@
 # MODULE MAP
 
-Verified-at: `3404a1a` + Phase 1 branch `phase-1/boot-security`; the commit `3404a1a` is from the owner's original repository history and is **not present in this repository** (0 commits as of 2026-10-12), so it cannot be resolved or diffed here. Paths re-checked against the working tree on 2026-10-12. Status labels: CURRENT / NOT YET IMPLEMENTED. Code wins over this file.
+Verified-at: `3404a1a` + Phase 1 branch `phase-1/boot-security`; the commit `3404a1a` is resolvable in this repository's history (verified 2026-10-13); Phase 1 closed at `4c096de`. Paths re-checked against the working tree on 2026-10-12. Status labels: CURRENT / NOT YET IMPLEMENTED. Code wins over this file.
 
 ## Django core — `django_core/`
 | Module | Path | Purpose / contents | Tests |
 |---|---|---|---|
 | Service auth (Phase 1) | `config/service_auth.py` | mints the Django→FastAPI service token | `dashboard/tests.py` (ServiceTokenTests) |
 | Access policy (Phase 1) | `students/access.py` (roles, `visible_students`), `dashboard/decorators.py` (`role_required`) | single source of role + object-scope rules | `students/tests.py`, `dashboard/tests.py` |
-| Settings/config | `config/` (`settings/{base,development,production}.py`, `urls.py`, `celery.py`, `wsgi.py`, `asgi.py`) | Project config. `config/settings.py` is shadowed by the `settings/` package (B-04) | none |
+| Settings/config | `config/` (`settings/{base,development,production}.py`, `urls.py`, `celery.py`, `wsgi.py`, `asgi.py`, plus `settings/demo.py` for DEMO SCOPE) | Project config. The former flat `config/settings.py` (shadowed, B-04) was removed in `48e8e1f` | none |
 | Students | `students/` — `models.py` (Student, Grade, Attendance), `views.py` (DRF `StudentViewSet`, import, features, predict), `serializers.py`, `permissions.py`, `tasks.py`, `migrations/0001–0006` | Operational student data & API at `/api/students/` | `tests.py` empty |
 | Dashboard | `dashboard/` — `views.py`, `urls.py`, `forms.py`, `models.py` (Homework, TeacherParentCommunication; no migrations, undefined imports — B-02), `templates/dashboard/*.html` | Server-rendered UI (login, student list/detail/form, chat, library) | `tests.py` empty |
 

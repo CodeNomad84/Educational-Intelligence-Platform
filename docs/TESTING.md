@@ -11,7 +11,7 @@ Docker commands (run from the repository root):
 - `docker compose exec -T fastapi python -m unittest discover -s tests -t .` (fakes torch and the RAG module, except `EmbeddingFailureTests`, which loads the real `rag_service.py` with only `ollama`/`psycopg2`/`pgvector` faked: it verifies routing, authentication, authorization and validation, not model loading)
 Live probes (not part of the suite, run 2026-10-12): role x route matrix against the running FastAPI, token-validation and cross-token probes, startup validation of `SERVICE_JWT_SECRET` with the real `main.py`, a Celery `debug_task` round trip, and the runbook verification SQL of `FASTAPI_DB_ROLE.md`.
 Superseded (historical, do not cite as current): the 2026-10-11 results of 31 Django and 14 FastAPI tests, run on the owner's machine and in a stubbed sandbox before the Round 2/3 policy changes.
-Not covered: a real Ollama embedding model (none pulled), RAG retrieval and document-level ACL (RAG is disabled in Phase 1), full browser flows, model quality (see `DATA_AND_ARTIFACTS.md`), GPU execution, and any historical comparison of test assertions (no baseline commit exists).
+Not covered: a real Ollama embedding model (none pulled), RAG retrieval and document-level ACL (RAG is disabled in Phase 1), full browser flows, model quality (see `DATA_AND_ARTIFACTS.md`), GPU execution, and any historical comparison of test assertions against `3404a1a` (now possible from `git log`; not performed).
 
 ## Pyramid (TARGET)
 Unit → integration/API → permission/RBAC → data integrity → AI/RAG evaluation → frontend → E2E → regression. Weight toward permission and API tests first.

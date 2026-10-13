@@ -42,7 +42,7 @@ Matrix cells above are interim containment, not approved policy: DECISION REQUIR
 | S-08 | FastAPI writes shared DB; `readonly` arg ignored | MEDIUM | PARTIAL: FastAPI now connects as least-privilege `fastapi_user` (SELECT, DELETE on `documents`; see `FASTAPI_DB_ROLE.md`); the `readonly` argument is still unused dead code |
 | S-09 | Upload validation weak (FastAPI no size cap, extension only) | MEDIUM | MITIGATED: ingestion routes are disabled for every role; validation itself not changed |
 | S-10 | No production hardening (SECURE_*, CSRF origins, CORS, static serving) | MEDIUM | NOT FIXED |
-| S-11 | Pickle model files committed | MEDIUM | PARTIAL: model artifacts are excluded from Git; they are still pickle-based and loaded with `torch.load` |
+| S-11 | Pickle model files committed | MEDIUM | PARTIAL: they are still pickle-based and loaded with `torch.load`. NOTE 2026-10-13: three artifacts are still tracked in the index (`fastapi_core/models/scaler.joblib`, `fastapi_core/models/student_risk_model.pth`, `fastapi_core/student_model.joblib`); see the deferred decision below |
 
 ## Critical Security Containment (Phase 1)
 Minimal changes, ahead of everything else: (A) authenticate + role-gate Django views and FastAPI routes, (B) block public exposure of FastAPI and data-store ports, (C) remove default secrets / require env config, (D) rotate any exposed secret (never rewrite history). Each is an L3 change needing approval.
@@ -86,4 +86,5 @@ CURRENT role mechanism: `NOT VERIFIED` beyond Django groups/permissions (S-04); 
 | Redis has no authentication | Mitigated only by not publishing the port. |
 | Torch | Stays `2.0.1+cu117`; CPU-wheel migration not approved. Image 8.26 GB; CUDA libraries unused. |
 | Hard-coded school-specific address `noreply@school.com` in `students/tasks.py` (unused task) | Observation; violates the "no hard-coded school-specific values" rule; not changed. |
-| Baseline commit | The repository has 0 commits; the owner creates the baseline commit after review. |
+| S-11 tracked model binaries | **DEFERRED by owner 2026-10-13.** The three files above stay untouched and uncommitted: content identical to the index (hash-verified), working tree differs only by file mode (`100755` vs `100644`), deliberately not normalized. Untracking, replacing the pickle format or purging history is a later owner decision; rotation/untracking only, never a history rewrite without authorization. |
+| Baseline commit | RESOLVED 2026-10-13: the Phase 1 work is committed (`3404a1a` … `4c096de`) on `phase-1/boot-security`; the repository history holds the baseline. |

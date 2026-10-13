@@ -1,6 +1,6 @@
 # SYSTEM MAP
 
-Derived from code at commit `3404a1a` (Verified-at); the commit `3404a1a` is from the owner's original repository history and is **not present in this repository** (0 commits as of 2026-10-12), so it cannot be resolved or diffed here. Phase 1 behavior was re-verified live in Docker Compose on 2026-10-12 (see `PHASE1_FINAL_VERIFICATION.md`). Code wins on disagreement. Start here to find where a feature lives.
+Derived from code at commit `3404a1a` (Verified-at); the commit `3404a1a` is resolvable in this repository's history (verified 2026-10-13); Phase 1 closed at `4c096de`. Phase 1 behavior was re-verified live in Docker Compose on 2026-10-12 (see `PHASE1_FINAL_VERIFICATION.md`). Code wins on disagreement. Start here to find where a feature lives.
 
 ## CURRENT (Phase 1: runs in Docker Compose; behavior verified 2026-10-12)
 ```

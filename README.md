@@ -3,9 +3,9 @@
 AI-native school platform for monitoring and supporting student growth, built around **Student 360**.
 AI is advisory; humans decide.
 
-> **Status: early prototype. Phase 1 fixes the known start-up blockers and contains the critical authorization holes, but full Docker/PostgreSQL bring-up is not yet verified. Must not hold real student data.** See `docs/SECURITY.md` and `docs/audit/STAGE0_BASELINE.md`. Copy `.env.example` to `.env` and set `SERVICE_JWT_SECRET` before running.
+> **Status: early prototype. Phase 1 fixes the known start-up blockers and contains the critical authorization holes, but PostgreSQL/FastAPI bring-up was last verified on 2026-10-12 and has not been re-run since (deferred verification gate). Must not hold real student data.** See `docs/SECURITY.md` and `docs/audit/STAGE0_BASELINE.md`. Copy `.env.example` to `.env` and set `SERVICE_JWT_SECRET` before running.
 
-## CURRENT (baseline commit `3404a1a` from the owner's original repository history — not present in this repository — plus Phase 1 changes on branch `phase-1/boot-security`)
+## CURRENT (baseline commit `3404a1a` plus Phase 1 changes on branch `phase-1/boot-security`, closed at `4c096de`; both are in this repository's history)
 - Django (`django_core/`): students API + server-rendered dashboard
 - FastAPI (`fastapi_core/`): RAG chat/documents, prototype risk model
 - PostgreSQL (pgvector), Redis, MinIO, Ollama via `docker-compose.yml`

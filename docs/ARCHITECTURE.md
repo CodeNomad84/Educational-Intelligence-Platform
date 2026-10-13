@@ -1,6 +1,6 @@
 # ARCHITECTURE
 
-Labels: CURRENT = verified at commit `3404a1a` (original repository history; not present in this repository) and re-verified in Docker on 2026-10-12; TARGET = intended. Defect details: `audit/STAGE0_BASELINE.md`.
+Labels: CURRENT = verified at commit `3404a1a` (resolvable in this repository's history) and re-verified in Docker on 2026-10-12; TARGET = intended. Defect details: `audit/STAGE0_BASELINE.md`.
 
 ## Established decisions (owner-approved; not reopened without an L3 proposal)
 1. Django = operational core (auth, RBAC, school entities, workflows, admin).
@@ -20,7 +20,7 @@ Labels: CURRENT = verified at commit `3404a1a` (original repository history; not
 - **Phase 1 (branch `phase-1/boot-security`, VERIFIED 2026-10-12 in Docker Compose on PostgreSQL 16 + pgvector with real Django 5.2.15 / DRF 3.15.2 / FastAPI 0.111.0 / torch 2.0.1+cu117; test results in `TESTING.md`):** the stack boots, migrations apply, Celery executes a task, authorization and disabled-RAG policy verified live. **NOT VERIFIED:** an embedding model (none pulled), RAG retrieval, GPU execution, a second-device LAN test. Frontend is Django templates, not React (DOC-01).
 - **DB ownership (CURRENT after Phase 1):** Django migrations own the `documents` table (`students/0007_rag_documents_table`, PostgreSQL only, idempotent; applied and re-run safely on PostgreSQL 16, verified 2026-10-12). FastAPI performs no DDL, connects as least-privilege `fastapi_user` (SELECT, DELETE; `FASTAPI_DB_ROLE.md`), and startup only checks the table exists.
 - **Service trust (CURRENT after Phase 1, interim, ADR-0002 PROPOSED):** Django sends FastAPI a 60-second HS256 token (`iss school-django`, `aud school-fastapi`, `sub`, `roles`) signed with env `SERVICE_JWT_SECRET` (no default; ≥32 chars; unset ⇒ fail closed). FastAPI authorizes by role. Symmetric shared secret; owner ratification DECISION REQUIRED.
-- Django and FastAPI share one database (S-08 unchanged: FastAPI still connects with a read/write role). The old FastAPI-managed schema (D-03, D-04) was removed in Phase 1; `students.Document` migration state vs. missing model (D-01) remains — DECISION REQUIRED.
+- Django and FastAPI share one database (S-08 unchanged: FastAPI still connects with a read/write role). The old FastAPI-managed schema (D-03, D-04) was removed in Phase 1; D-01 (`students.Document` migration state vs. missing model): the model was enabled in `c51ead2` and `makemigrations --check --dry-run` reports no changes (2026-10-13) — RESOLVED.
 
 ## TARGET
 - Single clear data-ownership model: Django owns operational data and migrations (ADR-0001 PROPOSED).

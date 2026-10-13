@@ -1,6 +1,6 @@
 # CHANGE GUIDE — "If I want to change X, where do I look?"
 
-Verified-at: `3404a1a` + Phase 1 branch `phase-1/boot-security`; the commit `3404a1a` is from the owner's original repository history and is **not present in this repository** (0 commits as of 2026-10-12), so it cannot be resolved or diffed here. Paths re-checked against the working tree on 2026-10-12. Rows marked NOT YET IMPLEMENTED have no location yet; classify via `CHANGE_PROCESS.md`. Any change touching auth/data is at least L2.
+Verified-at: `3404a1a` + Phase 1 branch `phase-1/boot-security`; the commit `3404a1a` is resolvable in this repository's history (verified 2026-10-13); Phase 1 closed at `4c096de`. Paths re-checked against the working tree on 2026-10-12. Rows marked NOT YET IMPLEMENTED have no location yet; classify via `CHANGE_PROCESS.md`. Any change touching auth/data is at least L2.
 
 | I want to change… | Look at | Notes |
 |---|---|---|
