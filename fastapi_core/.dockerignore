@@ -5,3 +5,6 @@ pycache/
 *.pyc
 
 .env
+
+.venv/
+.venv-win/
