@@ -8,8 +8,8 @@ Established decisions (Django core, FastAPI AI layer, PostgreSQL, React target, 
 |---|---|---|---|
 | 0001 | Service boundary & database ownership | PROPOSED (partly implemented in Phase 1) | 1 |
 | 0002 | Service-to-service authentication | PROPOSED (interim implemented in Phase 1) | 1 |
-| 0003 | Authorization model | DECISION REQUIRED | 2 |
-| 0004 | School scoping / tenant key | PROPOSED | 2–4 |
+| 0003 | Authorization model | PROPOSED (draft 2026-10-13; open cells DECISION REQUIRED) | 2 |
+| 0004 | School scoping / tenant key | PROPOSED (revised draft 2026-10-13; PK type DECISION REQUIRED) | 2–4 |
 | 0005 | Data layering & provenance | FUTURE — DEFERRED (no file yet; to be proposed in Phase 4) | 4 |
 | 0006 | React frontend mechanics | DEFERRED | 4/8 |
 | 0007 | RAG architecture | DEFERRED | 7 |
