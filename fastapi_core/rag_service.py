@@ -67,67 +67,29 @@ def get_db_connection(readonly=False):
         host=DB_HOST,
         port=DB_PORT
     )
-    conn.autocommit = True
-    cur = conn.cursor()
-    cur.execute("CREATE EXTENSION IF NOT EXISTS vector;")
-    cur.close()
-    conn.autocommit = False
+    # The pgvector extension is created by a Django migration (students/0007); no DDL here.
     register_vector(conn)
     return conn
 
-# ---------- توابع مدیریت جدول ----------
-def create_documents_table():
-    """ایجاد جدول با ابعاد پویا و ستون parent_id"""
+# ---------- بررسی جدول (فقط‌خواندنی) ----------
+def documents_table_exists() -> bool:
+    """Read-only check. The ``documents`` table is created by Django migrations
+    (students/0007_rag_documents_table); FastAPI never creates, alters or drops schema."""
     conn = get_db_connection()
-    cur = conn.cursor()
-
-    # بررسی وجود جدول
-    cur.execute("""
-        SELECT EXISTS (
-            SELECT 1 FROM information_schema.tables 
-            WHERE table_name = 'documents'
-        );
-    """)
-    table_exists = cur.fetchone()[0]
-
-    if table_exists:
-        # بررسی ابعاد فعلی
-        cur.execute("""
-            SELECT udt_name 
-            FROM information_schema.columns 
-            WHERE table_name = 'documents' AND column_name = 'embedding'
-        """)
-        col_type = cur.fetchone()[0]
-        if col_type and f"vector({EMBEDDING_DIM})" not in col_type:
-            logger.warning(f"⚠️ ابعاد بردار در جدول ({col_type}) با مدل ({EMBEDDING_DIM}) همخوانی ندارد. بازسازی جدول...")
-            cur.execute("DROP TABLE IF EXISTS documents CASCADE;")
-            table_exists = False
-
-    if not table_exists:
-        cur.execute(f"""
-            CREATE TABLE documents (
-                id SERIAL PRIMARY KEY,
-                parent_id TEXT,
-                title TEXT,
-                content TEXT,
-                embedding vector({EMBEDDING_DIM}),
-                metadata JSONB,
-                created_at TIMESTAMP DEFAULT NOW()
-            )
-        """)
-        cur.execute("""
-            CREATE INDEX IF NOT EXISTS documents_embedding_idx 
-            ON documents USING ivfflat (embedding vector_cosine_ops)
-        """)
-        conn.commit()
-        logger.info(f"✅ Table 'documents' created with dimension {EMBEDDING_DIM}!")
-    else:
-        logger.info(f"ℹ️ Table 'documents' already exists with correct dimension.")
-
-    cur.close()
-    conn.close()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT to_regclass('public.documents') IS NOT NULL")
+        exists = bool(cur.fetchone()[0])
+        cur.close()
+        return exists
+    finally:
+        conn.close()
 
 # ---------- توابع تولید بردار ----------
+class EmbeddingError(RuntimeError):
+    """The embedding model is unavailable. Never replaced by a placeholder vector."""
+
+
 def get_embedding(text: str) -> List[float]:
     try:
         response = client.embeddings(
@@ -137,8 +99,10 @@ def get_embedding(text: str) -> List[float]:
         )
         return response['embedding']
     except Exception as e:
+        # Log the cause server-side; raise a generic message so callers cannot store or search
+        # with a fake (zero) vector and API responses do not leak internals.
         logger.error(f"خطا در تولید embedding: {e}")
-        return [0.0] * EMBEDDING_DIM
+        raise EmbeddingError("Embedding model is unavailable.") from None
 
 # ---------- توابع مدیریت اسناد ----------
 def add_document(title: str, content: str, parent_id: str = None, metadata: Dict[str, Any] = None):
@@ -160,10 +124,12 @@ def add_document(title: str, content: str, parent_id: str = None, metadata: Dict
 def add_documents_batch(documents_list: List[Tuple[str, str, Dict, str]]):
     if not documents_list:
         return
+    # Embed everything BEFORE opening a DB connection: an embedding failure then raises without
+    # leaving a connection/transaction behind and without writing any row.
+    embeddings = [get_embedding(content) for _, content, _, _ in documents_list]
     conn = get_db_connection()
     cur = conn.cursor()
-    for title, content, metadata, parent_id in documents_list:
-        embedding = get_embedding(content)
+    for (title, content, metadata, parent_id), embedding in zip(documents_list, embeddings):
         cur.execute(
             """
             INSERT INTO documents (title, content, embedding, metadata, parent_id) 

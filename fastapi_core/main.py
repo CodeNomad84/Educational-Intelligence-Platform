@@ -6,11 +6,11 @@ import tempfile
 import logging
 from pathlib import Path
 
-from auth import verify_jwt
+from auth import require_roles, disabled_in_phase1, validate_service_secret, ADMIN
 import joblib
 import torch
 import numpy as np
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import Depends, FastAPI, HTTPException, UploadFile, File
 from pydantic import BaseModel
 from typing import Optional
 from fastapi import APIRouter
@@ -21,7 +21,7 @@ router_v1 = APIRouter(prefix="/api/v1")
 
 from rag_service import (
     chat,
-    create_documents_table,
+    documents_table_exists,
     add_document,
     add_documents_batch,
     get_all_documents,
@@ -55,11 +55,16 @@ app = FastAPI(title="School AI Platform", description="سرویس یکپارچه
 
 @app.on_event("startup")
 async def startup():
+    validate_service_secret()  # fail before serving traffic if the service-token secret is unusable
+    # FastAPI never creates or alters the schema: Django migrations own it (ADR-0001).
+    # This is a read-only check so a missing table is visible in the logs.
     try:
-        create_documents_table()
-        logger.info("✅ جدول اسناد با موفقیت ایجاد شد.")
+        if documents_table_exists():
+            logger.info("Table 'documents' found.")
+        else:
+            logger.error("Table 'documents' is missing. Run Django migrations (python manage.py migrate).")
     except Exception as e:
-        logger.error(f"❌ خطا در ایجاد جدول اسناد: {e}", exc_info=True)
+        logger.error(f"Could not check 'documents' table: {e}")
 
 # ---------- مدل‌های Pydantic ----------
 class ChatRequest(BaseModel):
@@ -105,7 +110,7 @@ async def read_root():
 
 @app.post("/predict/")
 @router_v1.post("/predict/")
-async def predict_risk(features: StudentFeatures, payload: dict = Depends(verify_jwt)):
+async def predict_risk(features: StudentFeatures, payload: dict = Depends(require_roles(ADMIN))):  # Teacher excluded until teacher->student assignment exists (S-04)
     try:
         input_data = np.array([[
             features.grade,
@@ -134,8 +139,7 @@ async def predict_risk(features: StudentFeatures, payload: dict = Depends(verify
 app.include_router(router_v1)
 
 @app.post("/chat/")
-@router_v1.get("/chat/")
-async def chat_endpoint(request: ChatRequest):
+async def chat_endpoint(request: ChatRequest, payload: dict = Depends(disabled_in_phase1)):  # RAG out of Phase 1 scope
     try:
         result = chat(request.query)
         return result
@@ -144,16 +148,16 @@ async def chat_endpoint(request: ChatRequest):
         raise HTTPException(status_code=500, detail=f"خطا در پردازش سؤال: {str(e)}")
 
 @app.post("/documents/")
-async def add_document_endpoint(request: DocumentRequest):
+async def add_document_endpoint(request: DocumentRequest, payload: dict = Depends(disabled_in_phase1)):  # ingestion disabled: no embedding model
     try:
-        add_document(request.title, request.content, request.metadata)
+        add_document(request.title, request.content, metadata=request.metadata)
         return {"status": "success", "message": "سند با موفقیت اضافه شد."}
     except Exception as e:
         logger.error(f"خطا در افزودن سند: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"خطا در افزودن سند: {str(e)}")
 
 @app.get("/documents/list/")
-async def list_documents(payload: dict = Depends(verify_jwt)):
+async def list_documents(payload: dict = Depends(require_roles(ADMIN))):  # document-level ACL not verified for other roles
     # فقط کاربران احراز هویت شده می‌توانند لیست اسناد را مشاهده کنند
     try:
         docs = get_all_documents()
@@ -163,7 +167,7 @@ async def list_documents(payload: dict = Depends(verify_jwt)):
         raise HTTPException(status_code=500, detail=f"خطا در دریافت لیست اسناد: {str(e)}")
 
 @app.get("/documents/search/")
-async def search_documents_endpoint(query: str, top_k: int = 3):
+async def search_documents_endpoint(query: str, top_k: int = 3, payload: dict = Depends(disabled_in_phase1)):  # embedding-based; RAG out of Phase 1 scope
     try:
         results = search_documents(query, top_k)
         return {
@@ -177,7 +181,7 @@ async def search_documents_endpoint(query: str, top_k: int = 3):
         raise HTTPException(status_code=500, detail=f"خطا در جستجوی اسناد: {str(e)}")
 
 @app.post("/upload-document/", response_model=UploadResponse)
-async def upload_document(file: UploadFile = File(...)):
+async def upload_document(file: UploadFile = File(...), payload: dict = Depends(disabled_in_phase1)):  # ingestion disabled: no embedding model
     try:
         logger.info(f"دریافت فایل: {file.filename}")
 
@@ -254,25 +258,29 @@ async def upload_document(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"خطا در پردازش فایل: {str(e)}")
 
 @app.delete("/documents/{doc_id}")
-async def delete_document_endpoint(doc_id: int, payload: dict = Depends(verify_jwt)):
+async def delete_document_endpoint(doc_id: int, payload: dict = Depends(require_roles(ADMIN))):
     try:
         deleted = delete_document(doc_id)
         if deleted:
             return {"status": "success", "message": "سند با موفقیت حذف شد."}
         else:
             raise HTTPException(status_code=404, detail="سند پیدا نشد.")
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"خطا در حذف سند: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"خطا در حذف سند: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal error while deleting the document.")
 
 @app.delete("/documents/parent/{parent_id}")
-async def delete_document_by_parent_endpoint(parent_id: str):
+async def delete_document_by_parent_endpoint(parent_id: str, payload: dict = Depends(require_roles(ADMIN))):
     try:
         deleted = delete_document_by_parent_id(parent_id)
         if deleted:
             return {"status": "success", "message": "فایل با موفقیت حذف شد."}
         else:
             raise HTTPException(status_code=404, detail="فایل پیدا نشد.")
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"خطا در حذف فایل: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"خطا در حذف فایل: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal error while deleting the file.")
