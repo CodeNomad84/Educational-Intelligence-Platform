@@ -7,7 +7,7 @@
 # Runs, in order, and stops at the first failure:
 #   1. manage.py check                           (config.settings.development)
 #   2. manage.py makemigrations --check --dry-run
-#   3. manage.py test students dashboard         (config.settings.development)
+#   3. manage.py test students dashboard schools (config.settings.development)
 #   4. manage.py test demo_intel                 (config.settings.demo)
 # Tests use throw-away in-memory SQLite databases; no .env file is read and no seed/reset runs.
 # Environment: PYTHON (interpreter; default django_core/.venv/bin/python, else python3).
@@ -29,7 +29,7 @@ run() {
 
 run config.settings.development check
 run config.settings.development makemigrations --check --dry-run
-run config.settings.development test students dashboard
+run config.settings.development test students dashboard schools
 run config.settings.demo test demo_intel
 
 echo
