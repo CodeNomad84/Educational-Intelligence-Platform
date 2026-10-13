@@ -1,0 +1,30 @@
+# MODULE MAP
+
+Verified-at: `3404a1a` + Phase 1 branch `phase-1/boot-security`; the commit `3404a1a` is from the owner's original repository history and is **not present in this repository** (0 commits as of 2026-10-12), so it cannot be resolved or diffed here. Paths re-checked against the working tree on 2026-10-12. Status labels: CURRENT / NOT YET IMPLEMENTED. Code wins over this file.
+
+## Django core — `django_core/`
+| Module | Path | Purpose / contents | Tests |
+|---|---|---|---|
+| Service auth (Phase 1) | `config/service_auth.py` | mints the Django→FastAPI service token | `dashboard/tests.py` (ServiceTokenTests) |
+| Access policy (Phase 1) | `students/access.py` (roles, `visible_students`), `dashboard/decorators.py` (`role_required`) | single source of role + object-scope rules | `students/tests.py`, `dashboard/tests.py` |
+| Settings/config | `config/` (`settings/{base,development,production}.py`, `urls.py`, `celery.py`, `wsgi.py`, `asgi.py`) | Project config. `config/settings.py` is shadowed by the `settings/` package (B-04) | none |
+| Students | `students/` — `models.py` (Student, Grade, Attendance), `views.py` (DRF `StudentViewSet`, import, features, predict), `serializers.py`, `permissions.py`, `tasks.py`, `migrations/0001–0006` | Operational student data & API at `/api/students/` | `tests.py` empty |
+| Dashboard | `dashboard/` — `views.py`, `urls.py`, `forms.py`, `models.py` (Homework, TeacherParentCommunication; no migrations, undefined imports — B-02), `templates/dashboard/*.html` | Server-rendered UI (login, student list/detail/form, chat, library) | `tests.py` empty |
+
+## AI layer — `fastapi_core/`
+| Module | Path | Purpose |
+|---|---|---|
+| API | `main.py` | chat, documents CRUD/search, upload, predict; role-protected (Phase 1) |
+| RAG | `rag_service.py` | embeddings/generation via Ollama; read-only table check, no DDL (Phase 1) |
+| Auth | `auth.py` | service-token verification, `require_roles`, `disabled_in_phase1` (chat/ingestion/search), `validate_service_secret` (startup); tests in `fastapi_core/tests/` |
+| Data pipeline / models | `data_pipeline.py`, `train_model.py`, `train_nn_model.py`, `models/`, `student_model.joblib` | prototype risk model (synthetic label — A-01) |
+| Config | `config.py` | empty |
+
+## Infrastructure
+`docker-compose.yml` (8 services; env files `.env`, `.env.service`, `.env.fastapi`, `.env.minio` — see `DATA_AND_ARTIFACTS.md`; DB role runbook `FASTAPI_DB_ROLE.md`), `django_core/Dockerfile`, `fastapi_core/Dockerfile`.
+
+## NOT YET IMPLEMENTED
+Student 360 · Rule engine · Risk events · Alerts · Interventions · Observations/Behavior · Parents/Classes entities · Audit log · Ingestion pipeline · React frontend · tests/CI.
+
+## Per-module template (use when a module is added)
+Purpose · Responsibility · Main files · Models · Services · APIs · Frontend · Dependencies · Inputs · Outputs · Tests · Related docs.

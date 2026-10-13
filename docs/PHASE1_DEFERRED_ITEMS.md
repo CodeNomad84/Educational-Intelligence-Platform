@@ -1,0 +1,15 @@
+# Phase 1 — Deferred Items
+
+Status label for every item: `DEFERRED` (consciously postponed; not blocking Phase 1 closure).
+Rule: none of these is to be done unless it becomes required by a failing test or a blocking issue.
+
+| # | Item | Why deferred | Revisit when |
+|---|---|---|---|
+| 1 | **Scaffold apps (C5)**: `academics`, `accounts`, `behavior`, `core`, `governance`, `interventions`, `risk`, `schools` | Present locally but untracked; not in `INSTALLED_APPS`; nothing imports them. | Phase 2 domain modelling, per an approved L2/L3 proposal. |
+| 2 | **PostgreSQL verification** | Dev/demo run on SQLite. Migrations and FastAPI DB-role behaviour (`FASTAPI_DB_ROLE.md`) have not been verified against PostgreSQL in this pass. `NOT VERIFIED`. | Before any non-demo deployment. |
+| 3 | **FastAPI venv rebuild** | The existing FastAPI environment was not rebuilt or re-validated from `requirements.txt`. `NOT VERIFIED`. | Before the next FastAPI dependency change or deployment. |
+| 4 | **Dead `django_core/config/settings.py`** | A module and a `settings/` package share the name `config.settings`; the package wins, so the module is dead config. Left in place (no silent deletion). | Next L1 cleanup, after confirming nothing references it. |
+| 5 | **Teacher assignment model** | Teacher → class/student scoping has no model yet; object-level teacher access cannot be fully enforced. `NOT YET IMPLEMENTED`. | Phase 2, together with the authorization matrix in `SECURITY.md`. |
+| 6 | **`.claude/commands/` missing** | `CLAUDE.md` §14 lists slash commands (`/propose-change`, …) but only `.claude/skills/` exists locally. | When the owner decides on the command set. |
+| 7 | **Untracked HuggingFace FastAPI variants** (`main_HuggingFace.py`, `rag_service_HuggingFace_Models.py`) | Experimental alternates; not reviewed for service-auth or ACL parity with the hardened files. | Only if the HuggingFace path is adopted (AI provider = L3). |
+| 8 | **CI (T-01)** | Explicitly out of scope for Phase 1 closure. | Phase 2. |
