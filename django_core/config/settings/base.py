@@ -66,6 +66,10 @@ LOGIN_URL = 'dashboard:login'
 # there is deliberately NO default. Empty/short value => service calls fail closed.
 SERVICE_JWT_SECRET = os.environ.get('SERVICE_JWT_SECRET', '')
 
+# Display name of the single default School row created by the class-link data migration (ADR-0004).
+# Deliberately neutral: a deployment must set the real school name here (or edit the School in the admin).
+DEFAULT_SCHOOL_NAME = os.environ.get('DEFAULT_SCHOOL_NAME', 'Default School')
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
