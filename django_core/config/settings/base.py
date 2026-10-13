@@ -3,7 +3,9 @@ import os
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
-SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-...')
+# No default: an empty key makes Django raise ImproperlyConfigured (fail closed).
+# development.py supplies a per-process key; production.py validates this one.
+SECRET_KEY = os.environ.get('SECRET_KEY', '')
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
 INSTALLED_APPS = [
@@ -54,6 +56,14 @@ MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Dashboard login page (namespaced URL). Without this, login_required redirects
+# to Django's default /accounts/login/, which does not exist.
+LOGIN_URL = 'dashboard:login'
+
+# Django -> FastAPI service trust (ADR-0002, interim). Read from the environment only;
+# there is deliberately NO default. Empty/short value => service calls fail closed.
+SERVICE_JWT_SECRET = os.environ.get('SERVICE_JWT_SECRET', '')
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (

@@ -1,3 +1,189 @@
-from django.test import TestCase
+"""Phase 1 tests for the server-rendered dashboard (S-01) and Django->FastAPI service tokens.
 
-# Create your tests here.
+All data is synthetic. Run with:  python manage.py test students dashboard
+"""
+import secrets
+from unittest import mock
+
+import jwt
+from django.core.exceptions import ImproperlyConfigured
+from django.test import TestCase, override_settings
+from django.urls import reverse
+
+from config.service_auth import AUDIENCE, ISSUER, service_headers
+from students.access import ADMIN, PARENT, TEACHER
+from students.tests import make_student, make_user
+
+
+class DashboardAuthzTests(TestCase):
+    def setUp(self):
+        self.parent_a = make_user('parent_a', PARENT)
+        self.parent_b = make_user('parent_b', PARENT)
+        self.teacher = make_user('teacher_a', TEACHER)
+        self.admin = make_user('admin_a', ADMIN)
+        self.nogroup = make_user('nogroup')
+        self.child_a = make_student('0000000001', self.parent_a, first='ChildA')
+        self.child_b = make_student('0000000002', self.parent_b, first='ChildB')
+
+    def url(self, name, *args):
+        return reverse(f'dashboard:{name}', args=args)
+
+    # -- unauthenticated --------------------------------------------------
+    def test_anonymous_redirected_to_login_everywhere(self):
+        for name, args in [('dashboard', ()), ('student_list', ()), ('student_detail', (self.child_a.pk,)),
+                           ('chat', ()), ('library', ()), ('student_add', ()), ('upload_students', ())]:
+            resp = self.client.get(self.url(name, *args))
+            self.assertEqual(resp.status_code, 302, name)
+            self.assertTrue(resp['Location'].startswith(reverse('dashboard:login')), name)
+
+    def test_anonymous_cannot_mutate(self):
+        for name in ('upload_document', 'delete_document'):
+            resp = self.client.post(self.url(name), {'parent_id': 'x'})
+            self.assertEqual(resp.status_code, 302)
+            self.assertTrue(resp['Location'].startswith(reverse('dashboard:login')))
+
+    # -- parent: own child allowed, other child denied -------------------
+    def test_parent_own_child_allowed(self):
+        self.client.force_login(self.parent_a)
+        self.assertEqual(self.client.get(self.url('student_detail', self.child_a.pk)).status_code, 200)
+
+    def test_parent_other_child_denied(self):
+        self.client.force_login(self.parent_a)
+        self.assertEqual(self.client.get(self.url('student_detail', self.child_b.pk)).status_code, 404)
+
+    def test_parent_list_shows_only_own_child(self):
+        self.client.force_login(self.parent_a)
+        resp = self.client.get(self.url('student_list'))
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(list(resp.context['students']), [self.child_a])
+
+    def test_parent_search_cannot_reveal_other_children(self):
+        self.client.force_login(self.parent_a)
+        resp = self.client.get(self.url('student_list'), {'search': '0000000002'})
+        self.assertEqual(list(resp.context['students']), [])
+
+    def test_parent_dashboard_redirects_to_own_list(self):
+        self.client.force_login(self.parent_a)
+        resp = self.client.get(self.url('dashboard'))
+        self.assertRedirects(resp, self.url('student_list'))
+
+    def test_parent_denied_staff_and_admin_pages(self):
+        self.client.force_login(self.parent_a)
+        for name in ('chat', 'library', 'student_add', 'upload_students'):
+            self.assertEqual(self.client.get(self.url(name)).status_code, 403, name)
+        self.assertEqual(self.client.post(self.url('upload_document')).status_code, 403)
+        self.assertEqual(self.client.post(self.url('delete_document'), {'parent_id': 'x'}).status_code, 403)
+
+    # -- unauthorized role (no recognised group) --------------------------
+    def test_user_without_role_denied(self):
+        self.client.force_login(self.nogroup)
+        for name, args in [('dashboard', ()), ('student_list', ()), ('student_detail', (self.child_a.pk,)),
+                           ('chat', ()), ('library', ()), ('student_add', ())]:
+            self.assertEqual(self.client.get(self.url(name, *args)).status_code, 403, name)
+
+    def test_teacher_predict_flag_on_unrelated_student_is_denied(self):
+        self.client.force_login(self.teacher)
+        with mock.patch('dashboard.views.requests.post') as post:
+            resp = self.client.get(self.url('student_detail', self.child_b.pk), {'predict': 'true'})
+        self.assertEqual(resp.status_code, 404)  # the student is not visible to a teacher
+        post.assert_not_called()
+
+    def test_unmapped_staff_roles_denied_everywhere(self):
+        for group in ('Mentor', 'Counselor', 'Manager'):
+            self.client.force_login(make_user(f'{group.lower()}_a', group))
+            for name, args in [('dashboard', ()), ('chat', ()), ('library', ()), ('student_add', ())]:
+                self.assertEqual(self.client.get(self.url(name, *args)).status_code, 403, f'{group} {name}')
+            self.assertEqual(self.client.get(self.url('student_detail', self.child_a.pk)).status_code, 403, group)
+            self.assertEqual(self.client.post(self.url('upload_document')).status_code, 403, group)
+
+    def test_chat_disabled_for_every_role_and_never_calls_ai(self):
+        root = make_user('root', is_superuser=True)
+        for user in (self.admin, root, self.teacher, self.parent_a, self.nogroup):
+            self.client.force_login(user)
+            with mock.patch('dashboard.views.requests.post') as post:
+                self.assertEqual(self.client.get(self.url('chat')).status_code, 403, user.username)
+                self.assertEqual(self.client.post(self.url('chat'), {'query': 'q'}).status_code, 403, user.username)
+            post.assert_not_called()
+
+    # -- staff ------------------------------------------------------------
+    def test_teacher_denied_student_data_and_documents(self):
+        # Teacher access to student data and document retrieval is disabled in Phase 1 (S-04).
+        self.client.force_login(self.teacher)
+        self.assertEqual(self.client.get(self.url('dashboard')).status_code, 403)
+        self.assertEqual(self.client.get(self.url('student_detail', self.child_b.pk)).status_code, 404)
+        self.assertEqual(list(self.client.get(self.url('student_list')).context['students']), [])
+        self.assertEqual(self.client.get(self.url('library')).status_code, 403)
+        self.assertEqual(self.client.get(self.url('chat')).status_code, 403)
+        self.assertEqual(self.client.get(self.url('student_add')).status_code, 403)
+        self.assertEqual(self.client.post(self.url('upload_document')).status_code, 403)
+        self.assertEqual(self.client.post(self.url('delete_document'), {'parent_id': 'x'}).status_code, 403)
+
+    def test_admin_can_create_student(self):
+        self.client.force_login(self.admin)
+        self.assertEqual(self.client.get(self.url('student_add')).status_code, 200)
+
+    def test_superuser_counts_as_admin(self):
+        root = make_user('root', is_superuser=True)
+        self.client.force_login(root)
+        self.assertEqual(self.client.get(self.url('student_add')).status_code, 200)
+
+    def test_logout_redirects_to_login(self):
+        self.client.force_login(self.parent_a)
+        resp = self.client.get(self.url('logout'))
+        self.assertRedirects(resp, reverse('dashboard:login'))
+
+    # -- predict is staff-only and never called for parents ---------------
+    def test_parent_predict_flag_does_not_call_ai_service(self):
+        self.client.force_login(self.parent_a)
+        with mock.patch('dashboard.views.requests.post') as post:
+            resp = self.client.get(self.url('student_detail', self.child_a.pk), {'predict': 'true'})
+        self.assertEqual(resp.status_code, 200)
+        post.assert_not_called()
+
+
+class ServiceTokenTests(TestCase):
+    def setUp(self):
+        self.secret = secrets.token_urlsafe(48)  # generated per run; never stored
+        self.teacher = make_user('teacher_a', TEACHER)
+        self.admin = make_user('admin_a', ADMIN)
+
+    def decode(self, headers):
+        token = headers['Authorization'].split(' ', 1)[1]
+        return jwt.decode(token, self.secret, algorithms=['HS256'], audience=AUDIENCE, issuer=ISSUER)
+
+    def test_token_carries_user_roles_and_expiry(self):
+        with override_settings(SERVICE_JWT_SECRET=self.secret):
+            claims = self.decode(service_headers(self.teacher))
+        self.assertEqual(claims['sub'], str(self.teacher.pk))
+        self.assertEqual(claims['roles'], [TEACHER])
+        self.assertLessEqual(claims['exp'] - claims['iat'], 60)
+
+    def test_missing_or_short_secret_fails_closed(self):
+        for value in ('', 'short'):
+            with override_settings(SERVICE_JWT_SECRET=value):
+                with self.assertRaises(ImproperlyConfigured):
+                    service_headers(self.teacher)
+
+    def test_weak_or_placeholder_secrets_fail_closed(self):
+        from django.conf import settings
+        weak = ['django-insecure-' + 'x' * 40, 'changeme' * 6, 'a' * 64, 'your-secret-key-' + 'Qz9' * 10,
+                settings.SECRET_KEY]
+        for value in weak:
+            with override_settings(SERVICE_JWT_SECRET=value):
+                with self.assertRaises(ImproperlyConfigured, msg=value[:8]):
+                    service_headers(self.teacher)
+
+    def test_library_admin_sends_token_and_survives_missing_secret(self):
+        self.client.force_login(self.admin)
+        fake = mock.Mock(status_code=200)
+        fake.json.return_value = {'documents': []}
+        with override_settings(SERVICE_JWT_SECRET=self.secret):
+            with mock.patch('dashboard.views.requests.get', return_value=fake) as get:
+                resp = self.client.get(reverse('dashboard:library'))
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn('Authorization', get.call_args.kwargs['headers'])
+        with override_settings(SERVICE_JWT_SECRET=''):
+            with mock.patch('dashboard.views.requests.get') as get:
+                resp = self.client.get(reverse('dashboard:library'))
+        self.assertEqual(resp.status_code, 200)
+        get.assert_not_called()

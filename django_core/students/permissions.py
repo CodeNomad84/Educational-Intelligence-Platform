@@ -15,10 +15,6 @@ class IsAdminUser(permissions.BasePermission):
             )
         )
 
-    def has_permission(self, request, view):
-        
-        return request.user and request.user.is_authenticated and request.user.groups.filter(name='Admin').exists()
-
 class IsTeacherUser(permissions.BasePermission):
     """فقط کاربرانی که در گروه Teacher هستند"""
     def has_permission(self, request, view):

@@ -7,6 +7,11 @@ from django.db.models import Avg
 from django.db import models
 from students.models import Student, Grade, Attendance
 import requests
+from django.core.exceptions import ImproperlyConfigured, PermissionDenied
+
+from config.service_auth import service_headers
+from students.access import ADMIN, TEACHER, PARENT, roles_for, visible_students
+from .decorators import role_required
 
 # صفحه‌ی ورود
 def login_view(request):
@@ -24,11 +29,17 @@ def login_view(request):
 # خروج از حساب
 def logout_view(request):
     logout(request)
-    return redirect('login')
+    return redirect('dashboard:login')
 
 # داشبورد اصلی (فقط کاربران لاگین‌شده)
 @login_required
 def dashboard_view(request):
+    roles = roles_for(request.user)
+    if ADMIN not in roles:  # school-wide aggregates: Admin only (teacher scoping unverified, S-04)
+        if PARENT in roles:
+            # School-wide aggregates are staff-only; parents see their own children.
+            return redirect('dashboard:student_list')
+        raise PermissionDenied
     total_students = Student.objects.count()
     total_grades = Grade.objects.count()
     total_attendances = Attendance.objects.count()
@@ -44,9 +55,9 @@ def dashboard_view(request):
     return render(request, 'dashboard/dashboard.html', context)
 
 # لیست دانش‌آموزان
-@login_required
+@role_required(ADMIN, TEACHER, PARENT)
 def student_list_view(request):
-    students = Student.objects.all()
+    students = visible_students(request.user)
     search_query = request.GET.get('search')
     if search_query:
         students = students.filter(
@@ -59,9 +70,11 @@ def student_list_view(request):
 # جزئیات یک دانش‌آموز + نمایش نتیجه‌ی پیش‌بینی
 # dashboard/views.py (قسمت student_detail_view)
 
-@login_required
+@role_required(ADMIN, TEACHER, PARENT)
 def student_detail_view(request, pk):
-    student = get_object_or_404(Student, pk=pk)
+    # Object-level access: the lookup is scoped to the students this user may see,
+    # so another family's child is a 404 (not a 403, to avoid confirming it exists).
+    student = get_object_or_404(visible_students(request.user), pk=pk)
     grades = student.grades.all()
     attendances = student.attendances.all()
     
@@ -109,16 +122,20 @@ def student_detail_view(request, pk):
     
     # ---------- ارسال درخواست به FastAPI ----------
     prediction_result = None
-    if request.GET.get('predict') == 'true':
+    if request.GET.get('predict') == 'true' and ADMIN in roles_for(request.user):  # Admin only (S-04)
         try:
             fastapi_url = "http://fastapi:8001/predict/"
-            response = requests.post(fastapi_url, json=input_data, timeout=5)
+            response = requests.post(
+                fastapi_url, json=input_data, headers=service_headers(request.user), timeout=5
+            )
             if response.status_code == 200:
                 prediction_result = response.json()
             else:
                 prediction_result = {
                     "error": f"خطا در سرویس AI: {response.status_code} - {response.text}"
                 }
+        except ImproperlyConfigured:
+            prediction_result = {"error": "سرویس AI پیکربندی نشده است."}
         except requests.exceptions.RequestException as e:
             prediction_result = {"error": f"خطا در ارتباط با سرویس AI: {str(e)}"}
 
@@ -134,29 +151,27 @@ def student_detail_view(request, pk):
     return render(request, 'dashboard/student_detail.html', context)
 
 # آپلود فایل (فقط ادمین)
-@login_required
+@role_required(ADMIN)
 def upload_students_view(request):
-    if not request.user.is_superuser and not request.user.groups.filter(name='Admin').exists():
-        messages.error(request, 'شما اجازه‌ی دسترسی به این بخش را ندارید.')
-        return redirect('dashboard')
-    
     if request.method == 'POST' and request.FILES.get('file'):
         # اینجا همان منطق import_students که قبلاً در API نوشته‌ایم را می‌توانیم صدا بزنیم
         # اما برای جلوگیری از تکرار کد، بهتر است از خود API استفاده کنیم (یا کد را کپی کنیم)
         # فعلاً برای سادگی، یک پیام موفقیت نمایش می‌دهیم:
         messages.success(request, 'فایل با موفقیت آپلود شد! (منطق پردازش اضافه خواهد شد)')
-        return redirect('upload_students')
+        return redirect('dashboard:upload_students')
     
     return render(request, 'dashboard/upload.html')
 
-@login_required
+@role_required()  # RAG chat is disabled for every role in Phase 1 (nobody holds an empty role set)
 def chat_view(request):
     if request.method == 'POST':
         query = request.POST.get('query')
         if query:
             try:
                 fastapi_url = "http://fastapi:8001/chat/"
-                response = requests.post(fastapi_url, json={"query": query}, timeout=30)
+                response = requests.post(
+                    fastapi_url, json={"query": query}, headers=service_headers(request.user), timeout=30
+                )
                 if response.status_code == 200:
                     result = response.json()
                     return render(request, 'dashboard/chat.html', {
@@ -166,6 +181,8 @@ def chat_view(request):
                     })
                 else:
                     error_msg = f"خطا در سرویس AI: {response.status_code}"
+            except ImproperlyConfigured:
+                error_msg = "سرویس AI پیکربندی نشده است."
             except requests.exceptions.RequestException as e:
                 error_msg = f"خطا در ارتباط با سرویس AI: {str(e)}"
             
@@ -176,7 +193,7 @@ def chat_view(request):
     
     return render(request, 'dashboard/chat.html')
 
-@login_required
+@role_required(ADMIN)  # document-level authorization is unverified for other roles
 def library_view(request):
     """
     صفحه‌ی کتابخانه: نمایش لیست اسناد و فرم آپلود
@@ -184,7 +201,9 @@ def library_view(request):
     # دریافت لیست اسناد از FastAPI (اختیاری)
     documents = []
     try:
-        response = requests.get("http://fastapi:8001/documents/list/", timeout=5)
+        response = requests.get(
+            "http://fastapi:8001/documents/list/", headers=service_headers(request.user), timeout=5
+        )
         if response.status_code == 200:
             documents = response.json().get('documents', [])
     except:
@@ -195,7 +214,7 @@ def library_view(request):
     }
     return render(request, 'dashboard/library.html', context)
 
-@login_required
+@role_required(ADMIN)
 def upload_document_view(request):
     if request.method != 'POST':
         return redirect('dashboard:library')
@@ -222,6 +241,7 @@ def upload_document_view(request):
         response = requests.post(
             "http://fastapi:8001/upload-document/",
             files=files,
+            headers=service_headers(request.user),
             timeout=3000  # افزایش timeout به ۳۰۰ ثانیه
         )
         
@@ -235,6 +255,8 @@ def upload_document_view(request):
             error_detail = response.json().get('detail', 'خطای ناشناخته')
             messages.error(request, f"خطا در آپلود: {error_detail}")
             
+    except ImproperlyConfigured:
+        messages.error(request, 'سرویس AI پیکربندی نشده است.')
     except requests.exceptions.Timeout:
         messages.error(request, 'زمان پردازش فایل بیش از حد مجاز بود. لطفاً فایل کوچک‌تری انتخاب کنید.')
     except requests.exceptions.RequestException as e:
@@ -242,7 +264,7 @@ def upload_document_view(request):
     
     return redirect('dashboard:library')
 
-@login_required
+@role_required(ADMIN)
 def delete_document_view(request):
     """حذف یک فایل (همه بخش‌ها) از کتابخانه"""
     if request.method != 'POST':
@@ -256,6 +278,7 @@ def delete_document_view(request):
     try:
         response = requests.delete(
             f"http://fastapi:8001/documents/parent/{parent_id}",
+            headers=service_headers(request.user),
             timeout=5
         )
         if response.status_code == 200:
@@ -263,6 +286,8 @@ def delete_document_view(request):
         else:
             error_detail = response.json().get('detail', 'خطای ناشناخته')
             messages.error(request, f'خطا در حذف فایل: {error_detail}')
+    except ImproperlyConfigured:
+        messages.error(request, 'سرویس AI پیکربندی نشده است.')
     except requests.exceptions.RequestException as e:
         messages.error(request, f'خطا در ارتباط با سرویس AI: {str(e)}')
     
@@ -271,7 +296,7 @@ def delete_document_view(request):
 
 from .forms import StudentForm
 
-@login_required
+@role_required(ADMIN)
 def student_create_view(request):
     """افزودن دانش‌آموز جدید"""
     if request.method == 'POST':

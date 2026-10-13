@@ -12,6 +12,9 @@ from django.db.models import Avg
 import requests
 from .serializers import StudentSerializer, FileUploadSerializer
 from .permissions import IsAdminUser  # فقط ادمین بتواند آپلود کند
+from django.core.exceptions import ImproperlyConfigured
+from config.service_auth import service_headers
+from .access import visible_students
 
 class StudentViewSet(viewsets.ModelViewSet):
     serializer_class = StudentSerializer
@@ -31,18 +34,8 @@ class StudentViewSet(viewsets.ModelViewSet):
         return [IsAdminUser()]
 
     def get_queryset(self):
-        # همان فیلترهای قبلی
-        user = self.request.user
-        if not user or not user.is_authenticated:
-            return Student.objects.none()
-        if user.groups.filter(name='Admin').exists():
-            return Student.objects.all()
-        if user.groups.filter(name='Teacher').exists():
-            return Student.objects.all()
-        if user.groups.filter(name='Parent').exists():
-            # در این مرحله، والدین فقط فرزندان خودشان را می‌بینند
-            return Student.objects.filter(parent_user=user)
-        return Student.objects.none()
+        # Deny by default; Admin/Teacher all, Parent only own children (see students/access.py)
+        return visible_students(self.request.user)
 
     # ✅ اکشن جدید برای آپلود فایل
     @action(detail=False, methods=['post'], url_path='import')
@@ -176,40 +169,6 @@ class StudentViewSet(viewsets.ModelViewSet):
                 {'error': f'خطا در پردازش فایل: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-    @action(detail=True, methods=['get'], url_path='predict')
-    def predict_status(self, request, pk=None):
-        """
-        دریافت اطلاعات یک دانش‌آموز و ارسال به FastAPI برای پیش‌بینی وضعیت
-        """
-        student = self.get_object()
-        
-        # در دنیای واقعی، اینجا باید میانگین نمرات و غیبت را از پایگاه داده محاسبه کنید.
-        # فعلاً برای تست، از داده‌های ساختگی استفاده می‌کنیم.
-        # بعداً که مدل‌های Grade و Attendance را ساختیم، این مقادیر واقعی می‌شوند.
-        
-        # داده‌های تستی (فرض می‌کنیم این دانش‌آموز نمره ۱۸ و ۱ جلسه غیبت دارد)
-        test_data = {
-            "avg_score": 18.0,
-            "absences": 1
-        }
-        
-        try:
-            # ارسال درخواست به FastAPI (از داخل شبکه‌ی Docker با نام سرویس)
-            fastapi_url = "http://fastapi:8001/predict/"
-            response = requests.post(fastapi_url, json=test_data, timeout=5)
-            response.raise_for_status()
-            result = response.json()
-            
-            return Response({
-                "student": f"{student.first_name} {student.last_name}",
-                "prediction_result": result
-            })
-            
-        except requests.exceptions.RequestException as e:
-            return Response(
-                {"error": f"خطا در ارتباط با سرویس هوش مصنوعی: {str(e)}"},
-                status=status.HTTP_503_SERVICE_UNAVAILABLE
-            )
     @action(detail=True, methods=['get'], url_path='features')
     def get_features(self, request, pk=None):
         student = self.get_object()
@@ -232,87 +191,46 @@ class StudentViewSet(viewsets.ModelViewSet):
             "completed_homework": 12    # از مدل Homework محاسبه شود
         }
         return Response(data)
-    
+
+    @action(detail=True, methods=['get'], url_path='predict')
     def predict_status(self, request, pk=None):
         student = self.get_object()
-        
-        # محاسبه‌ی میانگین نمرات دانش‌آموز (از تمام نمرات ثبت‌شده)
+
         grades = student.grades.all()
-        if grades.exists():
-            avg_score = grades.aggregate(Avg('score'))['score__avg']
-        else:
-            avg_score = 10.0  # مقدار پیش‌فرض در صورت نداشتن نمره
-        
-        # محاسبه‌ی تعداد غیبت‌های غیرموجه (غائب) - فرض می‌کنیم وضعیت 'absent' نشان‌دهنده‌ی غیبت است
-        absences_count = student.attendances.filter(status='absent').count()
-        
-        # داده‌های ورودی برای FastAPI
+        attendances = student.attendances.all()
+        avg_score = grades.aggregate(Avg('score'))['score__avg'] or 0
+        total_absences = attendances.filter(status='absent').count()
+        total_lates = attendances.filter(status='late').count()
+        attendance_rate = 1 - (total_absences / (attendances.count() + 1))  # +1 avoids division by zero
+
+        # Placeholder constants kept as-is (Stage 0 A-02): not real homework/communication data.
         input_data = {
-            "avg_score": round(avg_score, 2),
-            "absences": absences_count
+            "grade": student.grade,
+            "attendance_rate": round(attendance_rate, 2),
+            "avg_completion_rate": 0.8,
+            "avg_exam_score": round(avg_score, 2),
+            "total_absences": total_absences,
+            "total_lates": total_lates,
+            "total_communications": 3,
+            "completed_homework": 12,
         }
-        
+
         try:
             fastapi_url = "http://fastapi:8001/predict/"
-            response = requests.post(fastapi_url, json=input_data, timeout=5)
+            response = requests.post(
+                fastapi_url, json=input_data, headers=service_headers(request.user), timeout=5
+            )
             response.raise_for_status()
             result = response.json()
-            
+
             return Response({
                 "student": f"{student.first_name} {student.last_name}",
                 "input_data": input_data,
                 "prediction_result": result
             })
-            
-        except requests.exceptions.RequestException as e:
+
+        except (requests.exceptions.RequestException, ImproperlyConfigured) as e:
             return Response(
-                {"error": f"خطا در ارتباط با سرویس هوش مصنوعی: {str(e)}"},
+                {"error": "خطا در ارتباط با سرویس AI"},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE
             )
-        
-    # students/views.py (در کلاس StudentViewSet)
-@action(detail=True, methods=['get'], url_path='predict')
-def predict_status(self, request, pk=None):
-    student = self.get_object()
-    
-    # محاسبه‌ی ویژگی‌های مورد نیاز (بر اساس داده‌های موجود)
-    grades = student.grades.all()
-    attendances = student.attendances.all()
-    # فرض می‌کنیم مدل‌های Homework و TeacherComment را هم اضافه کرده‌اید
-    # یا حداقل داده‌های مشابه را از مدل‌های موجود استخراج کنید
-    
-    avg_score = grades.aggregate(models.Avg('score'))['score__avg'] or 0
-    total_absences = attendances.filter(status='absent').count()
-    total_lates = attendances.filter(status='late').count()
-    attendance_rate = 1 - (total_absences / (attendances.count() + 1))  # +1 برای جلوگیری از تقسیم بر صفر
-    
-    # برای تکمیل ویژگی‌های دیگر، ممکن است نیاز به مدل‌های جدید داشته باشید
-    # فعلاً با داده‌های موجود، یک درخواست نمونه می‌سازیم
-    input_data = {
-        "grade": student.grade,
-        "attendance_rate": round(attendance_rate, 2),
-        "avg_completion_rate": 0.8,  # نمونه
-        "avg_exam_score": round(avg_score, 2),
-        "total_absences": total_absences,
-        "total_lates": total_lates,
-        "total_communications": 3,  # نمونه
-        "completed_homework": 12  # نمونه
-    }
-    
-    try:
-        fastapi_url = "http://fastapi:8001/predict/"
-        response = requests.post(fastapi_url, json=input_data, timeout=5)
-        response.raise_for_status()
-        result = response.json()
-        
-        return Response({
-            "student": f"{student.first_name} {student.last_name}",
-            "input_data": input_data,
-            "prediction_result": result
-        })
-        
-    except requests.exceptions.RequestException as e:
-        return Response(
-            {"error": f"خطا در ارتباط با سرویس AI: {str(e)}"},
-            status=status.HTTP_503_SERVICE_UNAVAILABLE
-        )

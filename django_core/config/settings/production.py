@@ -1,7 +1,25 @@
 from .base import *
 import os
 
+from django.core.exceptions import ImproperlyConfigured
+
+# DEBUG is fixed to False here on purpose: there is no environment override.
 DEBUG = False
+
+# Fail closed on a missing or placeholder SECRET_KEY (same policy as config/service_auth.py;
+# duplicated because that module needs configured settings at import time).
+_MIN_SECRET_LENGTH = 32
+_PLACEHOLDER_PREFIXES = ('django-insecure', 'changeme', 'change-me', 'change_me', 'your-', 'your_',
+                         'placeholder', 'example', 'secret', 'password', 'replace')
+if (
+    len(SECRET_KEY) < _MIN_SECRET_LENGTH
+    or SECRET_KEY.lower().startswith(_PLACEHOLDER_PREFIXES)
+    or len(set(SECRET_KEY)) < 10
+):
+    raise ImproperlyConfigured(
+        'SECRET_KEY is missing, too short (min %d characters) or a placeholder; production refuses to start.'
+        % _MIN_SECRET_LENGTH
+    )
 
 DATABASES = {
     'default': {
