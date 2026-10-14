@@ -40,7 +40,7 @@ Unsure? Classify upward. Never execute L3 without explicit approval.
 
 ## 7. Hard rules
 - Never read, print, edit or commit `.env` or secrets; never reproduce secret values found in code (cite file:line only). Rotation, not history rewrite.
-- Never run `git push`, force-push, rebase, `reset --hard`, `clean`, or rewrite history unless the owner explicitly authorizes it. Check `git status` before and `git diff` after work. One focused change per commit; no unrelated edits.
+- Never run `git push`, force-push, rebase, `reset --hard`, `clean`, or rewrite history or any command that writes to GitHub without the owner's explicit approval in chat for that specific action.. Check `git status` before and `git diff` after work. One focused change per commit; no unrelated edits.
 - Do not bypass RBAC. New endpoints/views must declare authentication, role and object/school scope; add a permission test.
 - **NO REAL STUDENT DATA** in any environment until the security baseline exit criteria (`docs/SECURITY.md`) are met. Use synthetic data only.
 - Do not send student PII to external LLMs. Counseling data is never exposed to AI without an approved policy (`docs/AI_GOVERNANCE.md`).
