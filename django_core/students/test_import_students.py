@@ -11,10 +11,16 @@ Labels used below
   [KNOWN ISSUE - SEPARATE FIX]  pre-existing data-quality defects (owner decision D6: NOT part of C3c;
                 to be fixed in a separate approved change). They must stay exactly as they are in C3c.
 
-All data is synthetic. No production code is touched by this file.
+C3c-2 UPDATE: the tests labelled [C3c WILL CHANGE] were updated DELIBERATELY in the commit that integrated
+class resolution (each says what it recorded before). Every [KEEP] and [KNOWN ISSUE - SEPARATE FIX] test is
+untouched. The new integration tests are at the end of the file.
+
+All data is synthetic.
 Traceability: REQ: P2-REQ-18 (class_name is not authoritative), P2-REQ-17 (Admin-only management).
 """
 import io
+import json
+from unittest import mock
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
@@ -30,6 +36,7 @@ URL = '/api/students/import/'
 HEADER = 'first_name,last_name,national_id,grade,class_name,phone_number,father_job,mother_job'
 PERSIAN_HEADER = 'نام,نام خانوادگی,کد ملی,پایه,کلاس,شماره تماس,شغل پدر,شغل مادر'
 EXISTING_KEYS = {'status', 'created', 'updated', 'errors', 'total_rows'}
+NEW_KEYS = {'linked', 'preserved_links', 'class_blank', 'unmatched_classes', 'unmatched_classes_truncated'}
 
 
 def csv_upload(text, name='students.csv'):
@@ -126,7 +133,8 @@ class ImportHappyPathTests(ImportCase):
         data = resp.json()
         self.assertEqual({k: data[k] for k in EXISTING_KEYS},
                          {'status': 'success', 'created': 2, 'updated': 0, 'errors': [], 'total_rows': 2})
-        self.assertEqual(set(data), EXISTING_KEYS)  # [C3c WILL CHANGE]: exact key set today
+        # [C3c WILL CHANGE] was: set(data) == EXISTING_KEYS. C3c-2 adds keys and removes none.
+        self.assertEqual(set(data), EXISTING_KEYS | NEW_KEYS)
         ali = self.student('1234567890')
         self.assertEqual((ali.first_name, ali.last_name, ali.grade, ali.phone_number, ali.father_job,
                           ali.mother_job), ('Ali', 'Rezai', 9, '9120000001', 'Dr', 'Nurse'))
@@ -145,7 +153,11 @@ class ImportHappyPathTests(ImportCase):
         self.assertEqual(resp.status_code, 200, resp.content)
         self.assertEqual({k: resp.json()[k] for k in EXISTING_KEYS},
                          {'status': 'success', 'created': 1, 'updated': 0, 'errors': [], 'total_rows': 1})
-        self.assertEqual(self.student('1234567890').class_name, '9-A')
+        # [C3c WILL CHANGE] was: class_name == '9-A'. The import no longer writes class_name; no class '9-A'
+        # exists here, so it stays empty. The class column of the xlsx IS read: its value is reported.
+        self.assertEqual(self.student('1234567890').class_name, '')
+        self.assertEqual(resp.json()['unmatched_classes'],
+                         [{'row': 2, 'value': '9-A', 'reason': 'no_active_class'}])
 
     def test_existing_student_is_updated_by_national_id(self):
         old = self.make_existing('1234567890')
@@ -242,21 +254,27 @@ class ImportValidationTests(ImportCase):
 class ImportClassBehaviourTests(ImportCase):
     """[C3c WILL CHANGE] how the class column is handled today (class_name is written; nothing is linked)."""
 
-    def test_class_name_text_is_written_stripped_and_nothing_is_linked(self):
+    def test_matching_active_class_is_linked_and_class_name_is_derived_not_written(self):
+        """[C3c WILL CHANGE] was: class_name written (stripped) and nothing linked even with a matching
+        active class and a single School. Now the matching class is linked and class_name is its mirror."""
         school = self.one_school()
         klass = SchoolClass.objects.create(school=school, title='9-A')
-        self.post(csv_upload(f'{HEADER}\nAli,Rezai,1234567890,9,  9-A  ,9120000001,Dr,Nurse\n'))
+        resp = self.post(csv_upload(f'{HEADER}\nAli,Rezai,1234567890,9,  9-A  ,9120000001,Dr,Nurse\n'))
         s = self.student('1234567890')
-        self.assertEqual(s.class_name, '9-A')
-        self.assertIsNone(s.school_class_id)   # even though an active class '9-A' exists
-        self.assertIsNone(s.school_id)         # and exactly one School exists
-        self.assertEqual(klass.students.count(), 0)
+        self.assertEqual((s.school_class_id, s.school_id, s.class_name), (klass.pk, school.pk, '9-A'))
+        self.assertEqual(klass.students.count(), 1)
+        self.assertEqual((resp.json()['linked'], resp.json()['unmatched_classes']), (1, []))
 
-    def test_unlinked_existing_student_gets_the_file_class_text(self):
+    def test_unlinked_existing_student_keeps_class_name_and_is_reported_when_class_is_unknown(self):
+        """[C3c WILL CHANGE] was: class_name overwritten with the file text ('9-B'). Now class_name is left
+        alone, the student stays unlinked, gets the unique School, and the class is reported."""
+        school = self.one_school()
         old = self.make_existing('1234567890', class_name='legacy text')
-        self.post(csv_upload(f'{HEADER}\nAli,Rezai,1234567890,9,9-B,9120000001,Dr,Nurse\n'))
+        resp = self.post(csv_upload(f'{HEADER}\nAli,Rezai,1234567890,9,9-B,9120000001,Dr,Nurse\n'))
         old.refresh_from_db()
-        self.assertEqual((old.class_name, old.school_class_id), ('9-B', None))
+        self.assertEqual((old.class_name, old.school_class_id, old.school_id), ('legacy text', None, school.pk))
+        self.assertEqual(resp.json()['unmatched_classes'],
+                         [{'row': 2, 'value': '9-B', 'reason': 'no_active_class'}])
 
     def test_linked_student_keeps_the_link_and_the_mirror_discards_the_file_class(self):
         """[KEEP] the link is immutable. The file names ANOTHER class that really exists and is active, so a
@@ -286,11 +304,13 @@ class ImportClassBehaviourTests(ImportCase):
         self.assertEqual((linked.school_class_id, linked.school_id, linked.class_name),
                          (klass.pk, school.pk, 'X-1'))
 
-    def test_new_students_have_no_school_and_no_class(self):
-        self.one_school()
-        self.post(csv_upload(f'{HEADER}\nAli,Rezai,1234567890,9,9-A,9120000001,Dr,Nurse\n'))
+    def test_new_students_get_the_unique_school_but_no_class_when_unresolved(self):
+        """[C3c WILL CHANGE] was: school None. Decision D1: with exactly one School a new student gets it."""
+        school = self.one_school()
+        resp = self.post(csv_upload(f'{HEADER}\nAli,Rezai,1234567890,9,9-A,9120000001,Dr,Nurse\n'))
         s = self.student('1234567890')
-        self.assertEqual((s.school_id, s.school_class_id), (None, None))  # [C3c WILL CHANGE] school (D1)
+        self.assertEqual((s.school_id, s.school_class_id), (school.pk, None))
+        self.assertEqual(resp.json()['linked'], 0)   # assigning the School is not a class link
 
 
 class ImportKnownIssueTests(ImportCase):
@@ -308,20 +328,24 @@ class ImportKnownIssueTests(ImportCase):
         s = self.student('1234567890')
         self.assertEqual((s.phone_number, s.father_job, s.mother_job), ('', '', ''))
 
-    def test_missing_class_column_blanks_an_unlinked_students_class_name(self):
-        """[C3c WILL CHANGE] (not a D6 item) class_name stops being written by import in C3c-2."""
+    def test_missing_class_column_no_longer_blanks_an_unlinked_students_class_name(self):
+        """[C3c WILL CHANGE] was: class_name blanked to ''. The import no longer writes class_name. (The
+        blanking of phone and parent jobs, a D6 known issue, is a separate test above and is unchanged.)"""
         self.make_existing('1234567890', class_name='legacy text')
-        self.post(csv_upload('first_name,last_name,national_id,grade\nAli,Rezai,1234567890,9\n'))
-        self.assertEqual(self.student('1234567890').class_name, '')
+        resp = self.post(csv_upload('first_name,last_name,national_id,grade\nAli,Rezai,1234567890,9\n'))
+        self.assertEqual(self.student('1234567890').class_name, 'legacy text')
+        self.assertEqual((resp.json()['class_blank'], resp.json()['unmatched_classes']), (1, []))
 
     def test_blank_optional_cell_is_stored_as_the_text_nan(self):
         self.post(csv_upload(f'{HEADER}\nAli,Rezai,1234567890,9,9-A,9120000001,,Nurse\n'))
         self.assertEqual(self.student('1234567890').father_job, 'nan')
 
-    def test_blank_class_cell_is_stored_as_the_text_nan(self):
-        """[C3c WILL CHANGE] a blank class cell will no longer write anything (decision D9)."""
-        self.post(csv_upload(f'{HEADER}\nAli,Rezai,1234567890,9,,9120000001,Dr,Nurse\n'))
-        self.assertEqual(self.student('1234567890').class_name, 'nan')
+    def test_blank_class_cell_writes_nothing_and_is_not_reported(self):
+        """[C3c WILL CHANGE] was: class_name stored as the text 'nan'. Decision D9: a blank class cell is
+        counted in class_blank, writes nothing and is not an unmatched class."""
+        resp = self.post(csv_upload(f'{HEADER}\nAli,Rezai,1234567890,9,,9120000001,Dr,Nurse\n'))
+        self.assertEqual(self.student('1234567890').class_name, '')
+        self.assertEqual((resp.json()['class_blank'], resp.json()['unmatched_classes']), (1, []))
 
     def test_leading_zeros_of_numeric_looking_columns_are_lost(self):
         self.post(csv_upload(f'{HEADER}\nAli,Rezai,0123456789,9,9-A,09120000001,Dr,Nurse\n'))
@@ -335,3 +359,501 @@ class ImportKnownIssueTests(ImportCase):
         self.assertEqual((resp.json()['created'], resp.json()['errors']), (2, []))
         self.assertEqual(sorted(Student.objects.values_list('national_id', flat=True)),
                          ['1234567890.0', 'nan'])
+
+
+# =====================================================================================================
+# C3c-2 integration tests: class resolution during import (helper: students/class_resolution.py)
+# =====================================================================================================
+def nid(i):
+    return f'{1000000000 + i}'
+
+
+def line(national_id, grade, class_cell='', first='Ali', last='Rezai'):
+    return f'{first},{last},{national_id},{grade},{class_cell},9120000001,Dr,Nurse'
+
+
+def sheet(*lines):
+    return csv_upload(HEADER + '\n' + '\n'.join(lines) + '\n')
+
+
+class ClassImportCase(ImportCase):
+    def klass(self, school, title, **extra):
+        return SchoolClass.objects.create(school=school, title=title, **extra)
+
+    def member(self, national_id, grade, klass):
+        """An existing student already linked to ``klass`` (the model derives school and class_name)."""
+        return Student.objects.create(first_name='M', last_name='K', national_id=national_id, grade=grade,
+                                      phone_number='1', school_class=klass)
+
+    def structure(self):
+        return (School.objects.count(), SchoolClass.objects.count(),
+                sorted(SchoolClass.objects.values_list('pk', 'title', 'is_active', 'academic_year')))
+
+    def two_schools(self):
+        first = self.one_school('imp-a')
+        second = School.objects.create(code='imp-b', name='Second School')
+        return first, second
+
+
+class ImportClassResolutionTests(ClassImportCase):
+    def test_one_school_and_one_active_class_link_a_new_student(self):
+        school = self.one_school()
+        klass = self.klass(school, '9-A')
+        resp = self.post(sheet(line(nid(1), 9, ' 9-A ')))
+        data = resp.json()
+        s = self.student(nid(1))
+        self.assertEqual((s.school_id, s.school_class_id, s.class_name), (school.pk, klass.pk, '9-A'))
+        self.assertEqual((data['created'], data['linked'], data['preserved_links'], data['class_blank']),
+                         (1, 1, 0, 0))
+        self.assertEqual((data['unmatched_classes'], data['unmatched_classes_truncated']), ([], False))
+
+    def test_a_class_that_exists_only_in_another_school_is_never_selected(self):
+        first, second = self.two_schools()
+        self.klass(second, '9-A')
+        resp = self.post(sheet(line(nid(1), 9, '9-A')))
+        s = self.student(nid(1))
+        self.assertEqual((s.school_id, s.school_class_id), (None, None))
+        self.assertEqual(resp.json()['unmatched_classes'],
+                         [{'row': 2, 'value': '9-A', 'reason': 'no_unique_school'}])
+
+    def test_zero_schools_report_no_unique_school_and_still_import_the_student(self):
+        self.one_school()
+        School.objects.all().delete()
+        resp = self.post(sheet(line(nid(1), 9, '9-A')))
+        self.assertEqual((resp.status_code, resp.json()['created']), (200, 1))
+        s = self.student(nid(1))
+        self.assertEqual((s.school_id, s.school_class_id), (None, None))
+        self.assertEqual(resp.json()['unmatched_classes'],
+                         [{'row': 2, 'value': '9-A', 'reason': 'no_unique_school'}])
+        self.assertEqual(School.objects.count(), 0)   # the import never creates a School
+
+    def test_several_schools_report_no_unique_school_even_when_a_class_matches_in_each(self):
+        first, second = self.two_schools()
+        self.klass(first, '9-A')
+        self.klass(second, '9-A')
+        resp = self.post(sheet(line(nid(1), 9, '9-A')))
+        s = self.student(nid(1))
+        self.assertEqual((s.school_id, s.school_class_id), (None, None))
+        self.assertEqual([u['reason'] for u in resp.json()['unmatched_classes']], ['no_unique_school'])
+        self.assertEqual(resp.json()['linked'], 0)
+
+    def test_no_school_or_class_is_created_activated_or_changed_on_any_path(self):
+        school = self.one_school()
+        self.klass(school, '9-A')
+        self.klass(school, '9-Z', is_active=False)
+        self.member(nid(50), 10, self.klass(school, '10-A'))
+        before = self.structure()
+        self.post(sheet(line(nid(1), 9, '9-A'), line(nid(2), 9, '9-Z'), line(nid(3), 9, 'missing'),
+                        line(nid(4), 10, '10-A'), line(nid(5), 9, '10-A'), line(nid(6), 9, '')))
+        self.assertEqual(self.structure(), before)
+
+    def test_inactive_class_is_reported_not_linked_and_not_reactivated(self):
+        school = self.one_school()
+        closed = self.klass(school, '9-Z', is_active=False)
+        resp = self.post(sheet(line(nid(1), 9, '9-Z')))
+        self.assertIsNone(self.student(nid(1)).school_class_id)
+        closed.refresh_from_db()
+        self.assertFalse(closed.is_active)
+        self.assertEqual(resp.json()['unmatched_classes'], [{'row': 2, 'value': '9-Z', 'reason': 'inactive_class'}])
+
+    def test_unknown_class_is_no_active_class(self):
+        self.one_school()
+        resp = self.post(sheet(line(nid(1), 9, 'nowhere')))
+        self.assertEqual(resp.json()['unmatched_classes'],
+                         [{'row': 2, 'value': 'nowhere', 'reason': 'no_active_class'}])
+
+    def test_duplicate_normalized_active_titles_are_ambiguous(self):
+        school = self.one_school()
+        self.klass(school, '9-A', academic_year='1403')
+        self.klass(school, ' 9-A ', academic_year='1404')
+        resp = self.post(sheet(line(nid(1), 9, '9-A')))
+        self.assertIsNone(self.student(nid(1)).school_class_id)
+        self.assertEqual(resp.json()['unmatched_classes'], [{'row': 2, 'value': '9-A', 'reason': 'ambiguous'}])
+
+    def test_single_active_class_in_a_non_empty_academic_year_links_per_the_helper_policy(self):
+        school = self.one_school()
+        klass = self.klass(school, '9-A', academic_year='1404')
+        self.post(sheet(line(nid(1), 9, '9-A')))
+        self.assertEqual(self.student(nid(1)).school_class_id, klass.pk)
+
+    def test_two_active_classes_in_different_years_stay_ambiguous_whatever_their_order(self):
+        school = self.one_school()
+        self.klass(school, '9-A', academic_year='1404')
+        self.klass(school, '9-A', academic_year='')
+        resp = self.post(sheet(line(nid(1), 9, '9-A')))
+        self.assertEqual([u['reason'] for u in resp.json()['unmatched_classes']], ['ambiguous'])
+
+    def test_blank_class_cells_are_counted_not_reported(self):
+        self.one_school()
+        resp = self.post(sheet(line(nid(1), 9, ''), line(nid(2), 9, '   ')))
+        data = resp.json()
+        self.assertEqual((data['class_blank'], data['unmatched_classes'], data['linked']), (2, [], 0))
+        self.assertEqual(data['created'], 2)
+
+    def test_old_files_without_a_class_column_import_as_before(self):
+        school = self.one_school()
+        resp = self.post(csv_upload('first_name,last_name,national_id,grade\nAli,Rezai,1000000001,9\n'))
+        data = resp.json()
+        self.assertEqual((resp.status_code, data['created'], data['errors']), (200, 1, []))
+        self.assertEqual((data['class_blank'], data['unmatched_classes'], data['linked']), (1, [], 0))
+        self.assertEqual(self.student(nid(1)).school_id, school.pk)
+
+    def test_numeric_and_missing_class_cells_follow_class_text(self):
+        school = self.one_school()
+        klass = self.klass(school, '9')
+        head = ['first_name', 'last_name', 'national_id', 'grade', 'class_name', 'phone_number', 'father_job',
+                'mother_job']
+        resp = self.post(xlsx_upload([
+            head,
+            ['A', 'R', 1000000001, 9, 9, 9120000001, 'Dr', 'N'],       # integer cell
+            ['B', 'R', 1000000002, 9, 9.0, 9120000002, 'Dr', 'N'],     # whole float cell
+            ['C', 'R', 1000000003, 9, None, 9120000003, 'Dr', 'N'],    # genuinely missing cell
+            ['D', 'R', 1000000004, 9, 9.5, 9120000004, 'Dr', 'N'],     # not rounded to 9
+        ]))
+        data = resp.json()
+        self.assertEqual(self.student(nid(1)).school_class_id, klass.pk)
+        self.assertEqual(self.student(nid(2)).school_class_id, klass.pk)
+        self.assertIsNone(self.student(nid(3)).school_class_id)
+        self.assertIsNone(self.student(nid(4)).school_class_id)
+        self.assertEqual((data['linked'], data['class_blank']), (2, 1))
+        self.assertEqual(data['unmatched_classes'], [{'row': 5, 'value': '9.5', 'reason': 'no_active_class'}])
+
+
+class ImportExistingLinkTests(ClassImportCase):
+    def test_linked_student_keeps_class_school_and_mirror_and_is_not_reported(self):
+        school = self.one_school()
+        x = self.klass(school, 'X-1')
+        self.klass(school, 'Y-2')    # an existing ACTIVE class that the file names instead
+        self.member(nid(1), 9, x)
+        resp = self.post(sheet(line(nid(1), 9, 'Y-2'), line(nid(2), 9, 'does-not-exist')))
+        data = resp.json()
+        s = self.student(nid(1))
+        self.assertEqual((s.school_class_id, s.school_id, s.class_name), (x.pk, school.pk, 'X-1'))
+        self.assertEqual((data['preserved_links'], data['linked']), (1, 0))
+        self.assertEqual([u['row'] for u in data['unmatched_classes']], [3])   # row 2 (linked) not reported
+
+    def test_preserved_links_counts_students_not_rows(self):
+        school = self.one_school()
+        x = self.klass(school, 'X-1')
+        self.member(nid(1), 9, x)
+        self.member(nid(2), 9, x)
+        resp = self.post(sheet(line(nid(1), 9, 'X-1'), line(nid(1), 9, 'X-1'), line(nid(2), 9, ''),
+                               line(nid(3), 9, 'X-1')))
+        data = resp.json()
+        self.assertEqual((data['preserved_links'], data['linked'], data['class_blank']), (2, 1, 0))
+
+    def test_a_student_of_another_school_is_not_moved_or_linked(self):
+        """FK integrity makes this reachable only when the School set is mocked: the guard is defensive."""
+        first, second = self.two_schools()
+        klass = self.klass(first, '9-A')
+        Student.objects.create(first_name='S', last_name='K', national_id=nid(1), grade=9, phone_number='1',
+                               school=second)
+        with mock.patch('students.views.School.objects') as schools:
+            schools.values_list.return_value = [first.pk]    # pretend `first` is the only School
+            resp = self.post(sheet(line(nid(1), 9, '9-A')))
+        s = self.student(nid(1))
+        self.assertEqual((s.school_id, s.school_class_id), (second.pk, None))
+        self.assertEqual(resp.json()['unmatched_classes'],
+                         [{'row': 2, 'value': '9-A', 'reason': 'no_unique_school'}])
+        self.assertEqual(klass.students.count(), 0)
+
+    def test_existing_unlinked_student_without_a_school_gets_the_school_and_the_link(self):
+        school = self.one_school()
+        klass = self.klass(school, '9-A')
+        old = self.make_existing(nid(1), grade=9)
+        self.assertIsNone(old.school_id)
+        resp = self.post(sheet(line(nid(1), 9, '9-A')))
+        old.refresh_from_db()
+        self.assertEqual((old.school_id, old.school_class_id), (school.pk, klass.pk))
+        self.assertEqual((resp.json()['updated'], resp.json()['linked']), (1, 1))
+
+    def test_linked_counts_only_new_class_relationships_not_school_assignment(self):
+        school = self.one_school()
+        self.klass(school, '9-A')
+        resp = self.post(sheet(line(nid(1), 9, 'nowhere'), line(nid(2), 9, '')))
+        self.assertEqual(resp.json()['linked'], 0)
+        for i in (1, 2):
+            self.assertEqual(self.student(nid(i)).school_id, school.pk)
+            self.assertIsNone(self.student(nid(i)).school_class_id)
+
+
+class ImportGradeGuardTests(ClassImportCase):
+    def test_existing_grade_9_and_incoming_grade_10_block_the_link(self):
+        school = self.one_school()
+        x = self.klass(school, 'X')
+        self.member(nid(1), 9, x)
+        resp = self.post(sheet(line(nid(2), 10, 'X')))
+        self.assertIsNone(self.student(nid(2)).school_class_id)
+        self.assertEqual(resp.json()['unmatched_classes'], [{'row': 2, 'value': 'X', 'reason': 'grade_conflict'}])
+        self.assertEqual(resp.json()['created'], 1)   # the student itself is still imported
+
+    def test_two_incoming_rows_with_different_grades_block_every_link_to_that_class(self):
+        school = self.one_school()
+        self.klass(school, 'X')
+        resp = self.post(sheet(line(nid(1), 9, 'X'), line(nid(2), 10, 'X'), line(nid(3), 9, 'X')))
+        for i in (1, 2, 3):
+            self.assertIsNone(self.student(nid(i)).school_class_id, i)
+        self.assertEqual([(u['row'], u['reason']) for u in resp.json()['unmatched_classes']],
+                         [(2, 'grade_conflict'), (3, 'grade_conflict'), (4, 'grade_conflict')])
+
+    def test_row_order_does_not_change_the_decisions(self):
+        school = self.one_school()
+        x, y, z = self.klass(school, 'X'), self.klass(school, 'Y'), self.klass(school, 'Z')
+        self.member(nid(90), 9, x)
+        rows = [(nid(1), 9, 'X'), (nid(2), 10, 'X'), (nid(3), 9, 'Y'), (nid(4), 10, 'Y'), (nid(5), 11, 'Z')]
+        outcomes = []
+        for order in (rows, list(reversed(rows)), [rows[2], rows[4], rows[0], rows[3], rows[1]]):
+            Student.objects.filter(national_id__in=[r[0] for r in rows]).delete()
+            self.post(sheet(*[line(*row) for row in order]))
+            outcomes.append({r[0]: self.student(r[0]).school_class_id for r in rows})
+        self.assertEqual(outcomes[0], outcomes[1])
+        self.assertEqual(outcomes[0], outcomes[2])
+        self.assertEqual({k: v is not None for k, v in outcomes[0].items()},
+                         {nid(1): False, nid(2): False, nid(3): False, nid(4): False, nid(5): True})
+
+    def test_existing_members_with_inconsistent_grades_block_new_links(self):
+        school = self.one_school()
+        x = self.klass(school, 'X')
+        self.member(nid(1), 7, x)
+        self.member(nid(2), 8, x)
+        resp = self.post(sheet(line(nid(3), 7, 'X')))
+        self.assertIsNone(self.student(nid(3)).school_class_id)
+        self.assertEqual([u['reason'] for u in resp.json()['unmatched_classes']], ['grade_conflict'])
+
+    def test_a_changed_grade_of_a_linked_member_is_used_not_the_stored_one(self):
+        school = self.one_school()
+        x = self.klass(school, 'X')
+        self.member(nid(1), 9, x)
+        # the file moves the linked member to grade 10; a new grade-10 student then fits the class
+        resp = self.post(sheet(line(nid(1), 10, 'X'), line(nid(2), 10, 'X')))
+        self.assertEqual(self.student(nid(1)).grade, 10)
+        self.assertEqual(self.student(nid(1)).school_class_id, x.pk)      # link preserved
+        self.assertEqual(self.student(nid(2)).school_class_id, x.pk)      # no conflict: effective grades are {10}
+        self.assertEqual((resp.json()['linked'], resp.json()['preserved_links'], resp.json()['unmatched_classes']),
+                         (1, 1, []))
+
+    def test_a_changed_grade_of_a_linked_member_can_also_create_a_conflict(self):
+        school = self.one_school()
+        x = self.klass(school, 'X')
+        self.member(nid(1), 9, x)
+        # stored grade 9 would suit a grade-9 newcomer, but the member becomes grade 10 in this very file
+        resp = self.post(sheet(line(nid(1), 10, 'X'), line(nid(2), 9, 'X')))
+        self.assertEqual(self.student(nid(1)).school_class_id, x.pk)
+        self.assertIsNone(self.student(nid(2)).school_class_id)
+        self.assertEqual(resp.json()['unmatched_classes'], [{'row': 3, 'value': 'X', 'reason': 'grade_conflict'}])
+
+    def test_a_linked_students_other_class_never_becomes_a_proposed_link(self):
+        school = self.one_school()
+        x, y = self.klass(school, 'X'), self.klass(school, 'Y')
+        self.member(nid(1), 9, x)
+        # nid(1) is linked to X and names Y with grade 9; the grade-10 newcomer must still fit Y
+        resp = self.post(sheet(line(nid(1), 9, 'Y'), line(nid(2), 10, 'Y')))
+        self.assertEqual(self.student(nid(1)).school_class_id, x.pk)
+        self.assertEqual(self.student(nid(2)).school_class_id, y.pk)
+        self.assertEqual(resp.json()['unmatched_classes'], [])
+
+    def test_invalid_or_missing_grades_never_become_valid_grades(self):
+        school = self.one_school()
+        x = self.klass(school, 'X')
+        resp = self.post(sheet(line(nid(1), 'abc', 'X'), line(nid(2), '', 'X'), line(nid(3), 13, 'X'),
+                               line(nid(4), 9, 'X')))
+        data = resp.json()
+        self.assertEqual((data['created'], len(data['errors'])), (1, 3))
+        self.assertEqual(self.student(nid(4)).school_class_id, x.pk)   # the only valid row links, no conflict
+        self.assertFalse(Student.objects.filter(national_id__in=[nid(1), nid(2), nid(3)]).exists())
+
+    def test_duplicate_rows_of_one_student_with_the_same_class_link_it_once(self):
+        school = self.one_school()
+        x = self.klass(school, 'X')
+        resp = self.post(sheet(line(nid(1), 9, 'X'), line(nid(1), 9, 'X')))
+        data = resp.json()
+        self.assertEqual((data['created'], data['updated'], data['linked']), (1, 1, 1))
+        self.assertEqual(self.student(nid(1)).school_class_id, x.pk)
+
+    def test_duplicate_rows_naming_different_classes_are_ambiguous_and_not_linked(self):
+        school = self.one_school()
+        self.klass(school, 'X')
+        self.klass(school, 'Y')
+        resp = self.post(sheet(line(nid(1), 9, 'X'), line(nid(1), 9, 'Y')))
+        self.assertIsNone(self.student(nid(1)).school_class_id)
+        self.assertEqual([(u['row'], u['reason']) for u in resp.json()['unmatched_classes']],
+                         [(2, 'ambiguous'), (3, 'ambiguous')])
+
+    def test_duplicate_rows_with_different_grades_are_conservatively_not_linked(self):
+        school = self.one_school()
+        self.klass(school, 'X')
+        resp = self.post(sheet(line(nid(1), 9, 'X'), line(nid(1), 10, 'X')))
+        s = self.student(nid(1))
+        self.assertEqual((s.grade, s.school_class_id), (10, None))     # data semantics unchanged: last row wins
+        self.assertEqual([u['reason'] for u in resp.json()['unmatched_classes']], ['grade_conflict'] * 2)
+
+
+class ImportResponseContractTests(ClassImportCase):
+    def test_legacy_keys_keep_their_meaning_and_new_keys_are_present(self):
+        school = self.one_school()
+        self.klass(school, 'X')
+        self.make_existing(nid(2), grade=9)
+        data = self.post(sheet(line(nid(1), 9, 'X'), line(nid(2), 9, 'X'), line(nid(3), 'abc', 'X'))).json()
+        self.assertEqual(set(data), EXISTING_KEYS | NEW_KEYS)
+        self.assertEqual((data['status'], data['created'], data['updated'], data['total_rows']),
+                         ('success', 1, 1, 3))
+        self.assertEqual(len(data['errors']), 1)
+        self.assertTrue(data['errors'][0].startswith('ردیف 4:'))      # file row numbering is unchanged
+        self.assertEqual((data['linked'], data['preserved_links'], data['class_blank']), (2, 0, 0))
+
+    def test_unmatched_entries_carry_class_text_row_and_reason_only(self):
+        self.one_school()
+        resp = self.post(sheet(line(nid(1), 9, 'ghost-class', first='Zahra', last='Mohammadi')))
+        entries = resp.json()['unmatched_classes']
+        self.assertEqual(entries, [{'row': 2, 'value': 'ghost-class', 'reason': 'no_active_class'}])
+        dump = json.dumps(resp.json()['unmatched_classes'], ensure_ascii=False)
+        for personal in ('Zahra', 'Mohammadi', nid(1), '9120000001', 'Dr', 'Nurse'):
+            self.assertNotIn(personal, dump)
+
+    def test_the_unmatched_list_is_capped_at_200_with_a_truncation_flag(self):
+        self.one_school()
+        exactly = self.post(sheet(*[line(nid(i), 9, f'Q{i}') for i in range(200)])).json()
+        self.assertEqual((len(exactly['unmatched_classes']), exactly['unmatched_classes_truncated']), (200, False))
+        over = self.post(sheet(*[line(nid(1000 + i), 9, f'R{i}') for i in range(201)])).json()
+        self.assertEqual((len(over['unmatched_classes']), over['unmatched_classes_truncated']), (200, True))
+        self.assertEqual((over['unmatched_classes'][0]['row'], over['unmatched_classes'][-1]['row']), (2, 201))
+        self.assertEqual(over['created'], 201)   # truncation only affects the report, never the import
+
+    def test_long_class_values_are_truncated_in_the_report(self):
+        self.one_school()
+        resp = self.post(sheet(line(nid(1), 9, 'Z' * 150)))
+        self.assertEqual(len(resp.json()['unmatched_classes'][0]['value']), 100)
+
+    def test_unmatched_classes_do_not_stop_valid_rows_and_row_numbers_stay_compatible(self):
+        school = self.one_school()
+        x = self.klass(school, 'X')
+        resp = self.post(sheet(line(nid(1), 9, 'nope'), line(nid(2), 'abc', 'X'), line(nid(3), 9, 'X')))
+        data = resp.json()
+        self.assertEqual((data['created'], data['linked'], data['total_rows']), (2, 1, 3))
+        self.assertEqual([u['row'] for u in data['unmatched_classes']], [2])
+        self.assertEqual(len(data['errors']), 1)
+        self.assertTrue(data['errors'][0].startswith('ردیف 3:'))
+        self.assertEqual(self.student(nid(3)).school_class_id, x.pk)
+        self.assertIsNone(self.student(nid(1)).school_class_id)
+
+
+# =====================================================================================================
+# Write failures (C3c-2 review): decisions must rest on what is PERSISTED, and counters on what SUCCEEDED.
+# A failure is injected as a real database error (a SQLite trigger raises on the matching UPDATE/INSERT), so
+# the whole path runs: update_or_create, the per-row transaction, rollback, and the error report.
+# =====================================================================================================
+class ImportWriteFailureTests(ClassImportCase):
+    def fail_writes(self, national_id, event='UPDATE'):
+        from django.db import connection
+        name = f'imp_fail_{event.lower()}_{national_id}'
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"CREATE TRIGGER {name} BEFORE {event} ON students_student "
+                f"WHEN NEW.national_id = '{national_id}' "
+                f"BEGIN SELECT RAISE(ABORT, 'simulated write failure'); END;")
+        self.addCleanup(self._drop_trigger, name)
+
+    @staticmethod
+    def _drop_trigger(name):
+        from django.db import connection
+        with connection.cursor() as cursor:
+            cursor.execute(f'DROP TRIGGER IF EXISTS {name}')
+
+    def class_grades(self, klass):
+        return sorted(Student.objects.filter(school_class=klass).values_list('grade', flat=True))
+
+    def test_failed_write_of_a_linked_member_does_not_justify_new_links(self):
+        """The guard must not rely on a grade that was never stored (the reviewed failure mode)."""
+        school = self.one_school()
+        x = self.klass(school, 'X')
+        self.member(nid(1), 9, x)
+        self.fail_writes(nid(1), 'UPDATE')      # the member's grade change (9 -> 10) cannot be stored
+        resp = self.post(sheet(line(nid(1), 10, 'X'), line(nid(2), 10, 'X')))
+        data = resp.json()
+        member, newcomer = self.student(nid(1)), self.student(nid(2))
+        self.assertEqual((member.grade, member.school_class_id), (9, x.pk))     # unchanged, still linked
+        self.assertIsNone(newcomer.school_class_id)                              # NOT linked on a phantom grade
+        self.assertEqual(newcomer.grade, 10)                                     # the student itself is imported
+        self.assertEqual(self.class_grades(x), [9])                              # the class stays consistent
+        self.assertEqual((data['created'], data['updated'], data['linked']), (1, 0, 0))
+        self.assertEqual(len(data['errors']), 1)
+        self.assertTrue(data['errors'][0].startswith('ردیف 2:'))
+        self.assertEqual(data['unmatched_classes'], [{'row': 3, 'value': 'X', 'reason': 'grade_conflict'}])
+
+    def test_failed_write_of_a_linked_member_still_allows_links_that_fit_the_stored_grade(self):
+        school = self.one_school()
+        x = self.klass(school, 'X')
+        self.member(nid(1), 9, x)
+        self.fail_writes(nid(1), 'UPDATE')
+        resp = self.post(sheet(line(nid(1), 10, 'X'), line(nid(2), 9, 'X')))
+        self.assertEqual(self.student(nid(2)).school_class_id, x.pk)            # fits the persisted grade 9
+        self.assertEqual(self.class_grades(x), [9, 9])
+        self.assertEqual((resp.json()['linked'], resp.json()['unmatched_classes']), (1, []))
+
+    def test_preserved_links_counts_a_linked_student_whose_row_failed(self):
+        """Documented semantics: a linked student that appears in a valid row keeps its link, written or not."""
+        school = self.one_school()
+        x = self.klass(school, 'X')
+        self.member(nid(1), 9, x)
+        self.fail_writes(nid(1), 'UPDATE')
+        data = self.post(sheet(line(nid(1), 10, 'X'))).json()
+        self.assertEqual((data['preserved_links'], data['updated'], len(data['errors'])), (1, 0, 1))
+        self.assertEqual(self.student(nid(1)).school_class_id, x.pk)
+
+    def test_failed_insert_of_a_new_student_is_not_counted_and_leaves_nothing_behind(self):
+        school = self.one_school()
+        x = self.klass(school, 'X')
+        self.fail_writes(nid(2), 'INSERT')
+        data = self.post(sheet(line(nid(1), 9, 'X'), line(nid(2), 9, 'X'), line(nid(3), 9, 'X'))).json()
+        self.assertFalse(Student.objects.filter(national_id=nid(2)).exists())
+        self.assertEqual((data['created'], data['linked'], len(data['errors'])), (2, 2, 1))
+        self.assertTrue(data['errors'][0].startswith('ردیف 3:'))
+        self.assertEqual(self.class_grades(x), [9, 9])
+
+    def test_failed_update_of_an_unlinked_student_keeps_it_unlinked_unscored_and_uncounted(self):
+        school = self.one_school()
+        self.klass(school, 'X')
+        old = self.make_existing(nid(1), grade=8)
+        self.fail_writes(nid(1), 'UPDATE')
+        data = self.post(sheet(line(nid(1), 9, 'X'))).json()
+        old.refresh_from_db()
+        self.assertEqual((old.grade, old.school_id, old.school_class_id), (8, None, None))   # fully rolled back
+        self.assertEqual((data['linked'], data['updated'], len(data['errors'])), (0, 0, 1))
+
+    def test_a_link_created_after_planning_is_re_read_and_never_overwritten(self):
+        from students import views
+        school = self.one_school()
+        x, y = self.klass(school, 'X'), self.klass(school, 'Y')
+        self.make_existing(nid(1), grade=9)
+        real_plan = views._plan_class_links
+
+        def plan_then_someone_else_links(rows):
+            plan = real_plan(rows)   # decided: link nid(1) to X
+            Student.objects.filter(national_id=nid(1)).update(school=school, school_class=y, class_name='Y')
+            return plan
+
+        with mock.patch.object(views, '_plan_class_links', plan_then_someone_else_links):
+            data = self.post(sheet(line(nid(1), 9, 'X'))).json()
+        s = self.student(nid(1))
+        self.assertEqual((s.school_class_id, s.school_id), (y.pk, school.pk))    # the other link wins
+        self.assertEqual((data['linked'], data['updated']), (0, 1))
+
+
+class ImportLinkedStudentWriteTests(ClassImportCase):
+    """Review C: what the import may and may not write for a student that already has a class."""
+
+    def test_only_the_imported_fields_change_derived_fields_are_not_rewritten(self):
+        school = self.one_school()
+        x = self.klass(school, 'X-1')
+        self.klass(school, 'Y-2')
+        self.member(nid(1), 9, x)
+        # simulate drift of the derived mirror: if the import rewrote class_name/school it would show here
+        Student.objects.filter(national_id=nid(1)).update(class_name='drifted mirror')
+        before = Student.objects.values('school_id', 'school_class_id', 'created_at').get(national_id=nid(1))
+        resp = self.post(sheet(line(nid(1), 10, 'Y-2', first='Renamed')))
+        s = self.student(nid(1))
+        self.assertEqual((s.first_name, s.grade), ('Renamed', 10))                 # imported fields change
+        self.assertEqual((s.school_id, s.school_class_id, s.class_name),
+                         (before['school_id'], before['school_class_id'], 'drifted mirror'))
+        self.assertEqual(s.created_at, before['created_at'])
+        self.assertEqual((resp.json()['updated'], resp.json()['linked'], resp.json()['preserved_links']), (1, 0, 1))
