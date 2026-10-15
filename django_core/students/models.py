@@ -1,15 +1,12 @@
 from django.db import models
 from django.contrib.auth import get_user_model  # برای ارجاع به مدل User
 
-from schools.vocabulary import SUBJECT_CHOICES
+from schools.vocabulary import GRADE_CHOICES, SUBJECT_CHOICES
 
 User = get_user_model()
 
 class Student(models.Model):
-    GRADE_CHOICES = [
-        (7, 'هفتم'), (8, 'هشتم'), (9, 'نهم'),
-        (10, 'دهم'), (11, 'یازدهم'), (12, 'دوازدهم'),
-    ]
+    GRADE_CHOICES = GRADE_CHOICES  # shared vocabulary, defined in schools/vocabulary.py
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
     national_id = models.CharField(max_length=10, unique=True)

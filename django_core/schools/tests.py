@@ -70,7 +70,7 @@ class TeacherAssignmentValidationTests(TestCase):
         self.teacher = make_user("teacher_a", TEACHER)
 
     def assignment(self, **kw):
-        data = {"teacher": self.teacher, "school_class": self.klass}
+        data = {"teacher": self.teacher, "school_class": self.klass, "subject": "math"}
         data.update(kw)
         return TeacherAssignment(**data)
 

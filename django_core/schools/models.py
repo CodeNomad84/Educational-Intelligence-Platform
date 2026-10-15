@@ -10,6 +10,8 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 
+from .vocabulary import GRADE_CHOICES, SUBJECT_CHOICES
+
 
 class School(models.Model):
     """The school key (ADR-0004). Phase 2 runs with a single default row."""
@@ -34,6 +36,10 @@ class SchoolClass(models.Model):
     school = models.ForeignKey(School, on_delete=models.PROTECT, related_name="classes", verbose_name="مدرسه")
     title = models.CharField(max_length=50, verbose_name="عنوان کلاس")
     academic_year = models.CharField(max_length=20, blank=True, verbose_name="سال تحصیلی")
+    # Report/class-view attribute only (ADR-0004 amendment, owner D13): never the Grade Lead scope key,
+    # and not back-filled from students; legacy classes stay NULL until an admin sets it.
+    grade = models.PositiveSmallIntegerField(
+        choices=GRADE_CHOICES, null=True, blank=True, verbose_name="پایه")
     is_active = models.BooleanField(default=True, verbose_name="فعال")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -54,7 +60,7 @@ class SchoolClass(models.Model):
 
 
 class TeacherAssignment(models.Model):
-    """Links a teacher to a class. Scoping is class-level; ``subject`` is informational only."""
+    """Links a Subject Teacher to a class and a subject (vocabulary shared with ``Grade.subject``)."""
 
     teacher = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -68,7 +74,9 @@ class TeacherAssignment(models.Model):
         related_name="teacher_assignments",
         verbose_name="کلاس",
     )
-    subject = models.CharField(max_length=50, blank=True, verbose_name="درس")
+    # Access-relevant (ADR-0005 §3): same fixed vocabulary as Grade.subject. ``blank`` stays True so that
+    # legacy rows remain valid; clean() rejects a blank subject when a row is created.
+    subject = models.CharField(max_length=50, blank=True, choices=SUBJECT_CHOICES, verbose_name="درس")
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -104,6 +112,8 @@ class TeacherAssignment(models.Model):
         from students.access import TEACHER  # lazy: keeps role names in one place, avoids an import cycle
 
         errors = {}
+        if self._state.adding and not self.subject:
+            errors["subject"] = "درس باید انتخاب شود."
         if self.teacher_id:
             user = self.teacher
             if not user.is_active:
@@ -116,3 +126,74 @@ class TeacherAssignment(models.Model):
             errors["school_class"] = "کلاس غیرفعال است."
         if errors:
             raise ValidationError(errors)
+
+
+class GradeLeadAssignment(models.Model):
+    """Links a Grade Lead to one grade of one school for one academic year (ADR-0005 §2).
+
+    Scope key is ``Student.grade`` of the assignment's school, not ``SchoolClass.grade``. Nothing reads this
+    model yet: ``visible_students`` is unchanged until C5a, so creating a row grants no access.
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="grade_lead_assignments",
+        verbose_name="مربی پایه",
+    )
+    school = models.ForeignKey(
+        School, on_delete=models.PROTECT, related_name="grade_lead_assignments", verbose_name="مدرسه")
+    grade = models.PositiveSmallIntegerField(choices=GRADE_CHOICES, verbose_name="پایه")
+    academic_year = models.CharField(max_length=20, verbose_name="سال تحصیلی")
+    is_active = models.BooleanField(default=True, verbose_name="فعال")
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        editable=False,
+        related_name="+",
+        verbose_name="ثبت‌کننده",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "تخصیص مربی پایه"
+        verbose_name_plural = "تخصیص‌های مربی پایه"
+        ordering = ["school", "grade", "user"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "school", "grade", "academic_year"],
+                name="uniq_gradeleadassignment_user_school_grade_year",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.user} → {self.get_grade_display()} ({self.academic_year})"
+
+    def clean(self):
+        """Only an active, non-staff user in group ``GradeLead`` may be assigned (re-checked at query time in C5a)."""
+        from students.access import GRADE_LEAD  # lazy, same reason as TeacherAssignment.clean
+
+        errors = {}
+        if self.user_id:
+            user = self.user
+            if not user.is_active:
+                errors["user"] = "کاربر غیرفعال است."
+            elif user.is_staff or user.is_superuser:
+                errors["user"] = "حساب مدیریتی (staff/superuser) را نمی‌توان به‌عنوان مربی پایه تخصیص داد."
+            elif not user.groups.filter(name=GRADE_LEAD).exists():
+                errors["user"] = f"کاربر باید عضو گروه «{GRADE_LEAD}» باشد."
+        if self.academic_year is not None and not self.academic_year.strip():
+            errors["academic_year"] = "سال تحصیلی الزامی است."
+        if errors:
+            raise ValidationError(errors)
+
+    def year_warning(self):
+        """Non-blocking hint: no class of this school carries this academic year (typo or rollover not done)."""
+        if not (self.school_id and self.academic_year):
+            return None
+        if SchoolClass.objects.filter(school_id=self.school_id, academic_year=self.academic_year).exists():
+            return None
+        return f"هیچ کلاسی در این مدرسه با سال تحصیلی «{self.academic_year}» وجود ندارد."
