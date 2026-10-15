@@ -80,6 +80,8 @@ class AdminGrantTests(TestCase):
             ('schools', 'view_schoolclass'), ('schools', 'add_schoolclass'), ('schools', 'change_schoolclass'),
             ('schools', 'view_teacherassignment'), ('schools', 'add_teacherassignment'),
             ('schools', 'change_teacherassignment'), ('schools', 'delete_teacherassignment'),
+            ('schools', 'view_gradeleadassignment'), ('schools', 'add_gradeleadassignment'),
+            ('schools', 'change_gradeleadassignment'), ('schools', 'delete_gradeleadassignment'),
         })
         self.assertFalse(any(app in ('auth', 'students') for app, _ in got))
         self.assertIn('is_staff', text)
@@ -88,7 +90,7 @@ class AdminGrantTests(TestCase):
         admin_group = Group.objects.create(name=ADMIN)
         run('--grant-admin-assignments')
         run('--grant-admin-assignments')
-        self.assertEqual(admin_group.permissions.count(), 8)
+        self.assertEqual(admin_group.permissions.count(), 12)
         for name in STAFF:
             self.assertEqual(Group.objects.get(name=name).permissions.count(), 0)
 

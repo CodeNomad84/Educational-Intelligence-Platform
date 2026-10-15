@@ -22,6 +22,7 @@ ADMIN_ASSIGNMENT_GRANTS = {
     'school': ('view',),
     'schoolclass': ('view', 'add', 'change'),
     'teacherassignment': ('view', 'add', 'change', 'delete'),
+    'gradeleadassignment': ('view', 'add', 'change', 'delete'),
 }
 
 
