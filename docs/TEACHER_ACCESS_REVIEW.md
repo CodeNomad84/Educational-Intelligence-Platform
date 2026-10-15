@@ -30,6 +30,8 @@ A user may hold several roles; visibility is the **union** of the roles, but **a
 | Student detail page | shows grades and attendance of the student without subject filtering | `dashboard/views.py:84-170` |
 | API | `StudentViewSet` queryset = `visible_students`; filters/search include `national_id` | `students/views.py:174-193` |
 
+Note (2026-10-16): the v1 access-path table (17 paths) was replaced by this inspection. Its path 17, the unauthenticated debug route `/test-fastapi/`, was **removed** (owner-approved L2; regression test `RemovedDebugRouteTests`). No other unauthenticated data route exists in `config/urls.py`.
+
 ### What each capability needs
 
 | Capability | Needs | Gap |

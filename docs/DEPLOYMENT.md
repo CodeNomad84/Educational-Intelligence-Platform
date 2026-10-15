@@ -45,7 +45,7 @@ Internet ──443──> reverse proxy (TLS, HSTS, headers, rate limit)
 | `SECURE_HSTS_SECONDS` | start 3600, raise after verification; `INCLUDE_SUBDOMAINS` only if all subdomains are HTTPS | HSTS is hard to undo; stage it |
 | `SECURE_CONTENT_TYPE_NOSNIFF`, `X_FRAME_OPTIONS='DENY'`, referrer policy | on | Standard hardening |
 | Admin URL | non-default path and/or proxy IP allow-list | `/admin/` is a high-value target |
-| `/test-fastapi/` and `api/token/` | review before exposure | `/test-fastapi/` is an unauthenticated debug route that returns exception text (`config/urls.py`); the JWT token endpoint needs rate limiting |
+| `api/token/` | review before exposure; needs rate limiting | The JWT token endpoint is a credential-guessing surface. (`/test-fastapi/`, an unauthenticated debug route, was removed 2026-10-16 with a 404 regression test.) |
 | Login rate limiting / lockout | `NOT YET IMPLEMENTED` | Needs a decision (proxy rate limit vs app-level) |
 
 `python manage.py check --deploy` must be clean against the production settings; it becomes a deployment gate.

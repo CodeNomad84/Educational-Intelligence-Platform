@@ -244,3 +244,12 @@ class StudentFormClassSelectorTests(TestCase):
             self.client.force_login(user)
             self.assertEqual(self.client.post(self.url, {**self.base, 'school_class': self.klass.pk}).status_code, 403)
         self.assertFalse(Student.objects.filter(national_id='0000000301').exists())
+
+
+class RemovedDebugRouteTests(TestCase):
+    """/test-fastapi/ was an unauthenticated debug route that echoed exception text; it must stay gone."""
+
+    def test_test_fastapi_route_is_gone_for_everyone(self):
+        self.assertEqual(self.client.get('/test-fastapi/').status_code, 404)
+        self.client.force_login(make_user('admin_dbg', ADMIN))
+        self.assertEqual(self.client.get('/test-fastapi/').status_code, 404)
