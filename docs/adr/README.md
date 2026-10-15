@@ -9,7 +9,7 @@ Established decisions (Django core, FastAPI AI layer, PostgreSQL, React target, 
 | 0001 | Service boundary & database ownership | PROPOSED (partly implemented in Phase 1) | 1 |
 | 0002 | Service-to-service authentication | PROPOSED (interim implemented in Phase 1) | 1 |
 | 0003 | Authorization model | ACCEPTED 2026-10-13 (Phase 2 scope; other roles unchanged) | 2 |
-| 0011 | Temporal data model (academic years, enrollments) | DRAFT / PROPOSED 2026-10-16 | 2 |
+| 0011 | Temporal data model (academic years, enrollments) | ACCEPTED 2026-10-16 for scope 2.2a-1..3 (2.2a-4 parity-gated; Recommendation/retention deferred) | 2 |
 | 0004 | School scoping / tenant key | ACCEPTED 2026-10-13 (integer PKs, `schools` app) | 2–4 |
 | 0005 | Staff roles, scoping and counseling referral | ACCEPTED 2026-10-16 for decisions 1–9 (roles 2–4; amends 0003/0004; L3); 10–12 direction only | 2 |
 | 0006 | React frontend mechanics | DEFERRED | 4/8 |

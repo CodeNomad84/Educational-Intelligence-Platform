@@ -1,5 +1,5 @@
 # CHANGE PROPOSAL — Phase 2.2a: temporal data model (academic years, enrollments, year-aware records)
-Level: **L3** (schema, data migration, access matching, sensitive-data retention) · Status: **PROPOSED — design only, no code** (2026-10-16)
+Level: **L3** (schema, data migration, access matching, sensitive-data retention) · Status: **APPROVED for 2.2a-1..3 (owner 2026-10-16); 2.2a-4 only behind a parity test and as its own commit; `Recommendation`, real data and retention decisions DEFERRED**
 Depends on: ADR-0003/0004/0005 (ACCEPTED), ADR-0010 (partly). Draft decision record: `docs/adr/0011-temporal-data-model.md` (DRAFT).
 Blocks: Phase 2.2 (Student 360), 2.2b (grade entry), 2.2c (recommendations). Supersedes the "show all dates" option of D-22-1.
 Owner decisions applied: D-22-1 = option (b) extended (do not build the 360 page on the flat model); D-22-2 Parent staff-only for now; D-22-3 SchoolAdmin sees all sections.
@@ -77,7 +77,7 @@ Each step is its own migration or command, reversible, tested on SQLite and Post
 | Enrollment path (year, class, grade, status) | all years | yes, all years (to see the path) | **no** (current class only) | staff-only for now (D-22-2) |
 | Grades | all subjects, all years | **all subjects, all years** | **own subject only**, all years of that subject for this student | later; D-22-2 |
 | Attendance | all years | aggregates per year (rate, counts); daily rows only for the current year | **none** (as today) | later |
-| Improvement recommendations of past years | all, incl. retracted | only `grade_staff`/`school_admin` visibility; structured fields (subject, year, status) always, free text only if the author marked it | only own-subject `subject_team`/`grade_staff`; not other subjects | no (until a parent-facing text policy exists) |
+| Improvement recommendations of past years | all, incl. retracted | **OWNER 2026-10-16: until the 2.4 audit log exists, free text is SchoolAdmin only.** Afterwards: `grade_staff`/`school_admin` visibility; structured fields (subject, year, status) per matrix | same: free text SchoolAdmin only for now; afterwards own-subject `subject_team`/`grade_staff` | no (until a parent-facing text policy exists) |
 | Identity fields (`national_id`, phone, parents) | yes | current rules (own grade) | no | own child |
 | Counseling / behaviour notes | no (separate counseling policy, not in 2.2a) | no | no | no |
 Recommendation: history is **opt-in per role**, not inherited from "can see the student today". A student who left the grade (promoted) is no longer visible to the old lead except through an explicit rule; recommend: a former Grade Lead sees nothing of students no longer in their grade.
@@ -94,6 +94,8 @@ Recommendation: history is **opt-in per role**, not inherited from "can see the 
 | D24-6 | Backups and exports | Backups follow the same retention; no historical record in exports or AI prompts without policy; anonymisation also applies to restored copies (document the procedure). |
 | D24-7 | Parent access to history | Decide after D-22-2 is lifted; default no, current page unchanged. |
 | D24-8 | Who may import historical data | SchoolAdmin only, with dry-run, batch id and reversible batch. |
+
+**Owner status of D24 (2026-10-16):** recorded as direction; retention period and legal basis are an owner decision with legal advice; no `Recommendation` model and no real data until decided.
 
 ## 10. Tests (both backends, one step at a time)
 Year normalisation table (variants, unresolved, ambiguous), overlap and single-current constraints; enrollment constraints; backfill report counts and idempotence; no silent guess (unlinked student gets no enrollment, row outside ranges stays NULL); migration forward/backward on SQLite and PostgreSQL and on a copy of `data/postgres`; access parity (old vs new), promotion case (grade 10 → 11 changes the lead who sees the student), unresolved year grants nothing; history matrix per role in HTML and API; recommendation append-only (no delete via ORM, admin, API; retraction hides text but keeps row); import dry-run vs commit, idempotence, batch revert, historical file never touches current fields; choke-point guard extended to new readers; anonymisation procedure.
