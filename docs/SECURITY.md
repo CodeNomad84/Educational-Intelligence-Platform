@@ -16,8 +16,8 @@ Platform handles minors' data. Principles: privacy by design, least privilege, R
 | all others | unchanged (see table below) |
 
 ### Interim access policy (Phase 1; replaces the CURRENT cells in the matrix where they differ)
-Roles = Django groups `Admin`, `Teacher`, `Parent`; superuser ⇒ Admin; no recognised group ⇒ no access (`students/access.py`).
-| Capability | Admin | Teacher | Parent | no role / anonymous |
+Roles = Django groups `SchoolAdmin` (renamed from `Admin` by `students/0010`, ADR-0010; the migration is applied to a real database only by the owner after a backup), `Teacher`, `Parent`; superuser ⇒ SchoolAdmin; no recognised group ⇒ no access (`students/access.py`).
+| Capability | SchoolAdmin (was Admin) | Teacher | Parent | no role / anonymous |
 |---|---|---|---|---|
 | Dashboard aggregates, library (view) | allow | deny | deny (redirect to own children) | deny / login |
 | Chat (RAG) | disabled for every role in Phase 1 | disabled | disabled | disabled |

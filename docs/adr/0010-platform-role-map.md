@@ -1,5 +1,5 @@
 # ADR-0010: Platform role map
-- Status: **DRAFT / PROPOSED** (2026-10-16, revised after owner decisions of the same day; only the owner marks ACCEPTED). Owner positions so far: `PlatformAdmin` accepted in principle; Student role redefined as AI Study Assistant access (not own-record access); Administrative staff direction only.
+- Status: **DRAFT / PROPOSED**; **decision 2 rename `Admin` → `SchoolAdmin` ACCEPTED and IMPLEMENTED 2026-10-16** (`88a60a5` constants, `55babae` rename + `students/0010` + FastAPI; migration not yet applied to `data/postgres`, owner step after backup); the rest stays DRAFT (2026-10-16, revised after owner decisions of the same day; only the owner marks ACCEPTED). Owner positions so far: `PlatformAdmin` accepted in principle; Student role redefined as AI Study Assistant access (not own-record access); Administrative staff direction only.
 - Date: 2026-10-16
 - Decider: owner
 - Level: L3 (authorization model, privileged roles, naming across services)
@@ -143,7 +143,7 @@ S-01, S-04, S-05, R-04; `students/access.py`, `students/permissions.py`, `dashbo
 
 | # | Decision | Recommendation |
 |---|---|---|
-| D-R1 | Rename `Admin` → `SchoolAdmin` and add `PlatformAdmin`; when | **PlatformAdmin accepted in principle (owner)**; own L3 commit after C4, before C5a; fallback `TechAdmin` (metadata read-only) if the split proves problematic |
+| D-R1 | **Rename DONE in code 2026-10-16 (`55babae`; real-DB migration pending owner).** `PlatformAdmin` still DRAFT. Original: Rename `Admin` → `SchoolAdmin` and add `PlatformAdmin`; when | **PlatformAdmin accepted in principle (owner)**; own L3 commit after C4, before C5a; fallback `TechAdmin` (metadata read-only) if the split proves problematic |
 | D-R2 | Remove "superuser ⇒ school admin" | Yes, when `PlatformAdmin` exists; keep until then; one break-glass superuser held by the owner |
 | D-R3 | Who assigns roles/groups | Platform Admin creates accounts/resets passwords; **Principal** approves staff-role assignment through a Principal-only screen; nobody can self-grant `SchoolAdmin`/`PlatformAdmin`; `auth.*` stays superuser-only until that screen exists |
 | D-R4 | Who manages RAG documents | Platform Admin uploads/deletes (metadata view); Principal manages school-policy documents; document ACL per ADR-0007; metadata-only projection for Platform Admin |

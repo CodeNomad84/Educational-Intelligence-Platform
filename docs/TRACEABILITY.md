@@ -14,7 +14,7 @@ Labels per `CLAUDE.md` §2. `Test` is filled when the test exists; a row without
 ## Requirements
 | ID | Requirement | Source | Label | Phase | Test | Owner REQ-ID |
 |---|---|---|---|---|---|---|
-| P2-REQ-01 | Admin sees all students; a parent sees only own children; no recognised role means no access | `SECURITY.md` interim access policy; `students/access.py` | CURRENT | built (P1) | existing `students`/`dashboard` tests; per-test mapping due in 2.1 | |
+| P2-REQ-01 | SchoolAdmin (group formerly `Admin`) sees all students; a parent sees only own children; no recognised role means no access | `SECURITY.md` interim access policy; `students/access.py` | CURRENT | built (P1) | existing `students`/`dashboard` tests; per-test mapping due in 2.1 | |
 | P2-REQ-02 | A teacher sees only students of classes assigned to them, on every list, detail and API path | `SECURITY.md` matrix (“own classes”); ADR-0003 option (c) | ACCEPTED (ADR-0003) | 2.1 | | |
 | P2-REQ-03 | A teacher cannot create or edit students | `SECURITY.md` matrix and interim policy | CURRENT (deny) | built (P1); re-proved in 2.1 | existing tests | |
 | P2-REQ-04 | Teacher-to-class assignments are maintained by an administrator in the admin UI | Owner approval 2026-10-13; ADR-0003 §6 (admin staff with explicit permissions) | ACCEPTED | 2.1 | | |
