@@ -33,6 +33,8 @@ Nothing the service runs needs `INSERT`, `UPDATE`, `TRUNCATE`, sequence access, 
 4. Set the password (**section 5**) and write `.env.fastapi` (**section 6**).
 5. `docker compose up -d fastapi`, then run **section 7** (verification).
 
+> **Do not start `fastapi` before the role has its password.** On a fresh `./data/postgres`, `docker compose up -d fastapi django` starts FastAPI before `fastapi_user` can log in; FastAPI then logs `password authentication failed` at startup (the service still starts, but database-backed routes fail). Compose reads `.env.fastapi` only when the container is created, so if `fastapi` was started too early use `docker compose up -d --force-recreate fastapi` after step 4. Verified 2026-10-15 on a fresh database: the error disappears and the log shows `Table 'documents' found.`
+
 Commands marked **[ADMIN]** are run as `school_user` through the container's local socket. Commands marked **[SERVICE]** exercise `fastapi_user` (through `SET ROLE` or through the FastAPI container); they never need the admin password.
 
 ## 3. Pre-checks [ADMIN] (read-only)
