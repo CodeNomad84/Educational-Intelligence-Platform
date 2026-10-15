@@ -140,6 +140,40 @@ class SubjectTeacherScopeTests(Base):
         self.assertEqual(self.ids(user), set())
 
 
+class QueryTimeHardeningTests(Base):
+    """Grants of a Grade Lead / Subject Teacher stop applying if the account becomes staff, superuser (maps to
+    SchoolAdmin instead) or inactive after the assignment was created."""
+
+    def test_staff_grade_lead_and_teacher_lose_scoped_access(self):
+        lead = self.lead("hl")
+        teacher = self.teacher("ht", klass=self.c10a)
+        self.assertTrue(self.ids(lead) and self.ids(teacher))
+        for user in (lead, teacher):
+            user.is_staff = True
+            user.save()
+            self.assertEqual(self.ids(user), set(), user.username)
+            self.assertEqual(list(visible_grades(user)), [])
+            self.assertEqual(list(visible_attendances(user)), [])
+
+    def test_inactive_account_loses_scoped_access(self):
+        lead = self.lead("hl2")
+        lead.is_active = False
+        lead.save()
+        self.assertEqual(self.ids(lead), set())
+
+    def test_staff_user_in_parent_group_keeps_parent_access_only(self):
+        user = self.lead("hl3")
+        user.groups.add(Group.objects.get_or_create(name=PARENT)[0])
+        child = self.student(9, self.c10x, "KID2", parent_user=user)
+        user.is_staff = True
+        user.save()
+        self.assertEqual(self.ids(user), {child.pk})
+
+    def test_superuser_maps_to_school_admin_not_scoped(self):
+        root = make_user("root", GRADE_LEAD, is_superuser=True)
+        self.assertEqual(len(visible_students(root)), Student.objects.count())
+
+
 class UnionTests(Base):
     def test_lead_plus_teacher_union_without_duplicates_and_tiers(self):
         user = self.lead()

@@ -42,6 +42,12 @@ def _any(parts):
     return reduce(or_, parts) if parts else None
 
 
+def _may_hold_scoped_grants(user):
+    """Grade Lead / Subject Teacher grants apply only to an active, non-staff, non-superuser account, checked at
+    query time (owner decision 2026-10-16); the assignment forms enforce the same rule only at creation."""
+    return bool(user.is_active and not user.is_staff and not user.is_superuser)
+
+
 def _grade_lead_q(user, roles):
     """Students of (school, grade) for each ACTIVE assignment of the user (ADR-0005 §2; owner D-C5a-1).
 
@@ -49,7 +55,7 @@ def _grade_lead_q(user, roles):
     Unlinked students are invisible to a Grade Lead (fail closed). The group is re-checked here, so a row
     of a user who left the group grants nothing.
     """
-    if GRADE_LEAD not in roles:
+    if GRADE_LEAD not in roles or not _may_hold_scoped_grants(user):
         return None
     from schools.models import GradeLeadAssignment  # lazy: keeps the import graph acyclic
 
@@ -64,7 +70,7 @@ def _grade_lead_q(user, roles):
 
 def _teacher_assignments(user, roles):
     """Active assignments of a Subject Teacher: (school_id, class_id, subject). Blank/unknown subject = none."""
-    if TEACHER not in roles:
+    if TEACHER not in roles or not _may_hold_scoped_grants(user):
         return []
     from schools.models import TeacherAssignment
 
