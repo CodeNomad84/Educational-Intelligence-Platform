@@ -99,6 +99,8 @@ class Grade(models.Model):
     enrollment = models.ForeignKey(
         'students.Enrollment', on_delete=models.PROTECT, null=True, blank=True, related_name='grades',
         verbose_name="ثبت‌نام (سال تحصیلی)")
+    # '' = linked by a person/import, 'backfill' = linked by backfill_enrollments (so it can be reverted exactly).
+    enrollment_link_source = models.CharField(max_length=10, blank=True, default='', editable=False)
     subject = models.CharField(max_length=20, choices=SUBJECT_CHOICES, verbose_name="درس")
     exam_type = models.CharField(max_length=20, choices=EXAM_TYPE_CHOICES, verbose_name="نوع آزمون")
     score = models.FloatField(verbose_name="نمره")
@@ -127,6 +129,7 @@ class Attendance(models.Model):
     enrollment = models.ForeignKey(
         'students.Enrollment', on_delete=models.PROTECT, null=True, blank=True, related_name='attendances',
         verbose_name="ثبت‌نام (سال تحصیلی)")
+    enrollment_link_source = models.CharField(max_length=10, blank=True, default='', editable=False)
     date = models.DateField(verbose_name="تاریخ")
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, verbose_name="وضعیت")
     note = models.TextField(blank=True, verbose_name="یادداشت")
