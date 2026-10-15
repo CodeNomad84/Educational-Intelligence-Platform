@@ -1,6 +1,8 @@
 from django.db import models
 from django.contrib.auth import get_user_model  # برای ارجاع به مدل User
 
+from schools.vocabulary import SUBJECT_CHOICES
+
 User = get_user_model()
 
 class Student(models.Model):
@@ -87,14 +89,7 @@ class Student(models.Model):
         super().save(*args, **kwargs)
 
 class Grade(models.Model):
-    SUBJECT_CHOICES = [
-        ('math', 'ریاضی'), ('physics', 'فیزیک'), ('chemistry', 'شیمی'),
-        ('biology', 'زیست‌شناسی'), ('literature', 'ادبیات فارسی'),
-        ('arabic', 'عربی'), ('english', 'انگلیسی'), ('quran', 'قرآن'),
-        ('religious', 'دینی'), ('history', 'تاریخ'), ('geography', 'جغرافیا'),
-        ('social', 'اجتماعی'), ('sports', 'ورزش'), ('art', 'هنر'),
-        ('computer', 'کامپیوتر'),
-    ]
+    SUBJECT_CHOICES = SUBJECT_CHOICES  # shared vocabulary, defined in schools/vocabulary.py
     EXAM_TYPE_CHOICES = [
         ('midterm', 'میان‌ترم'),
         ('final', 'پایان‌ترم'),
