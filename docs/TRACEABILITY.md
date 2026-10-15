@@ -34,6 +34,8 @@ Labels per `CLAUDE.md` §2. `Test` is filled when the test exists; a row without
 | P2-REQ-18 | `school_class` is the source of truth; `class_name` is a deprecated mirror; import and forms resolve existing active classes only and never auto-create | ADR-0004 §4–6 | ACCEPTED | 2.1 (C2, C3) | | |
 | P2-REQ-19 | The migrated data never grants access by itself: no assignments are created, near-duplicate class names are reported not merged | Design review 2026-10-13 §2; fail-closed principle | ACCEPTED | 2.1 (C3) | | |
 | P2-REQ-20 | `TEACHER_ACCESS_REVIEW.md` exists and is reviewed before the teacher access change (C5) ships | Owner instruction 2026-10-13 | ACCEPTED | before C5 | | |
+| P2-REQ-21 | `TeacherAssignment.subject` uses the same fixed vocabulary as `Grade.subject`; a blank subject is rejected for new assignments; legacy values are converted only on exact match | ADR-0005 §3; ADR-0004 amendments | CURRENT (model + `check_assignment_subjects`; not yet used for access) | 2.1 (C4b; enforcement C5a) | `schools/test_c4b.py` | |
+| P2-REQ-22 | A Grade Lead is assigned to (school, grade, academic year) only by an Admin in the admin site; the assignment grants no access until C5a | ADR-0005 §2 | CURRENT (model + admin + guard test) | 2.1 (C4b; access C5a) | `schools/test_c4b.py` | |
 
 ## Open decisions that gate rows
 | Decision | Gates | Source |

@@ -31,11 +31,17 @@ D-06, D-09; `django_core/students/models.py`; scaffold `schools/models.py` (pres
 
 | Item | Status | Change |
 |---|---|---|
-| Decision 1 (`schools` app: School, SchoolClass, TeacherAssignment) | **EXTENDED** | adds `GradeLeadAssignment(user, school, grade, academic_year, is_active, created_by)` using the integer `Student.grade` (no separate grade-level model, consistent with the rejection of the scaffold's grade-level model in Alternatives) |
-| `TeacherAssignment.subject` (free text, informational) | **AMENDED** | access-relevant; constrained to the same fixed vocabulary as `Grade.subject`; existing rows checked by a data check before enforcement |
-| `SchoolClass` | **EXTENDED** | nullable `grade` (owner D13); not the sole grade key for Grade Lead scope |
+| Decision 1 (`schools` app: School, SchoolClass, TeacherAssignment) | **EXTENDED; `GradeLeadAssignment` IMPLEMENTED C4b (schools/0002), not yet read by any access code** | adds `GradeLeadAssignment(user, school, grade, academic_year, is_active, created_by)` using the integer `Student.grade` (no separate grade-level model, consistent with the rejection of the scaffold's grade-level model in Alternatives) |
+| `TeacherAssignment.subject` (free text, informational) | **AMENDED; IMPLEMENTED C4b (schools/0002)** | access-relevant; constrained to the same fixed vocabulary as `Grade.subject`; existing rows checked by a data check before enforcement |
+| `SchoolClass` | **EXTENDED; `grade` IMPLEMENTED C4b (nullable, no backfill)** | nullable `grade` (owner D13); not the sole grade key for Grade Lead scope |
 | Decision 5 (inactive class grants no teacher access) | **EXTENDED** | inactive assignments (teacher or grade lead) and assignments of another academic year grant nothing; year rollover is an admin action |
 | Decisions 2, 3, 4, 6, 7, 8 | UNCHANGED | |
+
+### C4b implementation notes (owner decisions 2026-10-16)
+- Subject vocabulary and grade levels live in `schools/vocabulary.py`; `Grade.SUBJECT_CHOICES` and `Student.GRADE_CHOICES` re-export them (no `students` migration diff).
+- `TeacherAssignment.subject`: `choices` = vocabulary; a blank subject is rejected for **new** rows (`clean()`), legacy blank rows stay valid. `check_assignment_subjects` (read-only) reports counts; only exact key/label matches may ever be converted. On the current PostgreSQL DB it found 0 assignments, so **no data migration `schools/0003` was created**.
+- `GradeLeadAssignment`: unique (user, school, grade, academic_year); user must be active, non-staff, in group `GradeLead`; admin picks `academic_year` from existing class years and warns (non-blocking) when the school has no class of that year. Grants no access until C5a.
+- `SchoolClass.grade`: report/class-view attribute only; students are not used to back-fill it.
 
 ## Supersedes / superseded by
 Extended by ADR-0005 (decisions 1–9 ACCEPTED 2026-10-16).

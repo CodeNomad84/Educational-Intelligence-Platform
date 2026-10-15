@@ -1,6 +1,6 @@
 # CHANGE GUIDE — "If I want to change X, where do I look?"
 
-Verified-at: `3404a1a` + Phase 1 branch `phase-1/boot-security`; the commit `3404a1a` is resolvable in this repository's history (verified 2026-10-13); Phase 1 closed at `4c096de`. Paths re-checked against the working tree on 2026-10-12. Rows marked NOT YET IMPLEMENTED have no location yet; classify via `CHANGE_PROCESS.md`. Any change touching auth/data is at least L2.
+Verified-at: `3404a1a` + Phase 1 branch `phase-1/boot-security`; the commit `3404a1a` is resolvable in this repository's history (verified 2026-10-13); Phase 1 closed at `4c096de`. Paths re-checked against the working tree on 2026-10-12. Schools/vocabulary rows re-verified 2026-10-16 (C4b). Rows marked NOT YET IMPLEMENTED have no location yet; classify via `CHANGE_PROCESS.md`. Any change touching auth/data is at least L2.
 
 | I want to change… | Look at | Notes |
 |---|---|---|
@@ -23,6 +23,8 @@ Verified-at: `3404a1a` + Phase 1 branch `phase-1/boot-security`; the commit `340
 | Add a school / branding / calendar | NOT YET IMPLEMENTED — `docs/CUSTOMIZATION.md`, ADR-0004 | L3 |
 | Notifications | `students/tasks.py` (unused), `config/celery.py` | L2 |
 | Create the staff role groups / grant Admin school-structure permissions | `django_core/schools/management/commands/setup_staff_roles.py` (`manage.py setup_staff_roles [--fix] [--grant-admin-assignments]`); constants in `students/access.py` | L2 |
+| Subject / grade vocabulary; report assignment subjects not in it | `django_core/schools/vocabulary.py` (re-exported by `students/models.py`); `manage.py check_assignment_subjects [--json]` (read-only) | L3 if a value changes (data migration) |
+| Grade Lead assignments (model, admin, year picker) | `django_core/schools/models.py` (`GradeLeadAssignment`), `schools/admin.py`; access reading it is C5a, NOT YET IMPLEMENTED | L3 |
 | Settings / secrets / ports | `config/settings/`, `docker-compose.yml`, FastAPI `auth.py` | never print secrets (S-03) |
 | Tests | `django_core/{students,dashboard}/tests.py`, `fastapi_core/tests/test_security.py`; commands in `docs/TESTING.md` | |
 | Reports | NOT YET IMPLEMENTED | |
