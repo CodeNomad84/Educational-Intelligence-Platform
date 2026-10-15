@@ -1,4 +1,5 @@
 # students/views.py
+import re
 import pandas as pd
 from io import BytesIO, TextIOWrapper
 from rest_framework import viewsets, status
@@ -34,6 +35,31 @@ UNMATCHED_LIST_LIMIT = 200
 UNMATCHED_VALUE_MAX = 100
 
 ImportRow = namedtuple('ImportRow', 'index national_id data class_cell')
+
+# Columns read as text so identifiers keep their exact form (a blank cell must not turn the column to float
+# text, and leading zeros must survive). Only these columns: grade and class_name keep pandas' inference.
+TEXT_COLUMNS = {'national_id': str, 'phone_number': str}
+
+NATIONAL_ID_MAX_LENGTH = 10   # mirrors Student.national_id max_length
+_NAN_LIKE = {'nan', 'none', 'null'}
+_DIGIT_MAP = str.maketrans('۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩', '01234567890123456789')
+
+
+def _clean_national_id(value):
+    """Return ``(national_id, error)``; exactly one of them is empty. Import path only (ASCII digits out)."""
+    if value is None or (isinstance(value, float) and value != value):
+        return '', 'کد ملی خالی است.'
+    text = str(value).strip().translate(_DIGIT_MAP)
+    if not text:
+        return '', 'کد ملی خالی است.'
+    if text.lower() in _NAN_LIKE or re.fullmatch(r'[0-9]+\.0+', text):
+        return '', 'کد ملی معتبر نیست.'
+    if not re.fullmatch(r'[0-9]+', text):
+        return '', 'کد ملی باید فقط شامل ارقام باشد.'
+    if len(text) > NATIONAL_ID_MAX_LENGTH:
+        return '', 'کد ملی نباید بیش از ۱۰ رقم باشد.'
+    return text, ''
+
 
 
 class ClassLinkPlan:
@@ -180,9 +206,9 @@ class StudentViewSet(viewsets.ModelViewSet):
             # خواندن فایل بر اساس پسوند
             if file_extension == 'csv':
                 # برای CSV باید encoding را utf-8-sig در نظر بگیریم تا فارسی به درستی خوانده شود
-                df = pd.read_csv(TextIOWrapper(file, encoding='utf-8-sig'))
+                df = pd.read_csv(TextIOWrapper(file, encoding='utf-8-sig'), converters=TEXT_COLUMNS)
             elif file_extension in ['xlsx', 'xls']:
-                df = pd.read_excel(BytesIO(file.read()))
+                df = pd.read_excel(BytesIO(file.read()), converters=TEXT_COLUMNS)
             else:
                 return Response(
                     {'error': 'فرمت فایل پشتیبانی نمی‌شود. فقط csv, xlsx, xls مجاز است.'},
@@ -240,9 +266,9 @@ class StudentViewSet(viewsets.ModelViewSet):
             for index, row in df.iterrows():
                 try:
                     # بررسی وجود کد ملی
-                    national_id = str(row.get('national_id', '')).strip()
-                    if not national_id:
-                        row_errors.append((index, f"ردیف {index+2}: کد ملی خالی است."))
+                    national_id, national_id_error = _clean_national_id(row.get('national_id'))
+                    if national_id_error:
+                        row_errors.append((index, f"ردیف {index+2}: {national_id_error}"))
                         continue
 
                     # ساخت دیکشنری داده‌ها (class_name is not written by the import: school_class is the

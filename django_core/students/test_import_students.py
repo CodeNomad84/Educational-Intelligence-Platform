@@ -347,18 +347,66 @@ class ImportKnownIssueTests(ImportCase):
         self.assertEqual(self.student('1234567890').class_name, '')
         self.assertEqual((resp.json()['class_blank'], resp.json()['unmatched_classes']), (1, []))
 
-    def test_leading_zeros_of_numeric_looking_columns_are_lost(self):
+    def test_leading_zeros_of_identifier_columns_are_kept(self):
+        """[P3 CHANGED] was: leading zeros of national_id and phone_number were lost (numeric inference)."""
         self.post(csv_upload(f'{HEADER}\nAli,Rezai,0123456789,9,9-A,09120000001,Dr,Nurse\n'))
         s = Student.objects.get()
-        self.assertEqual((s.national_id, s.phone_number), ('123456789', '9120000001'))
+        self.assertEqual((s.national_id, s.phone_number), ('0123456789', '09120000001'))
 
-    def test_a_blank_national_id_cell_makes_the_whole_column_float_text(self):
-        resp = self.post(csv_upload(
-            f'{HEADER}\nAli,Rezai,1234567890,9,9-A,9120000001,Dr,Nurse\n'
-            'Bob,Blank,,9,9-A,9120000002,Dr,Nurse\n'))
-        self.assertEqual((resp.json()['created'], resp.json()['errors']), (2, []))
-        self.assertEqual(sorted(Student.objects.values_list('national_id', flat=True)),
-                         ['1234567890.0', 'nan'])
+
+class ImportNationalIdValidationTests(ImportCase):
+    """[P3] national_id is read as text and validated before any write (import path only)."""
+
+    def import_ids(self, *cells):
+        rows = ''.join(f'Ali{i},Rezai,{c},9,9-A,9120000001,Dr,Nurse\n' for i, c in enumerate(cells))
+        return self.post(csv_upload(f'{HEADER}\n{rows}')).json()
+
+    def stored(self):
+        return sorted(Student.objects.values_list('national_id', flat=True))
+
+    def test_blank_national_id_does_not_corrupt_other_rows(self):
+        data = self.import_ids('1234567890', '')
+        self.assertEqual((data['created'], self.stored()), (1, ['1234567890']))
+        self.assertEqual(data['errors'], ['ردیف 3: کد ملی خالی است.'])
+
+    def test_nan_text_national_id_is_rejected(self):
+        for cell in ('nan', 'NaN', 'None', 'null'):
+            with self.subTest(cell=cell):
+                data = self.import_ids(cell)
+                self.assertEqual((data['created'], self.stored()), (0, []))
+                self.assertEqual(data['errors'], ['ردیف 2: کد ملی معتبر نیست.'])
+
+    def test_float_text_national_id_is_rejected(self):
+        data = self.import_ids('1234567890.0')
+        self.assertEqual((data['created'], self.stored()), (0, []))
+        self.assertEqual(data['errors'], ['ردیف 2: کد ملی معتبر نیست.'])
+
+    def test_non_digit_national_id_is_rejected(self):
+        for cell in ('12A4567890', '123-456', '12 34'):
+            with self.subTest(cell=cell):
+                data = self.import_ids(cell)
+                self.assertEqual((data['created'], self.stored()), (0, []))
+                self.assertEqual(data['errors'], ['ردیف 2: کد ملی باید فقط شامل ارقام باشد.'])
+
+    def test_too_long_national_id_is_rejected_before_any_database_write(self):
+        data = self.import_ids('12345678901')
+        self.assertEqual((data['created'], self.stored()), (0, []))
+        self.assertEqual(data['errors'], ['ردیف 2: کد ملی نباید بیش از ۱۰ رقم باشد.'])
+        self.assertNotIn('varying', ' '.join(data['errors']))
+
+    def test_one_to_ten_digits_are_valid_and_keep_their_text_form(self):
+        data = self.import_ids('123456789', '0123456789', '7')
+        self.assertEqual((data['created'], data['errors']), (3, []))
+        self.assertEqual(self.stored(), ['0123456789', '123456789', '7'])
+
+    def test_persian_and_arabic_indic_digits_are_normalised_to_ascii(self):
+        data = self.import_ids('۱۲۳۴۵۶۷۸۹۰', '٠١٢٣٤٥٦٧٨٩')
+        self.assertEqual((data['created'], data['errors']), (2, []))
+        self.assertEqual(self.stored(), ['0123456789', '1234567890'])
+
+    def test_identical_ids_in_different_scripts_are_one_student(self):
+        data = self.import_ids('1234567890', '۱۲۳۴۵۶۷۸۹۰')
+        self.assertEqual((data['created'], data['updated'], self.stored()), (1, 1, ['1234567890']))
 
 
 # =====================================================================================================
