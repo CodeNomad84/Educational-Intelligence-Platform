@@ -5,6 +5,8 @@ Environment of that run: Django 5.2.15, DRF 3.15.2, PyJWT 2.15.1 (Django image),
 **Single Django command (host virtualenv, SQLite, no Docker):** `scripts/run_tests.sh` runs `check`, `makemigrations --check --dry-run`, `test students dashboard schools` (development settings) and `test demo_intel` (demo settings), stopping at the first failure. Result 2026-10-15: check clean, no migration changes, **256** + **32** tests OK. It does **not** cover FastAPI, PostgreSQL or Docker; CI (T-01) stays deferred.
 **Why the counts differ:** the SQLite command also runs the `schools` app (24 tests), the PostgreSQL command lists `students dashboard` only: 232 + 24 = 256. Both exercise the same `students`/`dashboard` tests. Tests must be backend-neutral: `varchar` limits (`national_id` 10, `class_name` 50) are enforced only on PostgreSQL, so no test may depend on SQLite storing an over-limit value (see commit `3bf3b8c`).
 
+**Update 2026-10-16 (after `/test-fastapi/` removal and C4 `setup_staff_roles`):** `students dashboard schools` = **267 tests** on both SQLite (`scripts/run_tests.sh`, plus 32 `demo_intel`) and PostgreSQL 16 (container, all OK). The PostgreSQL command now lists `schools` too. New tests: `dashboard` `RemovedDebugRouteTests` (1) and `schools/test_setup_staff_roles.py` (10). FastAPI suite not re-run in this step (no FastAPI change).
+
 Docker commands (run from the repository root):
 - `docker compose exec -T django python manage.py check`
 - `docker compose exec -T django python manage.py makemigrations --check --dry-run`

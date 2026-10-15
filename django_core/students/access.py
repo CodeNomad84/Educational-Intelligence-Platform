@@ -8,7 +8,9 @@ ADR-0003 is still DECISION REQUIRED); it is not the final authorization model.
 from .models import Student
 
 ADMIN = 'Admin'
-TEACHER = 'Teacher'
+TEACHER = 'Teacher'  # Subject Teacher (ADR-0005)
+GRADE_LEAD = 'GradeLead'  # ADR-0005; group created by setup_staff_roles, not yet read by roles_for (C5a)
+COUNSELOR = 'Counselor'  # ADR-0005; same, access arrives with referrals (2.6)
 PARENT = 'Parent'
 ALL_ROLES = (ADMIN, TEACHER, PARENT)
 

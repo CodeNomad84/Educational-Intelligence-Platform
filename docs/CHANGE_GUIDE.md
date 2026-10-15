@@ -22,6 +22,7 @@ Verified-at: `3404a1a` + Phase 1 branch `phase-1/boot-security`; the commit `340
 | LLM / embedding provider or model | `fastapi_core/rag_service.py`, `docker-compose.yml` (ollama) | L3 (ADR-0008) |
 | Add a school / branding / calendar | NOT YET IMPLEMENTED — `docs/CUSTOMIZATION.md`, ADR-0004 | L3 |
 | Notifications | `students/tasks.py` (unused), `config/celery.py` | L2 |
+| Create the staff role groups / grant Admin school-structure permissions | `django_core/schools/management/commands/setup_staff_roles.py` (`manage.py setup_staff_roles [--fix] [--grant-admin-assignments]`); constants in `students/access.py` | L2 |
 | Settings / secrets / ports | `config/settings/`, `docker-compose.yml`, FastAPI `auth.py` | never print secrets (S-03) |
 | Tests | `django_core/{students,dashboard}/tests.py`, `fastapi_core/tests/test_security.py`; commands in `docs/TESTING.md` | |
 | Reports | NOT YET IMPLEMENTED | |
