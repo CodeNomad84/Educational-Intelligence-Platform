@@ -17,7 +17,7 @@ ISSUER = "school-django"
 AUDIENCE = "school-fastapi"
 MIN_SECRET_LENGTH = 32
 
-ADMIN = "Admin"
+ADMIN = "SchoolAdmin"  # ADR-0010; must equal students/access.py ADMIN in django_core
 TEACHER = "Teacher"
 
 # auto_error=False so a missing header is a deterministic 401 (not a version-dependent 403).

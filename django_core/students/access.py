@@ -1,13 +1,13 @@
 """Single place that maps a Django user to roles and to the students they may see.
 
-Roles are the existing Django groups: ``Admin``, ``Teacher``, ``Parent``. A superuser is
-treated as ``Admin``. Anything else (no group, anonymous, unknown group) gets NO role and
+Roles are the existing Django groups: ``SchoolAdmin`` (was ``Admin``), ``Teacher``, ``Parent``. A superuser is
+treated as ``SchoolAdmin``. Anything else (no group, anonymous, unknown group) gets NO role and
 therefore no access. This is an interim containment policy for Phase 1 (docs/SECURITY.md,
 ADR-0003 is still DECISION REQUIRED); it is not the final authorization model.
 """
 from .models import Student
 
-ADMIN = 'Admin'
+ADMIN = 'SchoolAdmin'  # ADR-0010 (renamed by students/0010); FastAPI auth.ADMIN must match
 TEACHER = 'Teacher'  # Subject Teacher (ADR-0005)
 GRADE_LEAD = 'GradeLead'  # ADR-0005; group created by setup_staff_roles, not yet read by roles_for (C5a)
 COUNSELOR = 'Counselor'  # ADR-0005; same, access arrives with referrals (2.6)
@@ -32,7 +32,7 @@ def has_any_role(user, *roles):
 def visible_students(user):
     """Students the user may read. Deny by default.
 
-    Admin: all students.
+    SchoolAdmin: all students.
     Parent: only students whose ``parent_user`` is this user.
     Teacher: NONE. There is no verified teacher-to-student/class assignment model yet (S-04), so
     teacher access to student data stays disabled until one exists (DECISION REQUIRED).

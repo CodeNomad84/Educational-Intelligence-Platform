@@ -26,6 +26,7 @@ sys.path.insert(0, str(ROOT))
 
 SECRET = secrets.token_urlsafe(48)
 ISS, AUD = 'school-django', 'school-fastapi'
+ADMIN_ROLE = 'SchoolAdmin'  # the one place this suite names the role (ADR-0010 rename)
 
 
 def _fake_modules():
@@ -186,29 +187,29 @@ class AuthenticationTests(BaseCase):
 
     def test_bad_tokens_denied(self):
         cases = {
-            'expired': bearer(['Admin'], exp=int(time.time()) - 5),
-            'wrong audience': bearer(['Admin'], aud='other'),
-            'wrong issuer': bearer(['Admin'], iss='other'),
-            'no roles claim': bearer(['Admin'], roles=None),
-            'roles not a list': bearer(['Admin'], roles='Admin'),
+            'expired': bearer([ADMIN_ROLE], exp=int(time.time()) - 5),
+            'wrong audience': bearer([ADMIN_ROLE], aud='other'),
+            'wrong issuer': bearer([ADMIN_ROLE], iss='other'),
+            'no roles claim': bearer([ADMIN_ROLE], roles=None),
+            'roles not a list': bearer([ADMIN_ROLE], roles=ADMIN_ROLE),
             'garbage': {'Authorization': 'Bearer not-a-jwt'},
             'wrong scheme': {'Authorization': 'Basic abc'},
         }
         for label, headers in cases.items():
             resp = self.client.delete('/documents/1', headers=headers)
             self.assertEqual(resp.status_code, 401, label)
-        forged = jwt.encode({'iss': ISS, 'aud': AUD, 'sub': '1', 'roles': ['Admin'],
+        forged = jwt.encode({'iss': ISS, 'aud': AUD, 'sub': '1', 'roles': [ADMIN_ROLE],
                              'exp': int(time.time()) + 60}, secrets.token_urlsafe(48), algorithm='HS256')
         self.assertEqual(self.client.delete('/documents/1', headers={'Authorization': f'Bearer {forged}'}).status_code, 401)
         self.assertEqual(FAKES['rag_service'].calls, [])
 
     def test_unsigned_token_denied(self):
-        none_token = jwt.encode({'iss': ISS, 'aud': AUD, 'sub': '1', 'roles': ['Admin'],
+        none_token = jwt.encode({'iss': ISS, 'aud': AUD, 'sub': '1', 'roles': [ADMIN_ROLE],
                                  'exp': int(time.time()) + 60}, None, algorithm='none')
         self.assertEqual(self.client.delete('/documents/1', headers={'Authorization': f'Bearer {none_token}'}).status_code, 401)
 
     def test_fails_closed_when_secret_missing_or_short(self):
-        headers = bearer(['Admin'])
+        headers = bearer([ADMIN_ROLE])
         for value in ('', 'short'):
             with mock.patch.dict(os.environ, {'SERVICE_JWT_SECRET': value}):
                 self.assertEqual(self.client.delete('/documents/1', headers=headers).status_code, 503)
@@ -217,7 +218,7 @@ class AuthenticationTests(BaseCase):
         for value in ('django-insecure-' + 'x' * 40, 'changeme' * 6, 'a' * 64, 'your-secret-key-' + 'Qz9' * 10):
             with mock.patch.dict(os.environ, {'SERVICE_JWT_SECRET': value}):
                 # even a correctly signed token is refused when the configured secret is weak
-                forged = jwt.encode({'iss': ISS, 'aud': AUD, 'sub': '1', 'roles': ['Admin'],
+                forged = jwt.encode({'iss': ISS, 'aud': AUD, 'sub': '1', 'roles': [ADMIN_ROLE],
                                      'exp': int(time.time()) + 60}, value, algorithm='HS256')
                 resp = self.client.delete('/documents/1', headers={'Authorization': f'Bearer {forged}'})
                 self.assertEqual(resp.status_code, 503, value[:8])
@@ -251,7 +252,7 @@ class AuthenticationTests(BaseCase):
 
     def test_wrong_algorithm_denied(self):
         for alg in ('HS384', 'HS512'):
-            t = jwt.encode({'iss': ISS, 'aud': AUD, 'sub': '1', 'roles': ['Admin'],
+            t = jwt.encode({'iss': ISS, 'aud': AUD, 'sub': '1', 'roles': [ADMIN_ROLE],
                             'exp': int(time.time()) + 60}, SECRET, algorithm=alg)
             self.assertEqual(self.client.delete('/documents/1', headers={'Authorization': f'Bearer {t}'}).status_code, 401, alg)
 
@@ -273,7 +274,7 @@ class AuthorizationTests(BaseCase):
 
     def test_predict_is_admin_only(self):
         for method, path, kw in PREDICT:
-            resp = getattr(self.client, method)(path, headers=bearer(['Admin']), **kw)
+            resp = getattr(self.client, method)(path, headers=bearer([ADMIN_ROLE]), **kw)
             self.assertEqual(resp.status_code, 200, f'Admin {method} {path}')
             for roles in (['Teacher'],) + OTHER_ROLES:
                 resp = getattr(self.client, method)(path, headers=bearer(roles), **kw)
@@ -290,21 +291,21 @@ class AuthorizationTests(BaseCase):
             self.assertNotIn('risk_probability', resp.text)
 
     def test_chat_search_and_ingestion_disabled_for_every_role(self):
-        for roles in (['Admin'], ['Teacher'], ['Admin', 'Teacher']) + OTHER_ROLES:
+        for roles in ([ADMIN_ROLE], ['Teacher'], [ADMIN_ROLE, 'Teacher']) + OTHER_ROLES:
             for method, path, kw in DISABLED:
                 resp = getattr(self.client, method)(path, headers=bearer(roles), **kw)
                 self.assertEqual(resp.status_code, 403, f'{roles} {method} {path}')
         self.assertEqual(FAKES['rag_service'].calls, [])  # nothing reached the RAG layer
 
     def test_document_list_and_delete_are_admin_only(self):
-        h = bearer(['Admin'])
+        h = bearer([ADMIN_ROLE])
         self.assertEqual(self.client.get('/documents/list/', headers=h).status_code, 200)
         self.assertEqual(self.client.delete('/documents/parent/abc', headers=h).status_code, 200)
         self.assertEqual(self.client.delete('/documents/1', headers=h).status_code, 200)
         self.assertEqual(self.client.get('/documents/list/', headers=bearer(['Teacher'])).status_code, 403)
 
     def test_delete_missing_document_is_404_not_500(self):
-        h = bearer(['Admin'])
+        h = bearer([ADMIN_ROLE])
         with mock.patch.object(main, 'delete_document', lambda i: False), \
                 mock.patch.object(main, 'delete_document_by_parent_id', lambda p: False):
             self.assertEqual(self.client.delete('/documents/999999', headers=h).status_code, 404)
@@ -313,7 +314,7 @@ class AuthorizationTests(BaseCase):
     def test_delete_internal_error_is_500_without_leaking_details(self):
         def boom(_):
             raise RuntimeError('db-host-secret-detail')
-        h = bearer(['Admin'])
+        h = bearer([ADMIN_ROLE])
         with mock.patch.object(main, 'delete_document', boom), mock.patch.object(main, 'delete_document_by_parent_id', boom):
             for path in ('/documents/1', '/documents/parent/x'):
                 resp = self.client.delete(path, headers=h)
@@ -321,7 +322,7 @@ class AuthorizationTests(BaseCase):
                 self.assertNotIn('db-host-secret-detail', resp.text)
 
     def test_admin_malformed_requests_fail_safely(self):
-        h = bearer(['Admin'])
+        h = bearer([ADMIN_ROLE])
         self.assertEqual(self.client.delete('/documents/not-an-int', headers=h).status_code, 422)
         # Disabled routes refuse before touching the body, even when it is malformed.
         self.assertEqual(self.client.post('/documents/', headers=h, json={'title': 't'}).status_code, 403)
@@ -369,6 +370,24 @@ class EmbeddingFailureTests(unittest.TestCase):
             with self.assertRaises(self.rag.EmbeddingError):
                 call()
         self.assertEqual(self.db_calls, [])  # the database was never reached
+
+
+
+class NoRoleLiteralTests(unittest.TestCase):
+    """The old group name must not survive in service code; roles come from auth.ADMIN."""
+
+    def test_no_admin_literal_outside_tests(self):
+        pattern = re.compile(r"""['"]Admin['"]""")
+        offenders = [
+            str(path.relative_to(ROOT))
+            for path in ROOT.rglob('*.py')
+            if 'tests' not in path.relative_to(ROOT).parts and '.venv' not in path.parts
+            and pattern.search(path.read_text(encoding='utf-8'))
+        ]
+        self.assertEqual(offenders, [])
+
+    def test_admin_constant_value(self):
+        self.assertEqual(auth.ADMIN, ADMIN_ROLE)
 
 
 if __name__ == '__main__':
