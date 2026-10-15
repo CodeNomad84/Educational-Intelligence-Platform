@@ -8,7 +8,7 @@ from django import forms
 from django.contrib import admin, messages
 from django.contrib.auth import get_user_model
 
-from .models import GradeLeadAssignment, School, SchoolClass, TeacherAssignment
+from .models import AcademicYear, GradeLeadAssignment, School, SchoolClass, TeacherAssignment
 
 
 @admin.register(School)
@@ -110,3 +110,16 @@ class GradeLeadAssignmentAdmin(admin.ModelAdmin):
         warning = obj.year_warning()
         if warning:
             messages.warning(request, warning)
+
+
+@admin.register(AcademicYear)
+class AcademicYearAdmin(admin.ModelAdmin):
+    """SchoolAdmin enters the year code and its dates (ADR-0011); nothing reads this table for access yet."""
+
+    list_display = ("code", "school", "start_date", "end_date", "is_current")
+    list_filter = ("school", "is_current")
+    search_fields = ("code", "label")
+    readonly_fields = ("created_at", "updated_at")
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser  # enrollments protect the row; deletion is never routine

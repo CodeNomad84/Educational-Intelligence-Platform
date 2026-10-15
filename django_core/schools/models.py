@@ -10,6 +10,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 
+from .academic_years import CODE_RE, RESOLVED, normalize_academic_year
 from .vocabulary import GRADE_CHOICES, SUBJECT_CHOICES
 
 
@@ -197,3 +198,55 @@ class GradeLeadAssignment(models.Model):
         if SchoolClass.objects.filter(school_id=self.school_id, academic_year=self.academic_year).exists():
             return None
         return f"هیچ کلاسی در این مدرسه با سال تحصیلی «{self.academic_year}» وجود ندارد."
+
+
+class AcademicYear(models.Model):
+    """One school year of one school (ADR-0011). Dates are entered by a SchoolAdmin, never computed.
+
+    Stage 2.2a-1 only stores the entity: ``SchoolClass.academic_year`` and ``GradeLeadAssignment.academic_year``
+    are still free text and nothing reads this table for access decisions.
+    """
+
+    school = models.ForeignKey(School, on_delete=models.PROTECT, related_name="academic_years", verbose_name="مدرسه")
+    code = models.CharField(max_length=9, verbose_name="کد سال تحصیلی", help_text="مثال: 1404-1405")
+    label = models.CharField(max_length=50, blank=True, verbose_name="عنوان")
+    start_date = models.DateField(verbose_name="شروع (میلادی)")
+    end_date = models.DateField(verbose_name="پایان (میلادی)")
+    is_current = models.BooleanField(default=False, verbose_name="سال جاری")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "سال تحصیلی"
+        verbose_name_plural = "سال‌های تحصیلی"
+        ordering = ["school", "-start_date"]
+        constraints = [
+            models.UniqueConstraint(fields=["school", "code"], name="uniq_academicyear_school_code"),
+            models.UniqueConstraint(
+                fields=["school"], condition=models.Q(is_current=True), name="uniq_academicyear_one_current_per_school"),
+            models.CheckConstraint(
+                condition=models.Q(end_date__gt=models.F("start_date")), name="academicyear_end_after_start"),
+        ]
+
+    def __str__(self):
+        return self.label or self.code
+
+    def clean(self):
+        errors = {}
+        status, canonical = normalize_academic_year(self.code)
+        if not CODE_RE.match(self.code or "") or status != RESOLVED or canonical != self.code:
+            errors["code"] = "کد باید به شکل 1404-1405 (سال بعد = سال اول + ۱) باشد."
+        if self.start_date and self.end_date:
+            if self.end_date <= self.start_date:
+                errors["end_date"] = "پایان باید بعد از شروع باشد."
+            elif self.school_id:
+                overlap = AcademicYear.objects.filter(
+                    school_id=self.school_id, start_date__lte=self.end_date, end_date__gte=self.start_date,
+                ).exclude(pk=self.pk)
+                if overlap.exists():
+                    errors["start_date"] = "بازه با یک سال تحصیلی دیگر همین مدرسه همپوشانی دارد."
+        if self.is_current and self.school_id:
+            if AcademicYear.objects.filter(school_id=self.school_id, is_current=True).exclude(pk=self.pk).exists():
+                errors["is_current"] = "برای هر مدرسه فقط یک سال جاری می‌تواند وجود داشته باشد."
+        if errors:
+            raise ValidationError(errors)

@@ -95,6 +95,10 @@ class Grade(models.Model):
     ]
     
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='grades')
+    # ADR-0011 stage 2.2a-1: nullable, unused by any read path yet; attribution to year/class/grade-in-year.
+    enrollment = models.ForeignKey(
+        'students.Enrollment', on_delete=models.PROTECT, null=True, blank=True, related_name='grades',
+        verbose_name="ثبت‌نام (سال تحصیلی)")
     subject = models.CharField(max_length=20, choices=SUBJECT_CHOICES, verbose_name="درس")
     exam_type = models.CharField(max_length=20, choices=EXAM_TYPE_CHOICES, verbose_name="نوع آزمون")
     score = models.FloatField(verbose_name="نمره")
@@ -105,6 +109,7 @@ class Grade(models.Model):
         verbose_name = "نمره"
         verbose_name_plural = "نمرات"
         ordering = ['-date']
+        indexes = [models.Index(fields=['enrollment', 'subject', 'date'], name='grade_enr_subject_date_idx')]
 
     def __str__(self):
         return f"{self.student} - {self.get_subject_display()} - {self.score}"
@@ -119,6 +124,9 @@ class Attendance(models.Model):
     ]
     
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='attendances')
+    enrollment = models.ForeignKey(
+        'students.Enrollment', on_delete=models.PROTECT, null=True, blank=True, related_name='attendances',
+        verbose_name="ثبت‌نام (سال تحصیلی)")
     date = models.DateField(verbose_name="تاریخ")
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, verbose_name="وضعیت")
     note = models.TextField(blank=True, verbose_name="یادداشت")
@@ -129,6 +137,7 @@ class Attendance(models.Model):
         verbose_name_plural = "حضور و غیاب"
         ordering = ['-date']
         unique_together = [['student', 'date']]
+        indexes = [models.Index(fields=['enrollment', 'date'], name='att_enr_date_idx')]
 
     def __str__(self):
         return f"{self.student} - {self.date} - {self.get_status_display()}"
@@ -148,3 +157,91 @@ class Document(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class ImportBatch(models.Model):
+    """One year-aware import run (ADR-0011 §5). Stage 2.2a-1: the entity only; no import writes it yet."""
+
+    KIND_CHOICES = [('roster', 'فهرست'), ('grades', 'نمرات'), ('attendance', 'حضور و غیاب')]
+
+    kind = models.CharField(max_length=12, choices=KIND_CHOICES)
+    academic_year = models.ForeignKey('schools.AcademicYear', on_delete=models.PROTECT, related_name='import_batches')
+    file_sha256 = models.CharField(max_length=64, blank=True)
+    uploaded_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, editable=False, related_name='+')
+    dry_run = models.BooleanField(default=True)
+    counts = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "دسته ورود داده"
+        verbose_name_plural = "دسته‌های ورود داده"
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.kind} {self.academic_year} #{self.pk}"
+
+
+class Enrollment(models.Model):
+    """One student in one academic year: class and grade IN THAT YEAR (ADR-0011 §3.2).
+
+    Stage 2.2a-1: storage only. ``Student.grade/school_class`` remain the source of truth and nothing in the
+    access layer reads this table (the switch is stage 2.2a-4, behind a parity test).
+    """
+
+    STATUS_CHOICES = [
+        ('active', 'فعال'), ('promoted', 'ارتقا یافته'), ('retained', 'مردود'),
+        ('transferred_out', 'انتقال به مدرسه دیگر'), ('transferred_in', 'انتقال از مدرسه دیگر'),
+        ('graduated', 'فارغ‌التحصیل'), ('withdrawn', 'ترک تحصیل'),
+    ]
+    SOURCE_CHOICES = [('manual', 'دستی'), ('import', 'ورود داده'), ('backfill', 'استنتاج از داده موجود')]
+
+    student = models.ForeignKey(Student, on_delete=models.PROTECT, related_name='enrollments')
+    academic_year = models.ForeignKey(
+        'schools.AcademicYear', on_delete=models.PROTECT, related_name='enrollments')
+    school_class = models.ForeignKey(
+        'schools.SchoolClass', on_delete=models.PROTECT, null=True, blank=True, related_name='enrollments')
+    grade = models.PositiveSmallIntegerField(choices=Student.GRADE_CHOICES, verbose_name="پایه در این سال")
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default='active')
+    started_on = models.DateField(null=True, blank=True)
+    ended_on = models.DateField(null=True, blank=True)
+    source = models.CharField(max_length=10, choices=SOURCE_CHOICES, default='manual')
+    import_batch = models.ForeignKey(ImportBatch, on_delete=models.PROTECT, null=True, blank=True, related_name='enrollments')
+    created_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, editable=False, related_name='+')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "ثبت‌نام سالانه"
+        verbose_name_plural = "ثبت‌نام‌های سالانه"
+        ordering = ['student', '-academic_year__start_date']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['student', 'academic_year'], condition=models.Q(ended_on__isnull=True),
+                name='uniq_enrollment_one_open_per_student_year'),
+            models.CheckConstraint(
+                condition=models.Q(ended_on__isnull=True) | models.Q(started_on__isnull=True)
+                | models.Q(ended_on__gte=models.F('started_on')),
+                name='enrollment_end_not_before_start'),
+        ]
+        indexes = [
+            models.Index(fields=['student', 'academic_year'], name='enr_student_year_idx'),
+            models.Index(fields=['academic_year', 'school_class'], name='enr_year_class_idx'),
+            models.Index(fields=['academic_year', 'grade', 'status'], name='enr_year_grade_status_idx'),
+        ]
+
+    def __str__(self):
+        return f"{self.student} {self.academic_year} grade {self.grade} ({self.status})"
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+
+        errors = {}
+        if self.school_class_id and self.academic_year_id:
+            if self.school_class.school_id != self.academic_year.school_id:
+                errors['school_class'] = "کلاس و سال تحصیلی باید از یک مدرسه باشند."
+        if self.student_id and self.academic_year_id and self.student.school_id not in (None, self.academic_year.school_id):
+            errors['academic_year'] = "سال تحصیلی با مدرسهٔ دانش‌آموز هم‌خوان نیست."
+        if errors:
+            raise ValidationError(errors)

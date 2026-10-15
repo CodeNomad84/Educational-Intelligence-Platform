@@ -23,6 +23,7 @@ ADMIN_ASSIGNMENT_GRANTS = {
     'schoolclass': ('view', 'add', 'change'),
     'teacherassignment': ('view', 'add', 'change', 'delete'),
     'gradeleadassignment': ('view', 'add', 'change', 'delete'),
+    'academicyear': ('view', 'add', 'change'),  # ADR-0011: SchoolAdmin enters year dates; no delete
 }
 
 
