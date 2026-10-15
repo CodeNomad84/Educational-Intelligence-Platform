@@ -23,5 +23,16 @@ class StudentSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'class_name', 'school', 'created_at', 'updated_at']
 
+    # Field policy (ADR-0005 §6, TEACHER_ACCESS_REVIEW R5): chosen server-side from the row's ``full_tier``
+    # annotation set by ``visible_students``. A row without the annotation is treated as limited (fail closed).
+    LIMITED_OMIT = ('national_id', 'phone_number', 'father_job', 'mother_job', 'parent_user')
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if not getattr(instance, 'full_tier', False):
+            for name in self.LIMITED_OMIT:
+                data.pop(name, None)
+        return data
+
 class FileUploadSerializer(serializers.Serializer):
     file = serializers.FileField()

@@ -22,7 +22,7 @@ from .serializers import StudentSerializer, FileUploadSerializer
 from .permissions import IsAdminUser  # فقط ادمین بتواند آپلود کند
 from django.core.exceptions import ImproperlyConfigured
 from config.service_auth import service_headers
-from .access import visible_students
+from .access import search_students, visible_attendances, visible_grades, visible_students
 
 # --- student import: class resolution (C3c-2) -------------------------------------------------------------
 # The import never creates or changes a School or SchoolClass and never overwrites or clears an existing
@@ -171,12 +171,18 @@ def _write_import_row(row, plan):
         return student, created, link
 
 
+class TierAwareSearchFilter(filters.SearchFilter):
+    """``?search=``: names for every role; ``national_id`` only on full-tier rows (access.search_students)."""
+
+    def filter_queryset(self, request, queryset, view):
+        return search_students(queryset, request.query_params.get(self.search_param, ''))
+
+
 class StudentViewSet(viewsets.ModelViewSet):
     serializer_class = StudentSerializer
     permission_classes = [IsAuthenticated]  # پیش‌فرض
-    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filter_backends = [DjangoFilterBackend, TierAwareSearchFilter, filters.OrderingFilter]
     filterset_fields = ['grade', 'first_name', 'last_name', 'class_name']
-    search_fields = ['first_name', 'last_name', 'national_id']
     ordering_fields = ['first_name', 'last_name', 'grade', 'created_at']
     ordering = ['first_name']
 
@@ -189,8 +195,17 @@ class StudentViewSet(viewsets.ModelViewSet):
         return [IsAdminUser()]
 
     def get_queryset(self):
-        # Deny by default; Admin/Teacher all, Parent only own children (see students/access.py)
+        # Deny by default; the union of the user's grants (see students/access.py)
         return visible_students(self.request.user)
+
+    # Writes are SchoolAdmin only; the instance has no tier annotation, so mark it full for the response.
+    def perform_create(self, serializer):
+        serializer.save()
+        serializer.instance.full_tier = True
+
+    def perform_update(self, serializer):
+        serializer.save()
+        serializer.instance.full_tier = True
 
     # ✅ اکشن جدید برای آپلود فایل
     @action(detail=False, methods=['post'], url_path='import')
@@ -359,9 +374,9 @@ class StudentViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['get'], url_path='features')
     def get_features(self, request, pk=None):
         student = self.get_object()
-        grades = student.grades.all()
+        grades = visible_grades(request.user).filter(student=student)
         avg_score = grades.aggregate(Avg('score'))['score__avg'] or 0
-        attendances = student.attendances.all()
+        attendances = visible_attendances(request.user).filter(student=student)
         total_absences = attendances.filter(status='absent').count()
         total_lates = attendances.filter(status='late').count()
         total_days = attendances.count()
@@ -383,8 +398,8 @@ class StudentViewSet(viewsets.ModelViewSet):
     def predict_status(self, request, pk=None):
         student = self.get_object()
 
-        grades = student.grades.all()
-        attendances = student.attendances.all()
+        grades = visible_grades(request.user).filter(student=student)
+        attendances = visible_attendances(request.user).filter(student=student)
         avg_score = grades.aggregate(Avg('score'))['score__avg'] or 0
         total_absences = attendances.filter(status='absent').count()
         total_lates = attendances.filter(status='late').count()
