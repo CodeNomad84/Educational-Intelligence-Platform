@@ -13,6 +13,7 @@ COPY requirements.txt .
 # RUN pip install --default-timeout=3000 --retries=5 --no-cache-dir torch --extra-index-url https://download.pytorch.org/whl/cpu
 
 # نصب بقیه وابستگی‌ها (fastapi, uvicorn, ...) — torch از قبل نصب شده و دوباره دانلود نمی‌شود
+RUN pip install --no-cache-dir --no-deps torch==2.0.1 --index-url https://download.pytorch.org/whl/cpu
 RUN pip install --default-timeout=3000 --retries=5 --no-cache-dir -r requirements.txt
 
 
