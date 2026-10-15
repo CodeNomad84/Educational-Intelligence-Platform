@@ -143,7 +143,7 @@ class StudentApiAuthzTests(TestCase):
         import time, secrets, jwt
         now = int(time.time())
         svc = jwt.encode({'iss': 'school-django', 'aud': 'school-fastapi', 'sub': str(self.admin.pk),
-                          'roles': ['Admin'], 'iat': now, 'exp': now + 60},
+                          'roles': [ADMIN], 'iat': now, 'exp': now + 60},
                          secrets.token_urlsafe(48), algorithm='HS256')
         resp = self.client.get('/api/students/', HTTP_AUTHORIZATION=f'Bearer {svc}')
         self.assertEqual(resp.status_code, 401)

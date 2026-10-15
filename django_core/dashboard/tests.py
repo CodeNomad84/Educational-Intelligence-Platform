@@ -253,3 +253,24 @@ class RemovedDebugRouteTests(TestCase):
         self.assertEqual(self.client.get('/test-fastapi/').status_code, 404)
         self.client.force_login(make_user('admin_dbg', ADMIN))
         self.assertEqual(self.client.get('/test-fastapi/').status_code, 404)
+
+
+class AdminRoleContextTests(TestCase):
+    """The upload link in base.html is keyed on the ADMIN constant, not on a literal (rename prep)."""
+
+    def render_base(self, group):
+        from django.contrib.auth import get_user_model
+        from django.contrib.auth.models import Group
+        from django.template.loader import render_to_string
+        from django.test import RequestFactory
+
+        user = get_user_model().objects.create_user(username=f"u_{group}", password="x")
+        user.groups.add(Group.objects.get_or_create(name=group)[0])
+        request = RequestFactory().get('/')
+        request.user = user
+        return render_to_string('dashboard/base.html', {'user': user}, request=request)
+
+    def test_only_admin_group_sees_upload_link(self):
+        upload = reverse('dashboard:upload_students')
+        self.assertIn(upload, self.render_base(ADMIN))
+        self.assertNotIn(upload, self.render_base(PARENT))

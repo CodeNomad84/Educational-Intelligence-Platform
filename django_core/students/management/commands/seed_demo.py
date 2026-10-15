@@ -19,6 +19,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils import timezone
 
+from students.access import ADMIN
 from students.models import Attendance, Grade, Student
 
 SUBJECTS = ["math", "physics", "chemistry", "literature", "english", "arabic"]
@@ -241,7 +242,7 @@ class Command(BaseCommand):
 
     def _users(self, password, students):
         User = get_user_model()
-        admin_g, _ = Group.objects.get_or_create(name="Admin")
+        admin_g, _ = Group.objects.get_or_create(name=ADMIN)
         parent_g, _ = Group.objects.get_or_create(name="Parent")
         for username, first, last, group in [
             ("demo_admin", "مدیر", "نمایشی", admin_g),

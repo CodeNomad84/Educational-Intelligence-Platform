@@ -1,6 +1,8 @@
 # students/permissions.py
 from rest_framework import permissions
 
+from .access import ADMIN, PARENT, TEACHER
+
 class IsAdminUser(permissions.BasePermission):
     """
     اجازه دسترسی فقط به کاربرانی که در گروه Admin هستند یا Superuser هستند.
@@ -11,19 +13,19 @@ class IsAdminUser(permissions.BasePermission):
             request.user.is_authenticated and 
             (
                 request.user.is_superuser or  # ✅ اضافه کردن این خط
-                request.user.groups.filter(name='Admin').exists()
+                request.user.groups.filter(name=ADMIN).exists()
             )
         )
 
 class IsTeacherUser(permissions.BasePermission):
     """فقط کاربرانی که در گروه Teacher هستند"""
     def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated and request.user.groups.filter(name='Teacher').exists()
+        return request.user and request.user.is_authenticated and request.user.groups.filter(name=TEACHER).exists()
 
 class IsParentUser(permissions.BasePermission):
     """فقط کاربرانی که در گروه Parent هستند"""
     def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated and request.user.groups.filter(name='Parent').exists()
+        return request.user and request.user.is_authenticated and request.user.groups.filter(name=PARENT).exists()
 
 class IsAdminOrReadOnly(permissions.BasePermission):
     """
@@ -34,4 +36,4 @@ class IsAdminOrReadOnly(permissions.BasePermission):
         if request.method in permissions.SAFE_METHODS:
             return request.user and request.user.is_authenticated
         # متدهای غیرامن (POST, PUT, DELETE) فقط برای Admin
-        return request.user and request.user.is_authenticated and request.user.groups.filter(name='Admin').exists()
+        return request.user and request.user.is_authenticated and request.user.groups.filter(name=ADMIN).exists()
