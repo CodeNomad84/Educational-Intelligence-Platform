@@ -1,5 +1,5 @@
 # ADR-0003: Authorization model
-- Status: ACCEPTED (owner decisions of 2026-10-13, Phase 2.1.0 design review; effective for Phase 2)
+- Status: ACCEPTED (owner decisions of 2026-10-13, Phase 2.1.0 design review; effective for Phase 2). **AMENDED in part by ADR-0005 (decisions 1–9 ACCEPTED 2026-10-16): see Amendments at the end; the original text below is kept unchanged.**
 - Date: 2026-10-03 (drafted 2026-10-13, accepted 2026-10-13)
 - Decider: owner
 
@@ -42,5 +42,22 @@ Manager, Mentor, Counselor, Student cells stay `DECISION REQUIRED`; no code for 
 ## Evidence (Stage 0 IDs, files)
 S-01, S-04, `SECURITY.md` matrix and interim policy, `django_core/students/access.py`, `students/views.py` (API uses `visible_students`), `students/serializers.py` (`fields='__all__'`, to be replaced), `dashboard/templates/dashboard/base.html` (role check on first group).
 
+## Amendments (2026-10-16, through ADR-0005 decisions 1–9, ACCEPTED; effective as C4–C5a ship)
+The three-role product decision of 2026-10-15 replaces the single "Teacher" model. The text above is not edited; this table says what still stands.
+
+| Item | Status | Change |
+|---|---|---|
+| Decision 1 (relationship-based, central `access.py`) | UNCHANGED | relationships now: grade-lead ↔ grade ↔ student, teacher ↔ class+subject ↔ student, counselor ↔ active referral ↔ student, parent ↔ child |
+| Decision 2 (roles are groups `Admin`, `Teacher`, `Parent`) | **AMENDED** | groups `GradeLead` and `Counselor` added; `Teacher` means Subject Teacher |
+| Decision 3 (deny by default, 404 outside scope) | UNCHANGED | |
+| Decision 4 (teacher sees a student through an assignment to an active class) | **SUPERSEDED IN PART** | Subject Teacher: active class **and own subject only**; Grade Lead: by grade; Counselor: active referral; union without widening |
+| Decision 5 (teacher never receives `national_id`, phone, parents' jobs, `parent_user`) | **AMENDED** | holds for Subject Teacher and Counselor; **Grade Lead (own grades) and Admin see them**, with the conditions of ADR-0005 §6 |
+| Decision 6 (admin-site management; Teacher group has no model permissions) | UNCHANGED, extended | applies equally to `GradeLead` and `Counselor` groups |
+| Decision 7 (matrix in `SECURITY.md` updated when behavior ships) | UNCHANGED | C6/C5a docs |
+| Phase 2 matrix: "Visible fields" for Teacher (incl. attendance) | **SUPERSEDED IN PART** | Subject Teacher sees own-subject grades and no attendance in C5a |
+| Phase 2 matrix: "Intervention ownership: Counselor future" | **REALISED LATER** | Counselor via referral in 2.6 (needs 2.4 audit); not before |
+| Phase 2 matrix: Post-login landing (Teacher → list) | UNCHANGED | Grade Lead the same; Counselor lands on the referral inbox (2.6) |
+| Consequences: `TEACHER_ACCESS_REVIEW.md` before C5 | SATISFIED | v3 written; committed `bd03b07` |
+
 ## Supersedes / superseded by
-None.
+Amended in part by ADR-0005 (decisions 1–9 ACCEPTED 2026-10-16).

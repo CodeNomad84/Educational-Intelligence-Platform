@@ -26,7 +26,7 @@ Labels: CURRENT = verified at commit `3404a1a` (resolvable in this repository's 
 - Single clear data-ownership model: Django owns operational data and migrations (ADR-0001 PROPOSED).
 - Authenticated service-to-service calls (ADR-0002 PROPOSED); FastAPI not publicly exposed.
 - Authorization model with object/school scope (ADR-0003 DECISION REQUIRED); school key (ADR-0004 PROPOSED).
-- Data layers Raw → Extracted → Validated → Canonical → Derived → Predictions with provenance — future decision, to be proposed in Phase 4 (ADR-0005 reserved, no file yet).
+- Data layers Raw → Extracted → Validated → Canonical → Derived → Predictions with provenance — future decision, to be proposed in Phase 4 (ADR-0009 reserved, no file yet; renumbered from 0005 on 2026-10-16).
 - Rules/Risk/Alert/Intervention pipeline; RAG with ACL before retrieval; Study vs School assistants (`AI_GOVERNANCE.md`).
 
 ## Constraints

@@ -1,5 +1,5 @@
 # ADR-0004: School scoping / tenant key
-- Status: ACCEPTED (owner decisions of 2026-10-13, Phase 2.1.0 design review; effective for Phase 2)
+- Status: ACCEPTED (owner decisions of 2026-10-13, Phase 2.1.0 design review; effective for Phase 2). **Extended by ADR-0005 (decisions 1–9 ACCEPTED 2026-10-16): see Amendments; the original text is kept unchanged.**
 - Date: 2026-10-03 (revised 2026-10-13, accepted 2026-10-13)
 - Decider: owner
 
@@ -27,5 +27,15 @@ Database-per-school or schema-per-tenant: rejected for now (operational cost, no
 ## Evidence (Stage 0 IDs, files)
 D-06, D-09; `django_core/students/models.py`; scaffold `schools/models.py` (preserved on the archive branch).
 
+## Amendments (2026-10-16, through ADR-0005 decisions 1–9, ACCEPTED; effective as C4b–C5a ship)
+
+| Item | Status | Change |
+|---|---|---|
+| Decision 1 (`schools` app: School, SchoolClass, TeacherAssignment) | **EXTENDED** | adds `GradeLeadAssignment(user, school, grade, academic_year, is_active, created_by)` using the integer `Student.grade` (no separate grade-level model, consistent with the rejection of the scaffold's grade-level model in Alternatives) |
+| `TeacherAssignment.subject` (free text, informational) | **AMENDED** | access-relevant; constrained to the same fixed vocabulary as `Grade.subject`; existing rows checked by a data check before enforcement |
+| `SchoolClass` | **EXTENDED** | nullable `grade` (owner D13); not the sole grade key for Grade Lead scope |
+| Decision 5 (inactive class grants no teacher access) | **EXTENDED** | inactive assignments (teacher or grade lead) and assignments of another academic year grant nothing; year rollover is an admin action |
+| Decisions 2, 3, 4, 6, 7, 8 | UNCHANGED | |
+
 ## Supersedes / superseded by
-None.
+Extended by ADR-0005 (decisions 1–9 ACCEPTED 2026-10-16).
