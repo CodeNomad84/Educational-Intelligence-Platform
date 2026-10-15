@@ -10,7 +10,10 @@ import requests
 from django.core.exceptions import ImproperlyConfigured, PermissionDenied
 
 from config.service_auth import service_headers
-from students.access import ADMIN, TEACHER, PARENT, roles_for, visible_students
+from students.access import (
+    ADMIN, GRADE_LEAD, TEACHER, PARENT, roles_for, search_students, visible_attendances, visible_grades,
+    visible_students,
+)
 from .decorators import role_required
 
 # صفحه‌ی ورود
@@ -40,9 +43,9 @@ def logout_view(request):
 @login_required
 def dashboard_view(request):
     roles = roles_for(request.user)
-    if ADMIN not in roles:  # school-wide aggregates: Admin only (teacher scoping unverified, S-04)
-        if PARENT in roles:
-            # School-wide aggregates are staff-only; parents see their own children.
+    if ADMIN not in roles:  # school-wide aggregates: SchoolAdmin only
+        if roles & {PARENT, GRADE_LEAD, TEACHER}:
+            # Aggregates are SchoolAdmin only; every other role lands on its own student list.
             return redirect('dashboard:student_list')
         raise PermissionDenied
     # DEMO SCOPE begin — demo school dashboard (only when config.settings.demo is active)
@@ -51,6 +54,7 @@ def dashboard_view(request):
         from demo_intel.views import school_dashboard
         return school_dashboard(request)
     # DEMO SCOPE end
+    # access: SchoolAdmin only (ADMIN in roles was checked above), school-wide aggregates by design
     total_students = Student.objects.count()
     total_grades = Grade.objects.count()
     total_attendances = Attendance.objects.count()
@@ -66,22 +70,15 @@ def dashboard_view(request):
     return render(request, 'dashboard/dashboard.html', context)
 
 # لیست دانش‌آموزان
-@role_required(ADMIN, TEACHER, PARENT)
+@role_required(ADMIN, GRADE_LEAD, TEACHER, PARENT)
 def student_list_view(request):
-    students = visible_students(request.user)
-    search_query = request.GET.get('search')
-    if search_query:
-        students = students.filter(
-            models.Q(first_name__icontains=search_query) |
-            models.Q(last_name__icontains=search_query) |
-            models.Q(national_id__icontains=search_query)
-        )
+    students = search_students(visible_students(request.user), request.GET.get('search'))
     return render(request, 'dashboard/student_list.html', {'students': students})
 
 # جزئیات یک دانش‌آموز + نمایش نتیجه‌ی پیش‌بینی
 # dashboard/views.py (قسمت student_detail_view)
 
-@role_required(ADMIN, TEACHER, PARENT)
+@role_required(ADMIN, GRADE_LEAD, TEACHER, PARENT)
 def student_detail_view(request, pk):
     # Object-level access: the lookup is scoped to the students this user may see,
     # so another family's child is a 404 (not a 403, to avoid confirming it exists).
@@ -92,8 +89,9 @@ def student_detail_view(request, pk):
         from demo_intel.views import student_profile
         return student_profile(request, student)
     # DEMO SCOPE end
-    grades = student.grades.all()
-    attendances = student.attendances.all()
+    # Only rows the user's grants cover: own-subject grades for a Subject Teacher, no attendance for them.
+    grades = visible_grades(request.user).filter(student=student)
+    attendances = visible_attendances(request.user).filter(student=student)
     
     # ---------- محاسبه‌ی ویژگی‌های مورد نیاز ----------
     # 1. میانگین نمرات
@@ -164,6 +162,7 @@ def student_detail_view(request, pk):
         'absences_count': total_absences,
         'prediction': prediction_result,
         'input_data': input_data,  # برای نمایش در قالب (اختیاری)
+        'can_predict': ADMIN in roles_for(request.user),
     }
     return render(request, 'dashboard/student_detail.html', context)
 

@@ -30,7 +30,7 @@
                 <a href="{% url 'dashboard:library' %}"><i class="bi bi-book"></i> کتابخانه</a>
                 {% endif %}
                 {# DEMO SCOPE end #}
-                {% if user.is_superuser or user.groups.all.0.name == ADMIN_ROLE %}
+                {% if IS_SCHOOL_ADMIN %}
                 <a href="{% url 'dashboard:upload_students' %}"><i class="bi bi-upload"></i> آپلود فایل</a>
                 {% endif %}
                 <hr class="bg-light">

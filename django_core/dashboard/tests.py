@@ -109,9 +109,10 @@ class DashboardAuthzTests(TestCase):
 
     # -- staff ------------------------------------------------------------
     def test_teacher_denied_student_data_and_documents(self):
-        # Teacher access to student data and document retrieval is disabled in Phase 1 (S-04).
+        # A Teacher WITHOUT an assignment sees no student data; documents and writes stay denied.
+        # (C5a: aggregates stay SchoolAdmin only, so the landing is a redirect to the student list.)
         self.client.force_login(self.teacher)
-        self.assertEqual(self.client.get(self.url('dashboard')).status_code, 403)
+        self.assertRedirects(self.client.get(self.url('dashboard')), self.url('student_list'))
         self.assertEqual(self.client.get(self.url('student_detail', self.child_b.pk)).status_code, 404)
         self.assertEqual(list(self.client.get(self.url('student_list')).context['students']), [])
         self.assertEqual(self.client.get(self.url('library')).status_code, 403)
