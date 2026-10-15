@@ -131,11 +131,17 @@ class LinkingRulesTests(MigrationCase):
             'b': self.student('ب', 9),
             'blank': self.student('', 9), 'blank_ws': self.student(' \t ', 9),
             'multi9': self.student(BARE, 9), 'multi10': self.student(BARE, 10),
-            'fifty': self.student('x' * 50, 8), 'fifty_one': self.student('y' * 51, 8),
+            'fifty': self.student('x' * 50, 8),
             'ar_yeh': self.student('يك', 8), 'fa_yeh': self.student('یک', 8),
             'zwnj': self.student('می' + ZWNJ + 'شود', 8),
             'no_zwnj': self.student('میشود', 8),
         }
+        # An over-limit legacy name can only be stored where varchar(50) is not enforced (SQLite). On PostgreSQL
+        # the column rejects it, so it cannot exist there and is not written; the rule itself is asserted at the
+        # planner level below for every backend.
+        over_limit_stored = connection.vendor == 'sqlite'
+        if over_limit_stored:
+            ids['fifty_one'] = self.student('y' * 51, 8)
         before = self.snapshot()
         report = self.apply()
 
@@ -146,7 +152,7 @@ class LinkingRulesTests(MigrationCase):
             self.assertEqual((c.school_id, c.academic_year, c.is_active), (school.pk, '', True))
         self.assertEqual(self.row(ids['a1']).school_class_id, self.row(ids['a2']).school_class_id)
         self.assertNotEqual(self.row(ids['a1']).school_class_id, self.row(ids['ascii']).school_class_id)
-        for key in ('blank', 'blank_ws', 'multi9', 'multi10', 'fifty_one'):
+        for key in ('blank', 'blank_ws', 'multi9', 'multi10') + (('fifty_one',) if over_limit_stored else ()):
             self.assertIsNone(self.row(ids[key]).school_class_id, key)
         for pk in ids.values():
             self.assertEqual(self.row(pk).school_id, school.pk)  # every student gets the default school
@@ -154,7 +160,10 @@ class LinkingRulesTests(MigrationCase):
         self.assert_constraint_holds()
         self.assertEqual((report['linked_students'], report['classes_created'], report['blank_students'],
                           report['multi_grade_titles'], report['multi_grade_students'],
-                          report['too_long_titles'], report['too_long_students']), (9, 8, 2, 1, 2, 1, 1))
+                          report['too_long_titles'], report['too_long_students']),
+                         (9, 8, 2, 1, 2) + ((1, 1) if over_limit_stored else (0, 0)))
+        plan = plan_class_links([('y' * 51, 8), ('x' * 50, 8)])   # backend-independent rule: 51 is too long, 50 fits
+        self.assertEqual((plan.titles('too_long'), plan.titles('linkable')), (['y' * 51], ['x' * 50]))
 
     def test_no_teacher_assignment_is_created_and_existing_ones_survive(self):
         """REQ: P2-REQ-19"""

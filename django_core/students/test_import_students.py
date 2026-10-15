@@ -739,25 +739,26 @@ class ImportResponseContractTests(ClassImportCase):
 
 # =====================================================================================================
 # Write failures (C3c-2 review): decisions must rest on what is PERSISTED, and counters on what SUCCEEDED.
-# A failure is injected as a real database error (a SQLite trigger raises on the matching UPDATE/INSERT), so
-# the whole path runs: update_or_create, the per-row transaction, rollback, and the error report.
+# A failure is injected by patching Student.save to raise a DatabaseError for one national_id (no DB-specific
+# SQL, so it runs on SQLite and PostgreSQL alike). Every import write goes through update_or_create -> save(),
+# so the whole path still runs: the per-row transaction, rollback, and the error report.
 # =====================================================================================================
 class ImportWriteFailureTests(ClassImportCase):
     def fail_writes(self, national_id, event='UPDATE'):
-        from django.db import connection
-        name = f'imp_fail_{event.lower()}_{national_id}'
-        with connection.cursor() as cursor:
-            cursor.execute(
-                f"CREATE TRIGGER {name} BEFORE {event} ON students_student "
-                f"WHEN NEW.national_id = '{national_id}' "
-                f"BEGIN SELECT RAISE(ABORT, 'simulated write failure'); END;")
-        self.addCleanup(self._drop_trigger, name)
+        """Make Student.save() fail for ``national_id`` on an UPDATE (existing row) or an INSERT (new row)."""
+        from django.db import DatabaseError
+        original = Student.save
+        failing = (national_id, event)
 
-    @staticmethod
-    def _drop_trigger(name):
-        from django.db import connection
-        with connection.cursor() as cursor:
-            cursor.execute(f'DROP TRIGGER IF EXISTS {name}')
+        def save(instance, *args, **kwargs):
+            kind = 'INSERT' if instance._state.adding else 'UPDATE'
+            if (instance.national_id, kind) == failing:
+                raise DatabaseError('simulated write failure')
+            return original(instance, *args, **kwargs)
+
+        patcher = mock.patch.object(Student, 'save', save)
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
     def class_grades(self, klass):
         return sorted(Student.objects.filter(school_class=klass).values_list('grade', flat=True))

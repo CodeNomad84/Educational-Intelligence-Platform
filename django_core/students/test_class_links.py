@@ -180,12 +180,18 @@ class CheckClassLinksCommandTests(TestCase):
         self.student(4, bare, 10)
         self.student(5, ASCII_10A, 10)
         self.student(6, '', 8)
-        self.student(7, 'z' * 80, 8)
+        # An over-limit legacy name can only be stored where varchar(50) is not enforced (SQLite); PostgreSQL
+        # cannot hold it, so it is not written there. The rule is asserted at the planner level for every backend.
+        over_limit_stored = connection.vendor == 'sqlite'
+        if over_limit_stored:
+            self.student(7, 'z' * 80, 8)
+        total = 7 if over_limit_stored else 6
         data = json.loads(self.run_report('--json'))
-        self.assertEqual((data['students'], data['already_linked'], data['candidates']), (7, 0, 7))
+        self.assertEqual((data['students'], data['already_linked'], data['candidates']), (total, 0, total))
         self.assertEqual(data['candidate_outcome'], {
             'would_link': 3, 'blank_left_unlinked': 1, 'multi_grade_left_unlinked': 2,
-            'too_long_left_unlinked': 1})
+            'too_long_left_unlinked': 1 if over_limit_stored else 0})
+        self.assertEqual(plan_class_links([('z' * 80, 8)]).titles('too_long'), ['z' * 80])
         self.assertEqual(sorted(data['titles']['linkable']), sorted([PERSIAN_10A, ASCII_10A]))
         self.assertEqual(list(data['titles']['multi_grade']), [bare])
         self.assertEqual(data['near_duplicate_groups'], [sorted([PERSIAN_10A, ASCII_10A])])
