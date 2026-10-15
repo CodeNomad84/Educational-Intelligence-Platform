@@ -21,10 +21,10 @@ Roles = Django groups `SchoolAdmin` (renamed from `Admin` by `students/0010`, AD
 |---|---|---|---|---|
 | Dashboard aggregates, library (view) | allow | deny | deny (redirect to own children) | deny / login |
 | Chat (RAG) | disabled for every role in Phase 1 | disabled | disabled | disabled |
-| Student list & detail | all | none (S-04) | own children only | deny / login |
+| Student list & detail | all | **C5a:** Subject Teacher = students of own active assigned classes, limited fields (no `national_id`, phone, parents' jobs, `parent_user`), own-subject grades only, no attendance; **Grade Lead** = students of the assigned school/grade whose linked class is active and of the assignment's academic year (unlinked students invisible), full fields incl. `national_id`, all subjects, attendance; multi-role = union with per-row tier (non-widening) | own children only | deny / login |
 | Create student, delete RAG documents, student file upload | allow | deny | deny | deny / login |
 | RAG document upload / search | disabled for every role in Phase 1 | disabled | disabled | disabled |
-| AI prediction (dashboard and FastAPI `/predict/`) | allow | deny (S-04) | deny | deny |
+| AI prediction (dashboard and FastAPI `/predict/`) | allow | deny (S-04; also for Grade Lead and Subject Teacher) | deny | deny |
 
 Scope: Phase 1 is a **single-school prototype with no multi-tenant isolation** (see `DATA_AND_ARTIFACTS.md`).
 Matrix cells above are interim containment, not approved policy: DECISION REQUIRED (ADR-0003).
@@ -35,7 +35,7 @@ Matrix cells above are interim containment, not approved policy: DECISION REQUIR
 | S-01 | Dashboard views only `@login_required`: parents read all students; any user creates students, uploads/deletes docs, chats | CRITICAL | CONTAINED (interim) |
 | S-02 | FastAPI routes unauthenticated, port 8001 published | CRITICAL | CONTAINED (interim); 8001 on loopback only |
 | S-03 | Hard-coded/default secrets in code; no `.env.example` (values never reproduced) | HIGH | PARTIAL: service, MinIO and DB secrets are random and kept in gitignored files; other hard-coded values remain |
-| S-04 | Teachers see all students; no class/school scoping | HIGH | **Teacher student access is denied by default** (list/detail/predict/dashboard/library); class/school scoping is still NOT IMPLEMENTED — DECISION REQUIRED |
+| S-04 | Teachers see all students; no class/school scoping | HIGH | **C5a (2026-10-16, implemented, tests green, manual security review recorded in ROADMAP/TESTING): teacher and grade-lead read access is scoped server-side by `visible_students`/`visible_grades`/`visible_attendances`; identity-field audit (2.4) still missing, so Grade Lead `national_id` is for synthetic data only.** Earlier text: **Teacher student access is denied by default** (list/detail/predict/dashboard/library); class/school scoping is still NOT IMPLEMENTED — DECISION REQUIRED |
 | S-05 | No audit/access logging | HIGH | NOT FIXED |
 | S-06 | Published ports: 5432, 6379 (no auth), 9000/9001, 11434, 8000, 8001 | HIGH | PARTIAL: 5432/6379/9000/9001 unpublished; 8001 and Ollama (11435) loopback; **8000 now loopback-only (2026-10-15)**; this is the Dev/Demo-on-VM setting, and a reverse proxy with HTTPS is required for any web-server deployment |
 | S-07 | Debug/logging exposure, `str(e)` returned, default `/docs` | MEDIUM | PARTIAL: delete handlers return generic 500; other handlers still return `str(e)`; `/docs` is public |

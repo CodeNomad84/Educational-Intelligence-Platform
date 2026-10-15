@@ -15,7 +15,7 @@ Labels per `CLAUDE.md` §2. `Test` is filled when the test exists; a row without
 | ID | Requirement | Source | Label | Phase | Test | Owner REQ-ID |
 |---|---|---|---|---|---|---|
 | P2-REQ-01 | SchoolAdmin (group formerly `Admin`) sees all students; a parent sees only own children; no recognised role means no access | `SECURITY.md` interim access policy; `students/access.py` | CURRENT | built (P1) | existing `students`/`dashboard` tests; per-test mapping due in 2.1 | |
-| P2-REQ-02 | A teacher sees only students of classes assigned to them, on every list, detail and API path | `SECURITY.md` matrix (“own classes”); ADR-0003 option (c) | ACCEPTED (ADR-0003) | 2.1 | | |
+| P2-REQ-02 | A teacher sees only students of classes assigned to them, on every list, detail and API path | `SECURITY.md` matrix (“own classes”); ADR-0003 option (c) | CURRENT for read (C5a; Subject Teacher via active class + own subject, Grade Lead via school/grade/linked-class year) | 2.1 (C5a) | `students/test_access_c5a.py` | |
 | P2-REQ-03 | A teacher cannot create or edit students | `SECURITY.md` matrix and interim policy | CURRENT (deny) | built (P1); re-proved in 2.1 | existing tests | |
 | P2-REQ-04 | Teacher-to-class assignments are maintained by an administrator in the admin UI | Owner approval 2026-10-13; ADR-0003 §6 (admin staff with explicit permissions) | ACCEPTED | 2.1 | | |
 | P2-REQ-05 | A `School` entity exists and school-owned data can be scoped to it; no school name, threshold or branding hard-coded in core | ADR-0004 (ACCEPTED); `CLAUDE.md` §3, §7 | ACCEPTED | 2.1 | | |
@@ -29,7 +29,7 @@ Labels per `CLAUDE.md` §2. `Test` is filled when the test exists; a row without
 | P2-REQ-13 | Only synthetic data is used in any environment | `SECURITY.md` interim rule; `CLAUDE.md` §7 | CURRENT rule | all; seed guard in 2.5 | | |
 | P2-REQ-14 | Phase 2 has no RAG, LLM or FastAPI dependency; Django-first | Owner approval 2026-10-13; `AI_GOVERNANCE.md` | CONSTRAINT | all | review per change | |
 | P2-REQ-15 | User-facing pages are Persian/RTL on the existing Django templates | `CLAUDE.md` §1; `ARCHITECTURE.md` decision 4 (React is TARGET, incremental) | CURRENT (partial) | 2.2 – 2.4 | | |
-| P2-REQ-16 | A teacher never receives `national_id`, phone, parents' jobs or `parent_user` (HTML or API) and cannot search/filter by them | ADR-0003 §5 (owner decision 2026-10-13); `CLAUDE.md` §7 (PII) | ACCEPTED | 2.1 (C2, C5) | | |
+| P2-REQ-16 | A teacher never receives `national_id`, phone, parents' jobs or `parent_user` (HTML or API) and cannot search/filter by them | ADR-0003 §5 (owner decision 2026-10-13); `CLAUDE.md` §7 (PII) | CURRENT (limited serializer tier; search/ordering cannot probe; Grade Lead sees `national_id` in own grades, synthetic data only until 2.4) | 2.1 (C5a) | `students/test_access_c5a.py` (API and HTML) | |
 | P2-REQ-17 | `auth.*` permissions stay superuser-only; Teacher users are never staff and the Teacher group has no model permissions | ADR-0003 §6 | ACCEPTED | 2.1 (C4) | | |
 | P2-REQ-18 | `school_class` is the source of truth; `class_name` is a deprecated mirror; import and forms resolve existing active classes only and never auto-create | ADR-0004 §4–6 | ACCEPTED | 2.1 (C2, C3) | | |
 | P2-REQ-19 | The migrated data never grants access by itself: no assignments are created, near-duplicate class names are reported not merged | Design review 2026-10-13 §2; fail-closed principle | ACCEPTED | 2.1 (C3) | | |

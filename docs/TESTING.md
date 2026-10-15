@@ -5,6 +5,19 @@ Environment of that run: Django 5.2.15, DRF 3.15.2, PyJWT 2.15.1 (Django image),
 **Single Django command (host virtualenv, SQLite, no Docker):** `scripts/run_tests.sh` runs `check`, `makemigrations --check --dry-run`, `test students dashboard schools` (development settings) and `test demo_intel` (demo settings), stopping at the first failure. Result 2026-10-15: check clean, no migration changes, **256** + **32** tests OK. It does **not** cover FastAPI, PostgreSQL or Docker; CI (T-01) stays deferred.
 **Why the counts differ:** the SQLite command also runs the `schools` app (24 tests), the PostgreSQL command lists `students dashboard` only: 232 + 24 = 256. Both exercise the same `students`/`dashboard` tests. Tests must be backend-neutral: `varchar` limits (`national_id` 10, `class_name` 50) are enforced only on PostgreSQL, so no test may depend on SQLite storing an over-limit value (see commit `3bf3b8c`).
 
+**Update 2026-10-16 (C5a):** `students dashboard schools` = **324 tests** on SQLite (plus 32 `demo_intel`) and PostgreSQL 16 (one-off container, all OK); FastAPI 26 OK. New: `students/test_access_c5a.py` (32: Grade Lead and Subject Teacher scope, union and non-widening, grades/attendance, API and HTML field policy, search probing, writes 403, role gate for Parent+GradeLead / GradeLead+Teacher / SchoolAdmin+any, and the grep-style choke-point guard). One existing assertion changed on purpose: an unassigned Teacher now lands on a redirect to the student list instead of 403 at the dashboard.
+
+**Pre-use check of `students/0010` on a COPY of `data/postgres` (PROPOSED steps, NOT RUN; owner executes with credentials):**
+1. Maintenance window: `docker compose stop django celery celery_beat`.
+2. Backup: `docker compose exec -T postgres pg_dump -U <db_user> -Fc school_db > school_db.backup.dump` (store it outside the repo).
+3. Copy: `docker compose exec -T postgres createdb -U <db_user> -T school_db school_copy` (needs no open connections to `school_db`).
+4. Record before: `SELECT g.id, g.name, (SELECT count(*) FROM auth_user_groups ug WHERE ug.group_id=g.id) members, (SELECT count(*) FROM auth_group_permissions gp WHERE gp.group_id=g.id) perms FROM auth_group g ORDER BY g.id;` against `school_copy`.
+5. Forward on the copy: `docker compose run --rm --no-deps -e DB_NAME=school_copy django python manage.py migrate students 0010`.
+6. Re-run the query from step 4: same `id`, name `SchoolAdmin`, identical `members` and `perms`. Abort and report if `SchoolAdmin` already existed (the migration raises by design).
+7. Backward on the copy: `... migrate students 0009`, re-run the query: name `Admin` again.
+8. `DROP DATABASE school_copy;`. Only then apply the same forward migration to `school_db`, ideally together with the code deploy, then restart the services.
+Rollback for the real DB: `migrate students 0009` and deploy the previous commit, or restore `school_db.backup.dump`.
+
 **Update 2026-10-16 (role rename):** `students dashboard schools` = **292 tests** on SQLite (plus 32 `demo_intel`) and PostgreSQL 16, all OK; FastAPI **26** tests OK (docker one-off). New: `students/test_migration_0010.py` (7: forward/backward, id/members/permissions preserved, collision abort, fresh-DB no-op, old-name fail-closed, no-literal scan), `dashboard` base-template upload-link test (1), FastAPI no-literal and constant tests (2). `students/0010` applied forward and backward on a scratch PostgreSQL database (dropped afterwards); `data/postgres` untouched.
 
 **Update 2026-10-16 (C4b):** `students dashboard schools` = **284 tests** on SQLite (`scripts/run_tests.sh`, plus 32 `demo_intel`) and on PostgreSQL 16 (one-off container, all OK; test DB only, real data untouched). New: `schools/test_c4b.py` (17) and one extended grant assertion (8 -> 12 Admin permissions). Migration `schools/0002` reversibility on PostgreSQL: NOT VERIFIED (no backward run). FastAPI not re-run (no change).
