@@ -30,7 +30,7 @@ services:
     build: ./django_core
     container_name: django_core
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     volumes:
       - ./django_core:/app
       - ./data/static:/app/staticfiles
