@@ -32,6 +32,21 @@ EXPLANATIONS = (
 )
 
 
+def signature(student, side, ctx):
+    """Counts-only fingerprint of an UNEXPLAINED difference (facts, never names or ids), to guide a data/tool fix."""
+    klass = student.school_class
+    e = ctx['enrollment'].get(student.pk)
+    year = ctx['current_year'].get(student.school_id)
+    class_year = None
+    if klass is not None:
+        status, code = normalize_academic_year(klass.academic_year)
+        class_year = 'unresolved' if status != RESOLVED else ('current' if code == year else 'other_year')
+    return (f"{side}: mirror_class={'none' if klass is None else class_year}"
+            f"{'' if klass is None else (',class_active=' + str(klass.is_active).lower())}"
+            f"{'' if klass is None or klass.grade is None else (',class_grade_eq_student=' + str(klass.grade == student.grade).lower())}"
+            f"; current_enrollment={'none' if e is None else ('grade_eq=' + str(e['grade'] == student.grade).lower() + ',class_eq=' + str(klass is not None and e['school_class_id'] == klass.pk).lower())}")
+
+
 def explain(student, side, ctx):
     """Return the first matching explanation, or None. ``student`` is a Student; ``ctx`` has precomputed facts."""
     year = ctx['current_year'].get(student.school_id)
@@ -63,6 +78,7 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument('--json', action='store_true')
+        parser.add_argument('--detail', action='store_true', help='also print a counts-only breakdown of unexplained differences')
 
     def handle(self, *args, **opts):
         User = get_user_model()
@@ -75,6 +91,7 @@ class Command(BaseCommand):
 
         totals = Counter()
         explained = Counter()
+        unexplained_signatures = Counter()
         users_with_diff = 0
         for user in users:
             legacy = {s.pk: s.full_tier for s in access_legacy.visible_students(user)}
@@ -96,13 +113,14 @@ class Command(BaseCommand):
             ctx = {'current_year': current_year, 'enrollment': enrollment, 'lead_years': lead_years}
             students = {s.pk: s for s in Student.objects.filter(
                 pk__in=only_legacy | only_new | set(tier_diff)).select_related('school_class')}
-            for pk in only_legacy:
-                explained[explain(students[pk], 'only_legacy', ctx) or 'UNEXPLAINED'] += 1
-            for pk in only_new:
-                explained[explain(students[pk], 'only_new', ctx) or 'UNEXPLAINED'] += 1
-            for pk in tier_diff:  # the side that gained full detail decides which explanation can apply
-                side = 'only_new' if new[pk] and not legacy[pk] else 'only_legacy'
-                explained[explain(students[pk], side, ctx) or 'UNEXPLAINED'] += 1
+            checks = [(pk, 'only_legacy') for pk in only_legacy] + [(pk, 'only_new') for pk in only_new] + [
+                # the side that gained full detail decides which explanation can apply
+                (pk, 'only_new' if new[pk] and not legacy[pk] else 'only_legacy') for pk in tier_diff]
+            for pk, side in checks:
+                reason = explain(students[pk], side, ctx)
+                explained[reason or 'UNEXPLAINED'] += 1
+                if reason is None:
+                    unexplained_signatures[signature(students[pk], side, ctx)] += 1
 
         report = {
             **{k: totals.get(k, 0) for k in ('users_compared', 'students_in_both', 'students_only_legacy',
@@ -112,6 +130,8 @@ class Command(BaseCommand):
             'unexplained': explained['UNEXPLAINED'],
             'writes': 'none',
         }
+        if opts['detail']:
+            report['unexplained_signatures'] = dict(unexplained_signatures)
         if opts['json']:
             self.stdout.write(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
         else:

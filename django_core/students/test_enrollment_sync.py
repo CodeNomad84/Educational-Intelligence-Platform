@@ -178,6 +178,14 @@ class PreflightTests(Base):
         self.assertEqual(report['teacher_assignments_class_without_current_enrollments'], 1)
         self.assertEqual(report['info_teacher_assignments_with_blank_or_invalid_subject_grant_nothing'], 1)
 
+    def test_continuing_student_without_current_enrollment_is_reported_as_info(self):
+        gone = self.student(self.c10a)
+        Enrollment.objects.create(student=gone, academic_year=self.y_old, grade=9, status='graduated')
+        stay = self.student(self.c_old, grade=9)       # mirror still points to last year's class
+        Enrollment.objects.create(student=stay, academic_year=self.y_old, grade=9, status='promoted')
+        report, _failed = self.run_cmd()
+        self.assertEqual(report['info_continuing_students_without_current_enrollment'], 1)
+
     def test_empty_database_is_ready_and_writes_nothing(self):
         before = (Student.objects.count(), Enrollment.objects.count())
         report, failed = self.run_cmd()

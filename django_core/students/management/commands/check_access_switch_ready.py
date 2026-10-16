@@ -80,6 +80,16 @@ class Command(BaseCommand):
                 r['students_missing_current_enrollment'] += 1
             elif not any(e['school_class_id'] == class_id and e['grade'] == grade for e in rows):
                 r['enrollment_mirror_disagreements'] += 1
+        # Diagnostic (not a blocker: both rules already hide these): students whose latest earlier enrollment says
+        # they continue (promoted/retained) but who have no current enrollment. Typical causes: a mirror class of a
+        # past year, an unresolved class year, no class, a class-grade conflict.
+        last_status = {}
+        for student_id, status, _start in Enrollment.objects.filter(academic_year__is_current=False).order_by(
+                'academic_year__start_date').values_list('student_id', 'status', 'academic_year__start_date'):
+            last_status[student_id] = status
+        for student_id, status in last_status.items():
+            if status in ('promoted', 'retained') and student_id not in enrollments:
+                r['info_continuing_students_without_current_enrollment'] += 1
         r['schools_with_students_but_no_current_year'] = sum(1 for s in schools_with_students if s not in current)
 
         for a in GradeLeadAssignment.objects.filter(is_active=True).values('school_id', 'academic_year'):
