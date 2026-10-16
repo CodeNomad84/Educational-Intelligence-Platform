@@ -1,5 +1,5 @@
 # CHANGE PROPOSAL — Phase 2.2a-4: access switch to current-enrollment matching
-Level: **L3** (authorization matching for Grade Lead and Subject Teacher) · Status: **DECISIONS TAKEN 2026-10-16 (D-4-1..6); 4a, 4b and 4d IMPLEMENTED; 4c not implemented. Loaded-database gate (synthetic, 234 students) = NOT READY: 6 data blockers and 124 intended gains from year spelling variants; 4c waits for the data to be fixed, the gate re-run, and the owner's confirmation** · Own commits, parity-gated (owner, ADR-0011).
+Level: **L3** (authorization matching for Grade Lead and Subject Teacher) · Status: **DECISIONS TAKEN 2026-10-16 (D-4-1..6); 4a, 4b and 4d IMPLEMENTED; `normalize_year_texts` IMPLEMENTED; 4c not implemented. Loaded-database gate (synthetic, 234 students): baseline NOT READY (6 blockers, 124 spelling-variant gains); after normalisation and the synthetic data fixes: READY, 0 unexplained differences, 0 access gains or losses. 4c waits for the owner's confirmation, and for the same gate on the real data before real use** · Own commits, parity-gated (owner, ADR-0011).
 Depends on: 2.2a-1..3 (schema, reports, backfill, historical import: CURRENT). Related: ADR-0003/0005/0011, `0003` §6, `TEACHER_ACCESS_REVIEW.md` R2/R3.
 
 ## 1. Why
@@ -35,6 +35,15 @@ Definition **current enrollment** of a student: an `Enrollment` with `ended_on I
 
 ## 6. Rollback
 4a/4b add code and tools only (revert the commits). 4c is a pure code change with no schema change: revert the commit and the legacy rule (kept verbatim in `access_legacy.py` until 4c is accepted in production) is active again; enrollments stay. 4d is an explicit admin command; its dry-run is the default and every enrollment it writes carries `source='rollover'`... (new source value; choice-only migration) so it can be reverted by source/batch.
+
+## 6a. 4d runbook and the post-rollover step (CURRENT) and `--carry-assignments` (DESIGN ONLY)
+**Order of a real rollover:** (1) `normalize_year_texts` (dry-run, then `--apply --log FILE`) so class and assignment years are canonical; (2) `check_access_switch_ready` and `compare_access_parity` must be READY / zero; (3) create the next `AcademicYear` (dates) and its classes in the admin; (4) prepare `--class-map` and, where needed, `--outcomes`; (5) `rollover_academic_year --to NEXT … ` dry-run, review counts; (6) back up, then `--apply` (optionally `--flip-current --deactivate-old-classes --deactivate-old-grade-lead-assignments`); (7) **post-rollover step, by an admin:** create the Grade Lead and Subject Teacher assignments for the NEW year and classes (the rollover deliberately does not carry them: until then non-admin staff see nothing of the new year's students under either rule); (8) re-run pre-flight and parity. Revert of step 6 is `--revert-batch ID`.
+**Proposed `--carry-assignments` (not built; dry-run, admin-confirmed, never automatic):**
+- Dry-run only emits a reviewable proposal file (CSV: kind, user id, from, to, subject) and counts; nothing is written without the reviewed file: `rollover_academic_year … --carry-assignments proposal.csv --apply` applies only the rows still present, so an admin can delete lines.
+- **Grade Lead:** the lead stays with the GRADE, not with the students: one new `GradeLeadAssignment(user, school, same grade, target year code)` per active old assignment; the old one is deactivated only by the existing flag.
+- **Subject Teacher:** by default the teacher stays with the grade level and section, not with the cohort: old class title to the target-year class with the same title (e.g. `8-A` to `8-A`), same subject; alternative `--carry-follow-cohort` uses the class map instead. Rows are skipped and counted when the target class is missing or ambiguous, the user is inactive/staff/not in the group, the subject is blank or outside the vocabulary, or an identical assignment exists.
+- Recorded in the rollover batch undo payload, so `--revert-batch` removes exactly the carried assignments; no other access change.
+- Tests to add when built: proposal is deterministic and writes nothing, only reviewed rows are applied, skips are counted, revert is exact, the parity tool reports zero afterwards.
 
 ## 7. Decisions (owner, 2026-10-16)
 D-4-1 current = `active` + `transferred_in`; D-4-2 Grade Lead year matched by normalised code (FK later); D-4-3 a service called from the write paths, not signals; D-4-4 Subject Teacher uses the enrollment's class; D-4-5 rollover command before any school-year change; D-4-6 `compare_access_parity` exits non-zero on any unexplained difference.
