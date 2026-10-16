@@ -171,7 +171,7 @@ class Document(models.Model):
 class ImportBatch(models.Model):
     """One year-aware import run (ADR-0011 §5). Stage 2.2a-1: the entity only; no import writes it yet."""
 
-    KIND_CHOICES = [('roster', 'فهرست'), ('grades', 'نمرات'), ('attendance', 'حضور و غیاب')]
+    KIND_CHOICES = [('roster', 'فهرست'), ('grades', 'نمرات'), ('attendance', 'حضور و غیاب'), ('rollover', 'انتقال سال تحصیلی')]
 
     kind = models.CharField(max_length=12, choices=KIND_CHOICES)
     academic_year = models.ForeignKey('schools.AcademicYear', on_delete=models.PROTECT, related_name='import_batches')
@@ -203,7 +203,8 @@ class Enrollment(models.Model):
         ('transferred_out', 'انتقال به مدرسه دیگر'), ('transferred_in', 'انتقال از مدرسه دیگر'),
         ('graduated', 'فارغ‌التحصیل'), ('withdrawn', 'ترک تحصیل'),
     ]
-    SOURCE_CHOICES = [('manual', 'دستی'), ('import', 'ورود داده'), ('backfill', 'استنتاج از داده موجود')]
+    SOURCE_CHOICES = [('manual', 'دستی'), ('import', 'ورود داده'), ('backfill', 'استنتاج از داده موجود'),
+                      ('rollover', 'انتقال سال تحصیلی')]
 
     student = models.ForeignKey(Student, on_delete=models.PROTECT, related_name='enrollments')
     academic_year = models.ForeignKey(
