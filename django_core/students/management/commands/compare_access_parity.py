@@ -1,12 +1,13 @@
-"""Compare the CURRENT access rule with the enrollment-based rule (ADR-0011, stage 2.2a-4b). Read-only.
+"""Compare the legacy (pre-switch) access rule with the enrollment-based rule (ADR-0011, stages 2.2a-4b/4c). Read-only.
 
     manage.py compare_access_parity [--json]
 
 For every user who holds GradeLead, Teacher or Parent it computes the visible student set and tier with the
-legacy rule (``access_legacy``) and with the enrollment rule (``access_enrollment``) and prints COUNTS only
+legacy rule (``access_legacy``) and with the production rule (``access.visible_students``, enrollment-based since
+the 4c switch) and prints COUNTS only
 (no names, no ids). Every difference is classified by a documented explanation (each one is a bug fixed by
 the switch, not a regression); a difference that fits none is UNEXPLAINED. Exit code 1 on any unexplained
-difference (owner D-4-6). Nothing here changes access: neither rule is modified by this command.
+difference (owner D-4-6). Nothing here changes access.
 """
 import json
 from collections import Counter
@@ -16,7 +17,7 @@ from django.core.management.base import BaseCommand, CommandError
 
 from schools.academic_years import RESOLVED, normalize_academic_year
 from schools.models import AcademicYear, GradeLeadAssignment
-from students import access_enrollment, access_legacy
+from students import access, access_legacy
 from students.access import GRADE_LEAD, PARENT, TEACHER
 from students.enrollment_sync import CURRENT_STATUSES
 from students.models import Enrollment, Student
@@ -95,7 +96,7 @@ class Command(BaseCommand):
         users_with_diff = 0
         for user in users:
             legacy = {s.pk: s.full_tier for s in access_legacy.visible_students(user)}
-            new = {s.pk: s.full_tier for s in access_enrollment.visible_students_by_enrollment(user)}
+            new = {s.pk: s.full_tier for s in access.visible_students(user)}
             totals['users_compared'] += 1
             totals['students_in_both'] += len(legacy.keys() & new.keys())
             only_legacy = legacy.keys() - new.keys()

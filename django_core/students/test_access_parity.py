@@ -1,7 +1,8 @@
 """Stage 2.2a-4b tests: legacy vs enrollment-based matching, every intended difference asserted (ADR-0011).
 
-Nothing here switches access: ``students.access.visible_students`` is still the legacy rule (a guard test
-proves it). The switch (4c) happens only after these tools show zero UNEXPLAINED differences.
+Since the 4c switch ``students.access.visible_students`` IS the enrollment rule ("new" below); the legacy rule is
+kept verbatim in ``access_legacy`` as the reference. The switch happened only after these tools showed zero
+UNEXPLAINED differences.
 """
 import inspect
 import json
@@ -15,7 +16,7 @@ from django.core.management.base import CommandError
 from django.test import TestCase
 
 from schools.models import AcademicYear, GradeLeadAssignment, School, SchoolClass, TeacherAssignment
-from students import access, access_enrollment, access_legacy
+from students import access, access_legacy
 from students.access import GRADE_LEAD, PARENT, TEACHER
 from students.enrollment_sync import ensure_current_enrollment
 from students.models import Enrollment, Student
@@ -69,7 +70,7 @@ class Base(TestCase):
         return ids(access_legacy.visible_students(u))
 
     def new(self, u):
-        return ids(access_enrollment.visible_students_by_enrollment(u))
+        return ids(access.visible_students(u))
 
     def report(self):
         out = StringIO()
@@ -227,17 +228,29 @@ class UnexplainedAndToolTests(Base):
         self.assertEqual(report['users_compared'], 0)
 
 
-class NoSwitchYetTests(Base):
-    def test_production_rule_is_still_the_legacy_rule(self):
-        """4b changes no access. REMOVE/REPLACE this test in the 4c switch commit (it asserts the pre-switch state)."""
-        self.student(self.c10a)
-        users = [self.lead('l', 10, '1404-1405'), self.teacher('t', self.c10a), self.lead('lv', 10, '1404')]
-        for u in users:
-            self.assertEqual(ids(access.visible_students(u)), self.legacy(u), u.username)
+class SwitchGuardTests(Base):
+    """Replace the two 4b guards (``test_production_rule_is_still_the_legacy_rule`` and
+    ``test_legacy_copy_is_verbatim_until_the_switch``): the former pinned the PRE-switch state, the latter that
+    the reference copy equals production. After 4c they are inverted."""
 
-    def test_legacy_copy_is_verbatim_until_the_switch(self):
-        for name in ('_grade_lead_q', '_teacher_assignments', '_full_tier_q', 'visible_students'):
-            self.assertEqual(inspect.getsource(getattr(access, name)), inspect.getsource(getattr(access_legacy, name)), name)
+    def test_production_rule_is_the_enrollment_rule(self):
+        """Mirror says 10-A, the current enrollment says 11-A: production follows the ENROLLMENT."""
+        s = self.student(self.c10a)
+        Enrollment.objects.filter(student=s).update(school_class=self.c11a, grade=11)
+        lead10, lead11 = self.lead('l10', 10, '1404-1405'), self.lead('l11', 11, '1404-1405')
+        t10, t11 = self.teacher('t10', self.c10a), self.teacher('t11', self.c11a)
+        self.assertEqual(ids(access.visible_students(lead10)), {})
+        self.assertEqual(set(ids(access.visible_students(lead11))), {s.pk})
+        self.assertEqual(ids(access.visible_students(t10)), {})
+        self.assertEqual(ids(access.visible_students(t11)), {s.pk: False})
+        # the reference copy still follows the mirror, so the two rules visibly differ here
+        self.assertEqual(set(self.legacy(lead10)), {s.pk})
+
+    def test_legacy_copy_is_not_used_by_production_and_differs_from_it(self):
+        for name in ('_grade_lead_q', 'visible_students'):
+            self.assertNotEqual(inspect.getsource(getattr(access, name)), inspect.getsource(getattr(access_legacy, name)), name)
+        self.assertNotIn('import access_legacy', inspect.getsource(access))
+        self.assertNotIn('from .access_legacy', inspect.getsource(access))
 
 
 class SeededParityTests(TestCase):

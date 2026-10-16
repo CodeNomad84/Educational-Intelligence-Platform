@@ -1,5 +1,9 @@
 """Single place that maps a Django user to roles and to the students they may see.
 
+Since stage 2.2a-4c (ADR-0011) Grade Lead and Subject Teacher scopes are decided by the student's CURRENT
+ENROLLMENT, not by the mirror fields on ``Student``; the pre-switch rule is kept verbatim in ``access_legacy`` for
+the parity tooling and for revert.
+
 Roles are the existing Django groups: ``SchoolAdmin`` (was ``Admin``), ``Teacher``, ``Parent``. A superuser is
 treated as ``SchoolAdmin``. Anything else (no group, anonymous, unknown group) gets NO role and
 therefore no access. This is an interim containment policy for Phase 1 (docs/SECURITY.md,
@@ -8,11 +12,13 @@ ADR-0003 is still DECISION REQUIRED); it is not the final authorization model.
 from functools import reduce
 from operator import or_
 
-from django.db.models import BooleanField, ExpressionWrapper, Q, Value
+from django.db.models import BooleanField, Exists, ExpressionWrapper, OuterRef, Q, Value
 
+from schools.academic_years import RESOLVED, normalize_academic_year
 from schools.vocabulary import SUBJECT_KEYS
 
-from .models import Attendance, Grade, Student
+from .enrollment_sync import CURRENT_STATUSES
+from .models import Attendance, Enrollment, Grade, Student
 
 ADMIN = 'SchoolAdmin'  # ADR-0010 (renamed by students/0010); FastAPI auth.ADMIN must match
 TEACHER = 'Teacher'  # Subject Teacher (ADR-0005)
@@ -48,24 +54,38 @@ def _may_hold_scoped_grants(user):
     return bool(user.is_active and not user.is_staff and not user.is_superuser)
 
 
+def _current_enrollment(school_id, *extra, **conditions):
+    """Q on ``Student``: the student has a CURRENT enrollment (open, status in ``CURRENT_STATUSES``) in the current
+    academic year of ``school_id``, and ``school_id`` is also the student's own school (owner D-4-1, D-4-4).
+    ``extra`` / ``conditions`` further filter the enrollment. An ``Exists`` subquery: no join duplicates, index-backed."""
+    return Q(school_id=school_id) & Q(Exists(Enrollment.objects.filter(
+        *extra, student_id=OuterRef('pk'), ended_on__isnull=True, status__in=CURRENT_STATUSES,
+        academic_year__is_current=True, academic_year__school_id=school_id, **conditions)))
+
+
 def _grade_lead_q(user, roles):
     """Students of (school, grade) for each ACTIVE assignment of the user (ADR-0005 §2; owner D-C5a-1).
 
-    Matched through the LINKED class: the class must be active and carry the assignment's academic year.
-    Unlinked students are invisible to a Grade Lead (fail closed). The group is re-checked here, so a row
-    of a user who left the group grants nothing.
+    Matched through the CURRENT ENROLLMENT (ADR-0011, owner D-4-2): the enrollment's grade equals the assignment's
+    grade and the current year's code equals the assignment's NORMALISED academic year; an enrollment class, when
+    present, must be active. An unresolved or blank assignment year grants nothing (fail closed), and so does a
+    student without a current enrollment. The group is re-checked here, so a row of a user who left the group
+    grants nothing.
     """
     if GRADE_LEAD not in roles or not _may_hold_scoped_grants(user):
         return None
     from schools.models import GradeLeadAssignment  # lazy: keeps the import graph acyclic
 
-    rows = GradeLeadAssignment.objects.filter(user=user, is_active=True).values_list(
-        'school_id', 'grade', 'academic_year')
-    return _any(
-        Q(school_id=school_id, grade=grade, school_class__isnull=False,
-          school_class__is_active=True, school_class__academic_year=year)
-        for school_id, grade, year in rows if year
-    )
+    parts = []
+    for school_id, grade, year in GradeLeadAssignment.objects.filter(user=user, is_active=True).values_list(
+            'school_id', 'grade', 'academic_year'):
+        status, code = normalize_academic_year(year)
+        if status != RESOLVED:
+            continue
+        parts.append(_current_enrollment(
+            school_id, Q(school_class__isnull=True) | Q(school_class__is_active=True),
+            academic_year__code=code, grade=grade))
+    return _any(parts)
 
 
 def _teacher_assignments(user, roles):
@@ -87,9 +107,9 @@ def _full_tier_q(user, roles):
 def visible_students(user):
     """Students the user may read: the union of the user's grants. Deny by default.
 
-    SchoolAdmin: all. Parent: own children. Grade Lead: students of the assigned school/grade whose linked
-    class is active and of the assignment's academic year. Subject Teacher: students of classes with an
-    active assignment. Each row is annotated ``full_tier``: True where a full-detail grant covers it
+    SchoolAdmin: all. Parent: own children. Grade Lead: students of the assigned school whose current enrollment
+    has the assigned grade, in the current year the assignment names. Subject Teacher: students whose current
+    enrollment is in a class with an active assignment. Each row is annotated ``full_tier``: True where a full-detail grant covers it
     (SchoolAdmin, Parent, Grade Lead), False where only a Subject Teacher grant does. Field policy, search
     and attendance follow ``full_tier``, never the user's role names (non-widening, ADR-0005 §5).
     """
@@ -98,7 +118,7 @@ def visible_students(user):
         return Student.objects.annotate(full_tier=Value(True, output_field=BooleanField()))
     full = _full_tier_q(user, roles)
     teacher = _any(
-        Q(school_id=school_id, school_class_id=class_id)
+        _current_enrollment(school_id, school_class_id=class_id)
         for school_id, class_id, _subject in _teacher_assignments(user, roles)
     )
     scope = _any([full, teacher])
@@ -120,7 +140,7 @@ def visible_grades(user):
     full = _full_tier_q(user, roles)
     parts = [Q(student__in=Student.objects.filter(full)) if full is not None else None]
     parts += [
-        Q(student__school_id=school_id, student__school_class_id=class_id, subject=subject)
+        Q(student__in=Student.objects.filter(_current_enrollment(school_id, school_class_id=class_id)), subject=subject)
         for school_id, class_id, subject in _teacher_assignments(user, roles)
     ]
     scope = _any(parts)

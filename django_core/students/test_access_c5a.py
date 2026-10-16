@@ -15,10 +15,11 @@ from django.test import TestCase
 from django.urls import reverse
 from rest_framework.test import APIClient
 
-from schools.models import GradeLeadAssignment, School, SchoolClass, TeacherAssignment
+from schools.models import AcademicYear, GradeLeadAssignment, School, SchoolClass, TeacherAssignment
 from students.access import (
     ADMIN, GRADE_LEAD, PARENT, TEACHER, visible_attendances, visible_grades, visible_students,
 )
+from students.enrollment_sync import ensure_current_enrollment
 from students.models import Attendance, Grade, Student
 
 User = get_user_model()
@@ -36,7 +37,10 @@ def make_user(username, *groups, **extra):
 
 class Base(TestCase):
     """School A: 10-A (1404, grade 10), 10-B (1404, grade 10), 11-A (1404, grade 11), 10-OLD (1403, grade 10).
-    School B: 10-A (1404). One unlinked grade-10 student of school A."""
+    School B: 10-A (1404). One unlinked grade-10 student of school A.
+    Since the 4c switch access follows the CURRENT ENROLLMENT: both schools have 1404-1405 as the current academic
+    year and every student with a current-year class is enrolled through the sync service (``enroll``). The 1403
+    class and the unlinked student get no current enrollment, as before they were not visible either."""
 
     def setUp(self):
         self.school = School.objects.create(name="A", code="a")
@@ -48,6 +52,9 @@ class Base(TestCase):
         self.c11a = mk(self.school, "11-A", "1404")
         self.c10old = mk(self.school, "10-OLD", "1403")
         self.c10x = mk(self.other_school, "10-A", "1404")
+        for school in (self.school, self.other_school):
+            AcademicYear.objects.create(school=school, code="1404-1405", start_date=date(2025, 9, 23),
+                                        end_date=date(2026, 6, 21), is_current=True)
         self.n = 0
         self.s10a = self.student(10, self.c10a, "S10A")
         self.s10b = self.student(10, self.c10b, "S10B")
@@ -55,6 +62,8 @@ class Base(TestCase):
         self.s10old = self.student(10, self.c10old, "S10OLD")
         self.s10x = self.student(10, self.c10x, "S10X")
         self.s10none = self.student(10, None, "S10NONE")
+        for st in Student.objects.all():
+            ensure_current_enrollment(st)
         for st in (self.s10a, self.s10b, self.s11a, self.s10x):
             for subject in ("math", "physics"):
                 Grade.objects.create(student=st, subject=subject, exam_type="quiz", score=15, date=date(2026, 1, 1))
