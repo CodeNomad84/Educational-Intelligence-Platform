@@ -1,5 +1,5 @@
 # CHANGE PROPOSAL — Phase 2.2a-4: access switch to current-enrollment matching
-Level: **L3** (authorization matching for Grade Lead and Subject Teacher) · Status: **PROPOSED, not implemented** (2026-10-16) · Own commits, parity-gated (owner, ADR-0011).
+Level: **L3** (authorization matching for Grade Lead and Subject Teacher) · Status: **DECISIONS TAKEN 2026-10-16 (D-4-1..6); 4a and 4b IMPLEMENTED; 4c not implemented, waits for the owner's confirmation of zero unexplained differences** · Own commits, parity-gated (owner, ADR-0011).
 Depends on: 2.2a-1..3 (schema, reports, backfill, historical import: CURRENT). Related: ADR-0003/0005/0011, `0003` §6, `TEACHER_ACCESS_REVIEW.md` R2/R3.
 
 ## 1. Why
@@ -36,7 +36,11 @@ Definition **current enrollment** of a student: an `Enrollment` with `ended_on I
 ## 6. Rollback
 4a/4b add code and tools only (revert the commits). 4c is a pure code change with no schema change: revert the commit and the legacy rule (kept verbatim in `access_legacy.py` until 4c is accepted in production) is active again; enrollments stay. 4d is an explicit admin command; its dry-run is the default and every enrollment it writes carries `source='rollover'`... (new source value; choice-only migration) so it can be reverted by source/batch.
 
-## 7. Decisions requested
+## 7. Decisions (owner, 2026-10-16)
+D-4-1 current = `active` + `transferred_in`; D-4-2 Grade Lead year matched by normalised code (FK later); D-4-3 a service called from the write paths, not signals; D-4-4 Subject Teacher uses the enrollment's class; D-4-5 rollover command before any school-year change; D-4-6 `compare_access_parity` exits non-zero on any unexplained difference.
+Note from 4a/4b: the pre-flight must treat a class-grade conflict that the sync refuses to enroll as a blocker (implemented), and a difference outside the documented list stays UNEXPLAINED until the data is fixed.
+
+## 7a. Decisions originally requested
 - **D-4-1** Which statuses count as current: recommend `active`, `transferred_in` only.
 - **D-4-2** Grade Lead assignment year: match by the normalised free-text code now (recommended), convert `GradeLeadAssignment.academic_year` to an FK later.
 - **D-4-3** Dual-write: a service called from the write paths (recommended, explicit) vs a `post_save` signal.
