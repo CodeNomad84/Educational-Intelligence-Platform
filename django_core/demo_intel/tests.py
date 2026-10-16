@@ -20,6 +20,7 @@ from django.utils import timezone  # noqa: E402
 from demo_intel import assistant  # noqa: E402
 from demo_intel.engine import analyze_student, analyze_students  # noqa: E402
 from demo_intel.models import InterventionRecord, StudentObservation  # noqa: E402
+from students.access import ADMIN, roles_for  # noqa: E402
 from students.models import Attendance, Grade, Student  # noqa: E402
 
 
@@ -104,6 +105,21 @@ class SeedAndViewTests(TestCase):
         with override_settings(DATABASES={"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": "/x/db.sqlite3"}}):
             with self.assertRaises(CommandError):
                 call_command("seed_demo", "--reset", verbosity=0)
+
+    def test_seed_creates_schooladmin_group_and_admin_roles(self):
+        """seed_demo must use the ADMIN constant (ADR-0010): SchoolAdmin exists and the pre-rename group name does not."""
+        self.assertEqual(ADMIN, "SchoolAdmin")
+        self.assertEqual(set(Group.objects.values_list("name", flat=True)), {ADMIN, "Parent"})
+        User = get_user_model()
+        for name in ("demo_admin", "demo_counselor"):
+            self.assertIn(ADMIN, roles_for(User.objects.get(username=name)), name)
+        self.assertNotIn(ADMIN, roles_for(User.objects.get(username="demo_parent")))
+
+    def test_admin_role_demo_login_reaches_admin_pages(self):
+        """Real password login (not force_login) as the Admin-role demo user reaches the 403-guarded demo pages."""
+        self.assertTrue(self.client.login(username="demo_admin", password="Test-pass-123"))
+        for url in ("/dashboard/", "/demo/counselor/", "/demo/students/"):
+            self.assertEqual(self.client.get(url).status_code, 200, url)
 
     def test_roles(self):
         c = self.client

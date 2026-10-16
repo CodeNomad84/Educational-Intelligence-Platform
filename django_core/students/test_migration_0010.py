@@ -64,8 +64,10 @@ class NoAdminLiteralTests(SimpleTestCase):
     def test_no_admin_group_literal_in_code_or_templates(self):
         pattern = re.compile(r"""['"]Admin['"]""")
         offenders = []
-        for path in list(ROOT.rglob('*.py')) + list(ROOT.rglob('*.html')):
-            rel = path.relative_to(ROOT)
+        # django_core code and templates plus the repo launch scripts (seed_demo and start_demo.sh are demo paths)
+        paths = list(ROOT.rglob('*.py')) + list(ROOT.rglob('*.html')) + list(ROOT.parent.glob('scripts/**/*.sh'))
+        for path in paths:
+            rel = path.relative_to(ROOT.parent)
             parts = rel.parts
             if '.venv' in parts or 'staticfiles' in parts or 'migrations' in parts:
                 continue
