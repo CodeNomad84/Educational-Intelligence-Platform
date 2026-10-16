@@ -45,6 +45,14 @@ class StudentAdmin(admin.ModelAdmin):
             kwargs['queryset'] = SchoolClass.objects.filter(Q(is_active=True) | Q(pk=current))
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        from django.contrib import messages
+        from students.enrollment_sync import SKIPPED, ensure_current_enrollment
+        outcome = ensure_current_enrollment(obj, source='manual')
+        if outcome in SKIPPED and outcome != 'no_class':
+            messages.warning(request, f'ثبت‌نام سال جاری به‌روز نشد ({outcome}).')
+
     # ✅ این خطوط را اضافه کنید تا Inlineها در صفحه‌ی دانش‌آموز نمایش داده شوند
     inlines = [GradeInline, AttendanceInline]
 

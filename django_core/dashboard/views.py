@@ -15,6 +15,7 @@ from students.access import (
     visible_students,
 )
 from .decorators import role_required
+from students.enrollment_sync import ensure_current_enrollment
 
 # صفحه‌ی ورود
 def login_view(request):
@@ -318,7 +319,8 @@ def student_create_view(request):
     if request.method == 'POST':
         form = StudentForm(request.POST)
         if form.is_valid():
-            form.save()
+            student = form.save()
+            ensure_current_enrollment(student, source='manual')  # keeps the current-year enrollment in step
             messages.success(request, 'دانش‌آموز با موفقیت اضافه شد.')
             return redirect('dashboard:student_list')
         else:

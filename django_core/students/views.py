@@ -22,6 +22,7 @@ from .serializers import StudentSerializer, FileUploadSerializer
 from .permissions import IsAdminUser  # فقط ادمین بتواند آپلود کند
 from django.core.exceptions import ImproperlyConfigured
 from config.service_auth import service_headers
+from .enrollment_sync import ensure_current_enrollment
 from .access import search_students, visible_attendances, visible_grades, visible_students
 
 # --- student import: class resolution (C3c-2) -------------------------------------------------------------
@@ -168,6 +169,7 @@ def _write_import_row(row, plan):
                     defaults['school_class_id'] = class_pk
                     link = True
         student, created = Student.objects.update_or_create(national_id=row.national_id, defaults=defaults)
+        ensure_current_enrollment(student, source='import')
         return student, created, link
 
 
@@ -201,10 +203,12 @@ class StudentViewSet(viewsets.ModelViewSet):
     # Writes are SchoolAdmin only; the instance has no tier annotation, so mark it full for the response.
     def perform_create(self, serializer):
         serializer.save()
+        ensure_current_enrollment(serializer.instance, source='manual')
         serializer.instance.full_tier = True
 
     def perform_update(self, serializer):
         serializer.save()
+        ensure_current_enrollment(serializer.instance, source='manual')
         serializer.instance.full_tier = True
 
     # ✅ اکشن جدید برای آپلود فایل
