@@ -20,6 +20,7 @@ from students.models import Enrollment, Student
 BLOCKERS = (
     'schools_with_students_but_no_current_year',
     'students_missing_current_enrollment',
+    'students_class_grade_conflict_would_vanish',
     'enrollment_mirror_disagreements',
     'grade_lead_assignments_with_unresolved_year',
     'grade_lead_assignments_year_has_no_academic_year_row',
@@ -72,7 +73,7 @@ class Command(BaseCommand):
                 r['info_students_with_stale_or_unresolved_class_year'] += 1
                 continue
             if class_grade is not None and class_grade != grade:
-                r['info_students_class_grade_conflict_not_expected_to_enroll'] += 1
+                r['students_class_grade_conflict_would_vanish'] += 1  # sync refuses to enroll: staff would lose them
                 continue
             rows = enrollments.get(pk, [])
             if not rows:

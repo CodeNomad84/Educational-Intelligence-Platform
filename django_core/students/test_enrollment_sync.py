@@ -151,6 +151,7 @@ class PreflightTests(Base):
         drift = self.student(self.c10b)
         Enrollment.objects.create(student=drift, academic_year=self.y_cur, school_class=self.c10a, grade=10)  # class disagrees
         self.student(self.c_old, grade=9)                         # stale mirror: informational only
+        self.student(self.c10a, grade=11)                         # class grade conflict: would vanish for staff
         lead = User.objects.create_user(username='lead')
         for year in ('404', '1405-1406', '1403-1404'):
             GradeLeadAssignment.objects.create(user=lead, school=self.school, grade=10, academic_year=year)
@@ -169,6 +170,7 @@ class PreflightTests(Base):
         self.assertEqual(report['students_missing_current_enrollment'], 1)
         self.assertEqual(report['enrollment_mirror_disagreements'], 1)
         self.assertEqual(report['info_students_with_stale_or_unresolved_class_year'], 1)
+        self.assertEqual(report['students_class_grade_conflict_would_vanish'], 1)
         self.assertEqual(report['grade_lead_assignments_with_unresolved_year'], 1)
         self.assertEqual(report['grade_lead_assignments_year_has_no_academic_year_row'], 1)
         self.assertEqual(report['grade_lead_assignments_year_not_current'], 1)
