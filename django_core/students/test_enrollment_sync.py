@@ -157,6 +157,8 @@ class PreflightTests(Base):
         t = User.objects.create_user(username='t')
         TeacherAssignment.objects.create(teacher=t, school_class=self.c10b, subject='physics')  # no current enrollments in 10-B
         TeacherAssignment.objects.create(teacher=t, school_class=self.c10a, subject='')         # grants nothing: informational
+        empty = SchoolClass.objects.create(school=self.school, title='12-A', academic_year='1404-1405', grade=12)
+        TeacherAssignment.objects.create(teacher=t, school_class=empty, subject='math')         # no students at all: not a blocker
         other = School.objects.create(name='B', code='b')
         SchoolClass.objects.create(school=other, title='c', academic_year='1404')
         Student.objects.create(first_name='O', last_name='T', national_id='9999999999', grade=10, phone_number='0',
