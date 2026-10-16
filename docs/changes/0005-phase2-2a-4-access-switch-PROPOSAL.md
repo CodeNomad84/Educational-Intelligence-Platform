@@ -1,5 +1,5 @@
 # CHANGE PROPOSAL — Phase 2.2a-4: access switch to current-enrollment matching
-Level: **L3** (authorization matching for Grade Lead and Subject Teacher) · Status: **DECISIONS TAKEN 2026-10-16 (D-4-1..6); 4a and 4b IMPLEMENTED; 4c not implemented, waits for the owner's confirmation of zero unexplained differences** · Own commits, parity-gated (owner, ADR-0011).
+Level: **L3** (authorization matching for Grade Lead and Subject Teacher) · Status: **DECISIONS TAKEN 2026-10-16 (D-4-1..6); 4a, 4b and 4d IMPLEMENTED; 4c not implemented. Loaded-database gate (synthetic, 234 students) = NOT READY: 6 data blockers and 124 intended gains from year spelling variants; 4c waits for the data to be fixed, the gate re-run, and the owner's confirmation** · Own commits, parity-gated (owner, ADR-0011).
 Depends on: 2.2a-1..3 (schema, reports, backfill, historical import: CURRENT). Related: ADR-0003/0005/0011, `0003` §6, `TEACHER_ACCESS_REVIEW.md` R2/R3.
 
 ## 1. Why
