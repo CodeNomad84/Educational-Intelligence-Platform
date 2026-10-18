@@ -34,6 +34,7 @@ class Command(BaseCommand):
         parser.add_argument('--json', action='store_true')
 
     def handle(self, *args, **opts):
+        batch_log.reject_flag_combinations(opts, revert='revert_batch', needs_apply=('batch_file',))
         if opts['revert_batch']:
             return self._revert(opts)
         User = get_user_model()
@@ -74,12 +75,15 @@ class Command(BaseCommand):
         if opts['apply']:
             if not opts['batch_file']:
                 raise CommandError('--apply needs --batch-file (a new file that records the created rows).')
+            batch_log.ensure_new(opts['batch_file'])
             with transaction.atomic():
                 # the batch file is written inside the transaction, before it commits: if writing it fails (existing
                 # file, unwritable path) the rows are rolled back; a batch that outlives a failed commit lists rows that
                 # do not exist, and the revert leaves missing rows alone
                 rows = SchoolMembership.objects.bulk_create(
                     [SchoolMembership(user_id=pk, school_id=school_id) for pk in eligible])
+                if not all(row.pk for row in rows):
+                    raise CommandError('The database did not return the new ids; nothing was written.')
                 batch_log.write_batch(opts['batch_file'], COMMAND, {
                     'school_id': school_id,
                     'memberships': [{'id': row.pk, 'user_id': row.user_id} for row in rows]})
@@ -90,16 +94,12 @@ class Command(BaseCommand):
 
     def _revert(self, opts):
         data = batch_log.read_batch(opts['revert_batch'], COMMAND)
-        entries = data.get('memberships')
-        school_id = data.get('school_id')
-        if not isinstance(entries, list) or not isinstance(school_id, int) or not all(
-                isinstance(e, dict) and isinstance(e.get('id'), int) and isinstance(e.get('user_id'), int)
-                for e in entries):
-            raise CommandError('The batch file is malformed.')
+        school_id = batch_log.require_valid_id(data, 'school_id')
+        entries = batch_log.id_rows(data, 'memberships', ('id', 'user_id'))
         deleted = changed = missing = 0
         with transaction.atomic():
             for entry in entries:
-                row = SchoolMembership.objects.filter(pk=entry['id']).first()
+                row = SchoolMembership.objects.select_for_update().filter(pk=entry['id']).first()
                 if row is None:
                     missing += 1
                 elif row.user_id != entry['user_id'] or row.school_id != school_id or not row.is_active:

@@ -39,6 +39,8 @@ class Command(BaseCommand):
         parser.add_argument('--revert-batch', help='batch file to revert')
 
     def handle(self, *args, **opts):
+        batch_log.reject_flag_combinations(
+            opts, revert='revert_batch', apply_requires='deactivate', needs_apply=('batch_file',))
         if opts['revert_batch']:
             return self._revert(opts)
         rows = classify_memberships()
@@ -59,12 +61,21 @@ class Command(BaseCommand):
             report['would_deactivate'] = len(ids)
             if opts['apply']:
                 if not opts['batch_file']:
-                    raise CommandError('--apply needs --batch-file (a new file that records the affected ids).')
-                batch_log.write_batch(opts['batch_file'], COMMAND, {'membership_ids': ids})
+                    raise CommandError('--apply needs --batch-file (a new file that records the affected rows).')
+                batch_log.ensure_new(opts['batch_file'])
                 with transaction.atomic():
-                    SchoolMembership.objects.filter(pk__in=ids, is_active=True).update(
+                    # re-classify inside the transaction and lock the rows: the batch records the rows ACTUALLY updated
+                    current = sorted(r['id'] for r in classify_memberships() if r['is_active'] and r['reason'])
+                    locked = list(SchoolMembership.objects.select_for_update().filter(
+                        pk__in=current, is_active=True).values('id', 'user_id', 'school_id'))
+                    updated = SchoolMembership.objects.filter(
+                        pk__in=[row['id'] for row in locked], is_active=True).update(
                         is_active=False, updated_at=timezone.now())
-                report['writes'] = f'deactivated {len(ids)}; batch file written'
+                    if updated != len(locked):
+                        raise CommandError('The rows changed while deactivating; nothing was written. Re-run.')
+                    batch_log.write_batch(opts['batch_file'], COMMAND, {'memberships': locked})
+                report['would_deactivate'] = len(locked)
+                report['writes'] = f'deactivated {len(locked)}; batch file written'
             else:
                 report['mode'] = 'dry-run (nothing written)'
         self._print(report, opts)
@@ -73,13 +84,23 @@ class Command(BaseCommand):
 
     def _revert(self, opts):
         data = batch_log.read_batch(opts['revert_batch'], COMMAND)
-        ids = batch_log.int_list(data, 'membership_ids')
+        rows = batch_log.id_rows(data, 'memberships', ('id', 'user_id', 'school_id'))
+        reactivated = mismatch = missing = already_active = 0
         with transaction.atomic():
-            restored = SchoolMembership.objects.filter(pk__in=ids, is_active=False).update(
-                is_active=True, updated_at=timezone.now())
-        missing = len(ids) - SchoolMembership.objects.filter(pk__in=ids).count()
-        self._print({'batch_rows': len(ids), 'reactivated': restored, 'rows_missing': missing,
-                     'already_active': len(ids) - restored - missing,
+            for entry in rows:
+                row = SchoolMembership.objects.select_for_update().filter(pk=entry['id']).first()
+                if row is None:
+                    missing += 1
+                elif row.user_id != entry['user_id'] or row.school_id != entry['school_id']:
+                    mismatch += 1  # not the row the batch changed: left alone
+                elif row.is_active:
+                    already_active += 1
+                else:
+                    SchoolMembership.objects.filter(pk=row.pk, is_active=False).update(
+                        is_active=True, updated_at=timezone.now())
+                    reactivated += 1
+        self._print({'batch_rows': len(rows), 'reactivated': reactivated, 'already_active': already_active,
+                     'rows_missing': missing, 'left_alone_user_or_school_differs': mismatch,
                      'warning': 'reverting re-activates exactly the batch rows; an orphan row stays an orphan',
                      'writes': 'reverted'}, opts)
 

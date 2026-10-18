@@ -65,6 +65,8 @@ class Command(BaseCommand):
         parser.add_argument('--json', action='store_true')
 
     def handle(self, *args, **opts):
+        batch_log.reject_flag_combinations(
+            opts, revert='revert_batch', needs_apply=('batch_file', 'accept_visibility_change'))
         if opts['revert_batch']:
             return self._revert(opts)
         school_ids = list(School.objects.order_by('pk').values_list('pk', flat=True))
@@ -93,17 +95,23 @@ class Command(BaseCommand):
                 raise CommandError(
                     f'Refused: {widened} student(s) already have a current enrollment and would become visible to '
                     'staff of their school. Review them, then re-run with --accept-visibility-change.')
-            items = [{'student_id': pk, 'school_id': sid} for pk, sid in sorted(assignments.items())]
-            batch_log.write_batch(opts['batch_file'], COMMAND, {'assignments': items})
-            written = 0
+            batch_log.ensure_new(opts['batch_file'])
+            items = []
             with transaction.atomic():
                 grouped = defaultdict(list)
                 for pk, sid in assignments.items():
                     grouped[sid].append(pk)
-                for sid, pks in grouped.items():
-                    for chunk in _chunks(pks):
-                        written += Student.objects.filter(pk__in=chunk, school__isnull=True).update(school_id=sid)
-            report['writes'] = f'set {written}; batch file written'
+                for sid, pks in sorted(grouped.items()):
+                    for chunk in _chunks(sorted(pks)):
+                        # lock the rows that are STILL NULL: the batch records the rows actually written
+                        ids = list(Student.objects.select_for_update().filter(
+                            pk__in=chunk, school__isnull=True).values_list('pk', flat=True))
+                        if Student.objects.filter(pk__in=ids, school__isnull=True).update(school_id=sid) != len(ids):
+                            raise CommandError('The rows changed while writing; nothing was written. Re-run.')
+                        items.extend({'student_id': pk, 'school_id': sid} for pk in ids)
+                batch_log.write_batch(opts['batch_file'], COMMAND, {'assignments': items})
+            report['planned'] = len(assignments)
+            report['writes'] = f'set {len(items)}; batch file written'
         else:
             report['mode'] = 'dry-run (nothing written)'
         self._print(report, opts)
@@ -125,11 +133,7 @@ class Command(BaseCommand):
 
     def _revert(self, opts):
         data = batch_log.read_batch(opts['revert_batch'], COMMAND)
-        items = data.get('assignments')
-        if not isinstance(items, list) or not all(
-                isinstance(i, dict) and all(isinstance(i.get(k), int) and not isinstance(i.get(k), bool)
-                                            for k in ('student_id', 'school_id')) for i in items):
-            raise CommandError('The batch file is malformed.')
+        items = batch_log.id_rows(data, 'assignments', ('student_id', 'school_id'))
         grouped = defaultdict(list)
         for i in items:
             grouped[i['school_id']].append(i['student_id'])

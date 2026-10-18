@@ -150,7 +150,7 @@ class BackfillSchoolMembershipsTests(ToolCase):
 
     def test_revert_rejects_a_foreign_or_malformed_batch(self):
         with open(self.path("bad.json"), "w", encoding="utf-8") as handle:
-            json.dump({"command": "check_school_memberships", "version": 1, "membership_ids": [1]}, handle)
+            json.dump({"command": "check_school_memberships", "version": 2, "memberships": []}, handle)
         with self.assertRaises(CommandError):
             self.run_cmd("backfill_school_memberships", "--revert-batch", self.path("bad.json"))
         with open(self.path("junk.json"), "w", encoding="utf-8") as handle:
@@ -261,7 +261,7 @@ class CheckSchoolMembershipsTests(ToolCase):
                          (True, False, False, False))
         self.assertEqual(SchoolMembership.objects.count(), 4)
         with open(self.path(), encoding="utf-8") as handle:
-            self.assertEqual(sorted(json.load(handle)["membership_ids"]), sorted([dual.pk, gone.pk]))
+            self.assertEqual(sorted(m["id"] for m in json.load(handle)["memberships"]), sorted([dual.pk, gone.pk]))
         report = self.run_json("check_school_memberships")
         self.assertEqual(report["orphan_active_total"], 0)
 
@@ -292,13 +292,13 @@ class CheckSchoolMembershipsTests(ToolCase):
 
     def test_revert_rejects_a_foreign_batch(self):
         with open(self.path(), "w", encoding="utf-8") as handle:
-            json.dump({"command": "backfill_school_memberships", "version": 1, "membership_ids": [1]}, handle)
+            json.dump({"command": "backfill_school_memberships", "version": 2, "memberships": [{"id": 1, "user_id": 1, "school_id": 1}]}, handle)
         with self.assertRaises(CommandError):
             self.run_cmd("check_school_memberships", "--revert-batch", self.path())
 
     def test_revert_rejects_a_malformed_id_list(self):
         with open(self.path(), "w", encoding="utf-8") as handle:
-            json.dump({"command": "check_school_memberships", "version": 1, "membership_ids": ["1; drop"]}, handle)
+            json.dump({"command": "check_school_memberships", "version": 2, "memberships": [{"id": "1; drop", "user_id": 1, "school_id": 1}]}, handle)
         with self.assertRaises(CommandError):
             self.run_cmd("check_school_memberships", "--revert-batch", self.path())
 

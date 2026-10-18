@@ -172,11 +172,11 @@ class BackfillStudentSchoolTests(TestCase):
 
     def test_revert_rejects_foreign_malformed_and_hostile_batches(self):
         cases = {
-            "foreign.json": {"command": "check_school_memberships", "version": 1, "assignments": []},
-            "text.json": {"command": "backfill_student_school", "version": 1, "assignments": "all"},
-            "bool.json": {"command": "backfill_student_school", "version": 1,
+            "foreign.json": {"command": "check_school_memberships", "version": 2, "assignments": []},
+            "text.json": {"command": "backfill_student_school", "version": 2, "assignments": "all"},
+            "bool.json": {"command": "backfill_student_school", "version": 2,
                           "assignments": [{"student_id": True, "school_id": 1}]},
-            "str.json": {"command": "backfill_student_school", "version": 1,
+            "str.json": {"command": "backfill_student_school", "version": 2,
                          "assignments": [{"student_id": "1 OR 1=1", "school_id": 1}]},
         }
         for name, payload in cases.items():
