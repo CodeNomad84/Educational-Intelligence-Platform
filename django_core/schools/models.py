@@ -242,9 +242,9 @@ class SchoolMembership(models.Model):
         return f"{self.user} → {self.school}"
 
     def clean(self):
-        """Only an active, non-superuser account in group ``SchoolAdmin`` may be a member (re-checked at query
-        time by ``school_ids_for_admin``). ``is_staff`` is allowed until the Django admin is restricted (S9)."""
-        from students.access import ADMIN  # lazy: keeps role names in one place, avoids an import cycle
+        """Only an active, non-superuser account in group ``SchoolAdmin`` and NOT in ``PlatformAdmin`` may be a
+        member (the group and account state are re-checked at query time by ``school_ids_for_admin``). ``is_staff`` is allowed until the Django admin is restricted (S9)."""
+        from students.access import ADMIN, PLATFORM_ADMIN  # lazy: keeps role names in one place, avoids an import cycle
 
         errors = {}
         if self.user_id:
@@ -255,6 +255,9 @@ class SchoolMembership(models.Model):
                 errors["user"] = "حساب superuser نمی‌تواند عضو مدرسه باشد."
             elif not user.groups.filter(name=ADMIN).exists():
                 errors["user"] = f"کاربر باید عضو گروه «{ADMIN}» باشد."
+            elif user.groups.filter(name=PLATFORM_ADMIN).exists():
+                # separation of duties (review finding F1): who manages memberships must not hold one
+                errors["user"] = f"کاربر عضو گروه «{PLATFORM_ADMIN}» است و نمی‌تواند عضو مدرسه باشد."
         if errors:
             raise ValidationError(errors)
 

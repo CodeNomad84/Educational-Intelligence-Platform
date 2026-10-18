@@ -159,12 +159,13 @@ class SchoolMembershipAdmin(admin.ModelAdmin):
         return _platform_level(request) and super().has_delete_permission(request, obj)
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        from students.access import ADMIN
+        from students.access import ADMIN, PLATFORM_ADMIN
 
         if db_field.name == "user":
             kwargs["queryset"] = (
                 get_user_model().objects
                 .filter(is_active=True, is_superuser=False, groups__name=ADMIN)
+                .exclude(groups__name=PLATFORM_ADMIN)  # separation of duties (F1)
                 .order_by("username")
                 .distinct()
             )

@@ -72,6 +72,21 @@ class MembershipHygieneTests(TestCase):
             with self.subTest(group=group), self.assertRaises(ValidationError):
                 self.membership(make_user(name, group)).full_clean()
 
+    def test_user_holding_both_school_admin_and_platform_admin_cannot_be_a_member(self):
+        """Review finding F1: separation of duties."""
+        user = make_user("both", ADMIN)
+        user.groups.add(Group.objects.get_or_create(name=PLATFORM_ADMIN)[0])
+        with self.assertRaises(ValidationError) as ctx:
+            self.membership(user).full_clean()
+        self.assertIn("user", ctx.exception.message_dict)
+
+    def test_joining_platform_admin_later_does_not_make_clean_pass_again(self):
+        user = make_user("later", ADMIN)
+        membership = SchoolMembership.objects.create(user=user, school=self.a)
+        user.groups.add(Group.objects.get_or_create(name=PLATFORM_ADMIN)[0])
+        with self.assertRaises(ValidationError):
+            membership.full_clean()
+
     def test_user_and_school_pair_is_unique(self):
         user = make_user("sa", ADMIN)
         SchoolMembership.objects.create(user=user, school=self.a)
@@ -365,6 +380,15 @@ class SchoolMembershipAdminTests(TestCase):
         make_user("root", ADMIN, is_superuser=True)
         field = self.model_admin.formfield_for_foreignkey(
             SchoolMembership._meta.get_field("user"), self.request(User.objects.create_superuser("r2", password="x")))
+        self.assertEqual(list(field.queryset), [eligible])
+
+    def test_user_choices_exclude_a_user_who_also_holds_platform_admin(self):
+        """Review finding F1: the picker never offers a dual-role account."""
+        eligible = make_user("sa", ADMIN)
+        both = make_user("both", ADMIN)
+        both.groups.add(Group.objects.get_or_create(name=PLATFORM_ADMIN)[0])
+        field = self.model_admin.formfield_for_foreignkey(
+            SchoolMembership._meta.get_field("user"), self.request(User.objects.create_superuser("r3", password="x")))
         self.assertEqual(list(field.queryset), [eligible])
 
     def test_created_by_is_set_on_creation(self):
