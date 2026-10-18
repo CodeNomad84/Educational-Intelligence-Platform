@@ -179,6 +179,45 @@ class SchoolIdsForAdminTests(TestCase):
             with self.subTest(group=group):
                 self.assertEqual(school_ids_for_admin(user), set())
 
+    def test_user_added_to_platform_admin_after_the_membership_exists_gets_the_empty_set(self):
+        """Review finding G1: the model check is creation-time, so the helper re-checks the group."""
+        self.join(self.a)
+        self.join(self.b)
+        self.assertEqual(school_ids_for_admin(self.user), {self.a.pk, self.b.pk})
+        self.user.groups.add(Group.objects.get_or_create(name=PLATFORM_ADMIN)[0])
+        self.assertEqual(school_ids_for_admin(User.objects.get(pk=self.user.pk)), set())
+
+    def test_leaving_platform_admin_again_restores_the_scope(self):
+        """Documents the behaviour: the rows are untouched, only the dual-role state neutralises them."""
+        self.join(self.a)
+        group = Group.objects.get_or_create(name=PLATFORM_ADMIN)[0]
+        self.user.groups.add(group)
+        self.assertEqual(school_ids_for_admin(self.user), set())
+        self.user.groups.remove(group)
+        self.assertEqual(school_ids_for_admin(User.objects.get(pk=self.user.pk)), {self.a.pk})
+
+    def test_bulk_created_row_for_a_dual_role_user_grants_nothing(self):
+        """Review finding G2: bulk_create/ORM writes bypass clean(); the query-time check is the control."""
+        dual = make_user("dual", ADMIN)
+        dual.groups.add(Group.objects.get_or_create(name=PLATFORM_ADMIN)[0])
+        SchoolMembership.objects.bulk_create([
+            SchoolMembership(user=dual, school=self.a), SchoolMembership(user=dual, school=self.b)])
+        self.assertEqual(SchoolMembership.objects.filter(user=dual).count(), 2)
+        self.assertEqual(school_ids_for_admin(dual), set())
+
+    def test_orm_created_row_for_a_dual_role_user_grants_nothing(self):
+        dual = make_user("dual", ADMIN)
+        dual.groups.add(Group.objects.get_or_create(name=PLATFORM_ADMIN)[0])
+        self.join(self.a, user=dual)  # bypasses clean()
+        self.assertEqual(school_ids_for_admin(dual), set())
+
+    def test_other_users_scope_is_unaffected_by_a_dual_role_user(self):
+        dual = make_user("dual", ADMIN)
+        dual.groups.add(Group.objects.get_or_create(name=PLATFORM_ADMIN)[0])
+        self.join(self.a, user=dual)
+        self.join(self.b)
+        self.assertEqual(school_ids_for_admin(self.user), {self.b.pk})
+
     def test_anonymous_and_none_grant_nothing(self):
         self.join(self.a)
         self.assertEqual(school_ids_for_admin(AnonymousUser()), set())

@@ -50,14 +50,18 @@ def school_ids_for_admin(user):
     visibility rule yet; the SchoolAdmin branch of ``visible_*`` still returns everything until S3).
 
     Empty set for anonymous, inactive and superuser accounts, for users outside the ``SchoolAdmin`` group
-    (checked on the group itself, never through ``roles_for``, which maps a superuser to SchoolAdmin) and for
-    inactive memberships. Account state, group and membership are all re-checked here, at query time.
+    (checked on the group itself, never through ``roles_for``, which maps a superuser to SchoolAdmin), for ANY
+    user who also holds ``PlatformAdmin`` (separation of duties; review findings G1/G2: the model check in
+    ``SchoolMembership.clean`` runs only at creation, so the group is re-checked here) and for inactive
+    memberships. Account state, groups and membership are all re-checked here, at query time. Callers must treat
+    an empty set as "no school", never as "no filter" (review finding F3).
     """
     if user is None or not getattr(user, 'is_authenticated', False):
         return set()
     if not user.is_active or user.is_superuser:
         return set()
-    if not user.groups.filter(name=ADMIN).exists():
+    held = set(user.groups.filter(name__in=(ADMIN, PLATFORM_ADMIN)).values_list('name', flat=True))
+    if ADMIN not in held or PLATFORM_ADMIN in held:
         return set()
     from schools.models import SchoolMembership  # lazy: keeps the import graph acyclic
 
