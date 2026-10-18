@@ -1,5 +1,5 @@
 # CHANGE REPORT — Multi-school hosting, stage S1: SchoolMembership, empty PlatformAdmin group, `school_ids_for_admin`
-Proposal: `0010-multi-school-hosting-PROPOSAL.md` §9 (S1) · ADR-0012 · Level: L3 · Date: 2026-10-19 · Commits: `ee8cfd6` (S1) and `8918434` (review finding F1) · Status: **S1 accepted by the owner; not pushed**. S2 and later, 2.2-0, 2.2 and 2.4 are NOT started.
+Proposal: `0010-multi-school-hosting-PROPOSAL.md` §9 (S1) · ADR-0012 · Level: L3 · Date: 2026-10-19 · Commits: `ee8cfd6` (S1), `8918434` (review finding F1), `b1ef9d7` (review findings G1/G2) · Status: **S1 accepted by the owner; not pushed**. S2 and later, 2.2-0, 2.2 and 2.4 are NOT started.
 Rule that still applies: NO REAL STUDENT DATA until the P3 exit criteria and the 2.4 audit log. All data below is synthetic or empty.
 
 ## WHY
@@ -70,17 +70,30 @@ Result: **no High or Medium issue newly introduced by `ee8cfd6`**; "S1 changes n
 | F4 | Membership rows survive group removal; a re-added user regains the old scope (3) | Low | **S2** (as F2) |
 | F5 | `created_by` is set only by the admin (2) | Info | No action |
 
-**Review of the follow-up `8918434`** (also static, all findings): F1 is closed for the two paths the commit targets (admin form and `full_clean()`); no new vulnerability was introduced. It reports residual items that are **not** closed by `8918434` and are **OPEN, decision requested** (nothing has been changed for them):
+**Review of the follow-up `8918434`** (also static, all findings): F1 is closed for the two paths the commit targets (admin form and `full_clean()`); no new vulnerability was introduced. It reported residual items G1–G5, handled as follows (owner decision 2026-10-19):
 | # | Residual item (confidence /10) | Severity | Proposed handling (not decided) |
 |---|---|---|---|
-| G1 | Group added after the membership exists: `clean()` is not re-run, and `school_ids_for_admin` would still return the schools of a user who later joins `PlatformAdmin` (8) | Medium now as latent; High once S3 reads memberships | Make `school_ids_for_admin` return the empty set for a user in `PlatformAdmin` (one cheap query; changes no S1 access because nothing calls the helper), and/or reject the second role on `User.groups` changes (`m2m_changed`); before S3 |
-| G2 | Direct ORM/shell/`bulk_create`/`loaddata`/`update` skip `clean()` (9) | Low | Covered by the query-time check of G1; same limit as the other three `clean()` rules |
-| G3 | A dual-role row cannot be deactivated in the admin ("invalid choice"), only deleted (7) | Low | Same as F2 (S2) |
-| G4 | The group is matched by name; a renamed group silently stops the rule (5) | Info | Existing pattern across the code base; `setup_platform_role` could assert the name |
-| G5 | Whether `SchoolAdmin` holds `auth.change_user`/`auth.change_group` and could add itself to `PlatformAdmin` (3) | Info | By design `setup_staff_roles` never grants `auth.*` (docstring; test P2-REQ-17 in `schools/tests.py`), and the stock Django user admin is the one in use (the `accounts` app is not installed); the permissions of the real Admin group are NOT VERIFIED |
+| G1 | Group added after the membership exists: `clean()` is not re-run, and `school_ids_for_admin` would still return the schools of a user who later joins `PlatformAdmin` (8) | Medium now as latent; High once S3 reads memberships | **Fixed** in `b1ef9d7`: the helper re-checks the `PlatformAdmin` group at query time and returns the empty set for any member. The `m2m_changed` guard was **skipped** (see below) |
+| G2 | Direct ORM/shell/`bulk_create`/`loaddata`/`update` skip `clean()` (9) | Low | **Fixed** in `b1ef9d7` by the same query-time check (tests: bulk_create and ORM rows of a dual-role user grant nothing) |
+| G3 | A dual-role row cannot be deactivated in the admin ("invalid choice"), only deleted (7) | Low | **S2 tooling requirement** (0010 §9: `user` read-only on change, `--deactivate`) |
+| G4 | The group is matched by name; a renamed group silently stops the rule (5) | Info | **Documented risk** MS-R9 in 0010 §14; not fixed |
+| G5 | Whether `SchoolAdmin` holds `auth.change_user`/`auth.change_group` and could add itself to `PlatformAdmin` (3) | Info | **S9 checklist item** in 0010 §9: list the real Admin group permissions on the target database; NOT VERIFIED today. By design `setup_staff_roles` never grants `auth.*` (docstring; test P2-REQ-17 in `schools/tests.py`); the stock Django user admin is in use (the `accounts` app is not installed) |
 Checked and safe: `.exclude(groups__name=...)` on the M2M join, the `elif` ordering, superuser-also-in-groups, every `has_*_permission` override.
 
 Evidence for `8918434`: `students dashboard schools` **487** tests OK on SQLite (plus 34 `demo_intel`) and on PostgreSQL 16 (disposable container, test database only, removed afterwards); `schools/test_school_membership.py` 49 tests. Mutation checks: removing the `clean()` rule fails `test_user_holding_both_school_admin_and_platform_admin_cannot_be_a_member` and `test_joining_platform_admin_later_does_not_make_clean_pass_again`; removing the picker exclusion fails `test_user_choices_exclude_a_user_who_also_holds_platform_admin`; files restored and hash-verified.
 
+**Skipped on purpose: the `m2m_changed` guard on `User.groups`.** It would block creating the dual-role state at the source, but it is not simple: it would raise inside the stock Django user/group admin (a 500 instead of a form error unless the admin forms are also changed), it would affect every existing code path and test fixture that adds groups (seeds, `make_user` helpers, the F1 tests that create a dual-role user on purpose), and it touches group management outside this stage. The query-time check in `school_ids_for_admin` already makes the dual-role state grant nothing, wherever it comes from. Revisit if a later stage needs the state to be impossible rather than harmless.
+
+**Review of the G1/G2 fix `b1ef9d7`** (static, all findings; no High or Medium; G1/G2 closed at read time for every caller that goes through the helper; fail-closed in every group/account combination; no new vulnerability):
+| # | Finding (confidence /10) | Severity | Handling |
+|---|---|---|---|
+| H1 | The dual-role neutralisation protects only the helper; a future reader of `SchoolMembership` that bypasses it would reopen G1/G2; the existing "no reader" tests check a fixed module list (6) | Low | **Open, for S3**: the helper must stay the only reader of `SchoolMembership` outside `schools/`; add a repo-wide test that no other module references it |
+| H2 | Leaving `PlatformAdmin` silently restores the old scope (rows are untouched; tested on purpose) (5) | Low | **Open, for S2**: consider deactivating a user's memberships when they join `PlatformAdmin`, or a runbook step "review memberships on role change" |
+| H3 | Exact group name is the only control; if the `PlatformAdmin` group is renamed or deleted the dual-role check stops applying (the `SchoolAdmin` side fails closed) (4) | Info | Same as G4 / MS-R9 |
+| H4 | The helper trusts `is_active`/`is_superuser` of the passed user object (same as `roles_for`) (3) | Low | Note for S3 (callers pass a freshly loaded `request.user`) |
+| H5 | Empty set could be misread as "no filter"; no test pins the downstream behaviour (6) | Info | F3 test requirement in 0010 S3 already covers it (the S3 test must assert a filter built from the empty set returns zero rows) |
+
+Evidence for `b1ef9d7`: `students dashboard schools` **492** tests OK on SQLite (plus 34 `demo_intel`) and on PostgreSQL 16 (disposable container, test database only, removed afterwards); `schools/test_school_membership.py` 54 tests. Mutation check: removing the `PlatformAdmin` condition in the helper fails `test_user_added_to_platform_admin_after_the_membership_exists_gets_the_empty_set`, `test_leaving_platform_admin_again_restores_the_scope`, `test_bulk_created_row_for_a_dual_role_user_grants_nothing` and `test_orm_created_row_for_a_dual_role_user_grants_nothing`; file restored and hash-verified.
+
 ## OWNER ACCEPTANCE
-S1 (`ee8cfd6`) accepted 2026-10-19. Not pushed; the push awaits the owner's approval. S2 and later need their own explicit approval.
+S1 (`ee8cfd6`), the F1 fix (`8918434`) and the review record (`0da37bd`) accepted 2026-10-19; the G1/G2 fix (`b1ef9d7`) and this record are pending review. Not pushed; the push awaits the owner's approval. S2 and later need their own explicit approval.
