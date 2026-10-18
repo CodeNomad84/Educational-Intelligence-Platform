@@ -244,20 +244,26 @@ class SchoolMembership(models.Model):
     def clean(self):
         """Only an active, non-superuser account in group ``SchoolAdmin`` and NOT in ``PlatformAdmin`` may be a
         member (the group and account state are re-checked at query time by ``school_ids_for_admin``). ``is_staff`` is allowed until the Django admin is restricted (S9)."""
+        from django.core.exceptions import NON_FIELD_ERRORS
+
         from students.access import ADMIN, PLATFORM_ADMIN  # lazy: keeps role names in one place, avoids an import cycle
 
         errors = {}
-        if self.user_id:
+        # An existing INACTIVE row is not re-validated: it grants nothing and must stay deactivatable (review
+        # finding G3). On an existing row the user cannot be edited (read-only in the admin), so the error is a
+        # non-field error there instead of a field error the form does not have.
+        if self.user_id and (self._state.adding or self.is_active):
+            key = "user" if self._state.adding else NON_FIELD_ERRORS
             user = self.user
             if not user.is_active:
-                errors["user"] = "کاربر غیرفعال است."
+                errors[key] = "کاربر غیرفعال است."
             elif user.is_superuser:
-                errors["user"] = "حساب superuser نمی‌تواند عضو مدرسه باشد."
+                errors[key] = "حساب superuser نمی‌تواند عضو مدرسه باشد."
             elif not user.groups.filter(name=ADMIN).exists():
-                errors["user"] = f"کاربر باید عضو گروه «{ADMIN}» باشد."
+                errors[key] = f"کاربر باید عضو گروه «{ADMIN}» باشد."
             elif user.groups.filter(name=PLATFORM_ADMIN).exists():
                 # separation of duties (review finding F1): who manages memberships must not hold one
-                errors["user"] = f"کاربر عضو گروه «{PLATFORM_ADMIN}» است و نمی‌تواند عضو مدرسه باشد."
+                errors[key] = f"کاربر عضو گروه «{PLATFORM_ADMIN}» است و نمی‌تواند عضو مدرسه باشد."
         if errors:
             raise ValidationError(errors)
 

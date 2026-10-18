@@ -446,3 +446,79 @@ class SchoolMembershipAdminTests(TestCase):
         sa = self.grant(sa, "view")
         self.client.force_login(sa)
         self.assertEqual(self.client.get("/admin/schools/schoolmembership/").status_code, 403)
+
+
+class OrphanRowLifecycleTests(TestCase):
+    """S2 / review finding G3: an orphan or dual-role row must be deactivatable and is not re-validated once inactive."""
+
+    def setUp(self):
+        self.school = School.objects.create(name="A", code="a")
+        self.root = User.objects.create_superuser("root", password="x")
+        self.client.force_login(self.root)
+
+    def orphan(self, kind):
+        user = make_user(f"o_{kind}", ADMIN)
+        membership = SchoolMembership.objects.create(user=user, school=self.school)
+        if kind == "dual":
+            user.groups.add(Group.objects.get_or_create(name=PLATFORM_ADMIN)[0])
+        elif kind == "left_group":
+            user.groups.clear()
+        elif kind == "inactive_user":
+            User.objects.filter(pk=user.pk).update(is_active=False)
+        elif kind == "superuser":
+            User.objects.filter(pk=user.pk).update(is_superuser=True)
+        return SchoolMembership.objects.get(pk=membership.pk)
+
+    def test_active_orphan_fails_full_clean_with_a_non_field_error(self):
+        for kind in ("dual", "left_group", "inactive_user", "superuser"):
+            with self.subTest(kind=kind), self.assertRaises(ValidationError) as ctx:
+                self.orphan(kind).full_clean()
+            self.assertNotIn("user", ctx.exception.message_dict)
+
+    def test_inactive_orphan_is_not_revalidated(self):
+        for kind in ("dual", "left_group", "inactive_user", "superuser"):
+            membership = self.orphan(kind)
+            membership.is_active = False
+            with self.subTest(kind=kind):
+                membership.full_clean()  # does not raise
+
+    def test_creation_still_reports_a_field_error(self):
+        user = make_user("new", ADMIN, is_superuser=True)
+        with self.assertRaises(ValidationError) as ctx:
+            SchoolMembership(user=user, school=self.school).full_clean()
+        self.assertIn("user", ctx.exception.message_dict)
+
+    def test_admin_change_form_deactivates_an_orphan_row(self):
+        for kind in ("dual", "left_group", "inactive_user", "superuser"):
+            membership = self.orphan(kind)
+            response = self.client.post(
+                f"/admin/schools/schoolmembership/{membership.pk}/change/", {"school": self.school.pk})
+            with self.subTest(kind=kind):
+                self.assertEqual(response.status_code, 302)
+                membership.refresh_from_db()
+                self.assertFalse(membership.is_active)
+
+    def test_admin_change_form_refuses_to_keep_an_orphan_active_without_a_server_error(self):
+        membership = self.orphan("dual")
+        response = self.client.post(
+            f"/admin/schools/schoolmembership/{membership.pk}/change/", {"school": self.school.pk, "is_active": "on"})
+        self.assertEqual(response.status_code, 200)
+        membership.refresh_from_db()
+        self.assertTrue(membership.is_active)  # unchanged, form error shown
+
+    def test_user_is_read_only_on_an_existing_row_and_editable_on_add(self):
+        model_admin = SchoolMembershipAdmin(SchoolMembership, admin.site)
+        request = RequestFactory().get("/")
+        request.user = self.root
+        membership = self.orphan("dual")
+        self.assertIn("user", model_admin.get_readonly_fields(request, membership))
+        self.assertNotIn("user", model_admin.get_readonly_fields(request, None))
+
+    def test_the_user_of_an_existing_row_cannot_be_changed_through_the_form(self):
+        membership = self.orphan("dual")
+        other = make_user("other", ADMIN)
+        self.client.post(
+            f"/admin/schools/schoolmembership/{membership.pk}/change/",
+            {"school": self.school.pk, "user": other.pk})
+        membership.refresh_from_db()
+        self.assertNotEqual(membership.user_id, other.pk)

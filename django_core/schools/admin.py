@@ -143,6 +143,12 @@ class SchoolMembershipAdmin(admin.ModelAdmin):
     search_fields = ("user__username", "school__name", "school__code")
     readonly_fields = ("created_by", "created_at", "updated_at")
 
+    def get_readonly_fields(self, request, obj=None):
+        # The user of an existing row is fixed (review finding G3): a row whose user no longer qualifies must stay
+        # deactivatable, and the picker (eligible users only) cannot show it.
+        fields = tuple(super().get_readonly_fields(request, obj))
+        return fields + ("user",) if obj is not None else fields
+
     def has_module_permission(self, request):
         return _platform_level(request) and super().has_module_permission(request)
 
