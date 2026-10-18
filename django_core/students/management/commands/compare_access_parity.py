@@ -80,8 +80,14 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument('--json', action='store_true')
         parser.add_argument('--detail', action='store_true', help='also print a counts-only breakdown of unexplained differences')
+        parser.add_argument(
+            '--multi-school', action='store_true',
+            help='instead of the enrollment comparison, compare what each SchoolAdmin sees today (everything) with '
+                 'the membership scope of changes/0010 S3 (counts only; exit 1 if any SchoolAdmin would lose rows)')
 
     def handle(self, *args, **opts):
+        if opts['multi_school']:
+            return self._multi_school(opts)
         User = get_user_model()
         users = list(User.objects.filter(groups__name__in=[GRADE_LEAD, TEACHER, PARENT]).distinct())
         current_year = dict(AcademicYear.objects.filter(is_current=True).values_list('school_id', 'code'))
@@ -140,3 +146,17 @@ class Command(BaseCommand):
                 self.stdout.write(f'{key}: {value}')
         if report['unexplained']:
             raise CommandError(f"{report['unexplained']} unexplained difference(s).")
+
+    def _multi_school(self, opts):
+        from schools.multischool_checks import school_admin_parity
+
+        report = {'users_compared': 0, 'users_with_differences': 0, 'students_lost': 0, 'grades_lost': 0,
+                  'attendances_lost': 0, **school_admin_parity()}
+        report['writes'] = 'none'
+        if opts['json']:
+            self.stdout.write(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
+        else:
+            for key, value in sorted(report.items()):
+                self.stdout.write(f'{key}: {value}')
+        if report['students_lost'] or report['grades_lost'] or report['attendances_lost']:
+            raise CommandError(f"{report['users_with_differences']} SchoolAdmin(s) would lose rows with the membership scope.")

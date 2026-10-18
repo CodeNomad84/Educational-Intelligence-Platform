@@ -34,6 +34,11 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument('--json', action='store_true')
+        parser.add_argument(
+            '--multi-school', action='store_true',
+            help='also check the multi-school gate (changes/0010 S2): SchoolAdmins without a membership, students '
+                 'without a school, inconsistent school links, active memberships of PlatformAdmin users. Default '
+                 'output and verdict are unchanged without this flag.')
 
     def handle(self, *args, **opts):
         current = {y['school_id']: y for y in AcademicYear.objects.filter(is_current=True).values(
@@ -111,8 +116,15 @@ class Command(BaseCommand):
             if class_mirror[class_id] > 0 and class_enrolled[class_id] == 0:  # students linked, none enrolled
                 r['teacher_assignments_class_without_current_enrollments'] += 1
 
+        blocker_keys = BLOCKERS
+        extra = {}
+        if opts['multi_school']:
+            from schools.multischool_checks import MULTI_SCHOOL_BLOCKERS, readiness_counts
+            extra = readiness_counts()
+            blocker_keys = BLOCKERS + MULTI_SCHOOL_BLOCKERS
         report = {k: r.get(k, 0) for k in sorted(set(r) | set(BLOCKERS))}
-        blockers = {k: report[k] for k in BLOCKERS if report[k]}
+        report.update(extra)
+        blockers = {k: report.get(k, 0) for k in blocker_keys if report.get(k, 0)}
         report['verdict'] = 'READY' if not blockers else 'NOT READY'
         report['blockers_nonzero'] = blockers
         report['writes'] = 'none'
