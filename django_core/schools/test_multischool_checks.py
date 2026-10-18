@@ -118,6 +118,7 @@ class ReadinessTests(Base):
         self.assertEqual(self.ready(fail=False)["verdict"], "READY")  # unchanged default gate
 
     def test_students_without_school_zero_case(self):
+        self.member("sa")
         self.student(self.a)
         self.assertEqual(self.ready("--multi-school")["students_without_school"], 0)
 
@@ -137,6 +138,7 @@ class ReadinessTests(Base):
         self.assertEqual(self.ready("--multi-school", fail=True)["school_inconsistent_rows"], 1)
 
     def test_consistent_enrollment_is_not_counted(self):
+        self.member("sa")
         s = self.student(self.a)
         Enrollment.objects.create(student=s, academic_year=self.year(self.a), grade=7, status="active", source="manual")
         self.assertEqual(self.ready("--multi-school")["school_inconsistent_rows"], 0)
@@ -163,7 +165,9 @@ class ReadinessTests(Base):
         user.groups.remove(Group.objects.get(name=ADMIN))
         user.groups.add(Group.objects.get_or_create(name=PLATFORM_ADMIN)[0])
         report = self.ready("--multi-school", fail=True)
-        self.assertEqual(report["blockers_nonzero"], {"active_memberships_of_platform_admin_users": 1})
+        # a membership of a PlatformAdmin user is always also an invalid membership (D3), so both blockers fire
+        self.assertEqual(report["blockers_nonzero"], {"active_memberships_of_platform_admin_users": 1,
+                                                      "memberships_invalid": 1})
         self.assertEqual(report["verdict"], "NOT READY")
 
     def test_deactivating_the_promoted_users_membership_clears_the_blocker(self):
@@ -174,13 +178,56 @@ class ReadinessTests(Base):
         report = self.ready("--multi-school")
         self.assertEqual(report["active_memberships_of_platform_admin_users"], 0)
 
-    def test_invalid_memberships_are_a_warning_that_does_not_change_the_verdict(self):
+    def test_invalid_memberships_are_a_blocker(self):
+        """S2 review D3: a dormant grant is exactly what the gate must catch."""
         user = self.member("gone")
         user.groups.clear()
-        report = self.ready("--multi-school")
+        report = self.ready("--multi-school", fail=True)
         self.assertEqual(report["memberships_invalid"], 1)
-        self.assertEqual(report["verdict"], "READY")
-        self.assertNotIn("memberships_invalid", report["blockers_nonzero"])
+        self.assertEqual(report["verdict"], "NOT READY")
+        self.assertEqual(report["blockers_nonzero"], {"memberships_invalid": 1})
+
+    def test_invalid_memberships_zero_case_and_deactivation_clears_it(self):
+        user = self.member("gone")
+        user.groups.clear()
+        SchoolMembership.objects.filter(user=user).update(is_active=False)  # what --deactivate does
+        self.assertEqual(self.ready("--multi-school")["memberships_invalid"], 0)
+
+    def test_invalid_memberships_are_not_a_blocker_without_the_flag(self):
+        user = self.member("gone")
+        user.groups.clear()
+        self.assertEqual(self.ready()["verdict"], "READY")
+
+    def test_no_school_admin_while_students_exist_is_a_blocker(self):
+        """S2 review D1: the gate must not pass vacuously."""
+        self.student(self.a)
+        report = self.ready("--multi-school", fail=True)
+        self.assertEqual(report["no_school_admin_while_students_exist"], 1)
+        self.assertEqual(report["blockers_nonzero"], {"no_school_admin_while_students_exist": 1})
+
+    def test_no_school_admin_zero_cases(self):
+        self.assertEqual(self.ready("--multi-school")["no_school_admin_while_students_exist"], 0)  # no students
+        self.member("sa")
+        self.student(self.a)
+        self.assertEqual(self.ready("--multi-school")["no_school_admin_while_students_exist"], 0)  # an admin exists
+
+    def test_superuser_only_installation_with_students_blocks(self):
+        make_user("root", ADMIN, is_superuser=True)
+        self.student(self.a)
+        self.assertEqual(self.ready("--multi-school", fail=True)["no_school_admin_while_students_exist"], 1)
+
+    def test_not_run_line_without_the_flag_and_run_line_with_it(self):
+        """The S3 gate needs the flag: the default output says so, in text and in JSON."""
+        out = StringIO()
+        call_command("check_access_switch_ready", stdout=out)
+        self.assertIn("multi-school checks: NOT RUN", out.getvalue())
+        self.assertNotIn("multi-school checks: RUN", out.getvalue().replace("NOT RUN", ""))
+        self.assertEqual(self.ready()["multi_school_checks"], "NOT RUN")
+        out = StringIO()
+        call_command("check_access_switch_ready", "--multi-school", stdout=out)
+        self.assertIn("multi-school checks: RUN", out.getvalue())
+        self.assertNotIn("NOT RUN", out.getvalue())
+        self.assertEqual(self.ready("--multi-school")["multi_school_checks"], "RUN")
 
     def test_info_counts(self):
         self.member("sa1")
@@ -189,9 +236,10 @@ class ReadinessTests(Base):
         self.assertEqual(report["info_schools_count"], 1)
         self.assertEqual(report["info_school_admins_per_school"], {str(self.a.pk): 2})
 
-    def test_verdict_stays_not_ready_with_a_blocker_and_ready_with_only_warnings(self):
-        user = self.member("gone")
-        user.groups.clear()  # warning only
+    def test_verdict_stays_not_ready_with_a_blocker_and_ready_with_only_info(self):
+        self.member("sa1")
+        self.member("sa2")
+        make_user("root", ADMIN, is_superuser=True)  # info only
         self.assertEqual(self.ready("--multi-school")["verdict"], "READY")
         self.student(None)  # blocker
         self.assertEqual(self.ready("--multi-school", fail=True)["verdict"], "NOT READY")
@@ -256,17 +304,48 @@ class SchoolAdminParityTests(Base):
         make_user("root", ADMIN, is_superuser=True)
         make_user("off", ADMIN, is_active=False)
         self.data(self.a)
-        self.assertEqual(self.parity()["users_compared"], 0)  # neither is a scoped SchoolAdmin
+        report = self.parity(fail=True)  # neither is a scoped SchoolAdmin: D1, the comparison would pass vacuously
+        self.assertEqual((report["users_compared"], report["no_school_admin_while_students_exist"]), (0, 1))
         dual = self.member("dual")
         dual.groups.add(Group.objects.get_or_create(name=PLATFORM_ADMIN)[0])
         self.assertEqual(self.parity(fail=True)["users_compared"], 1)  # a dual-role account would lose everything
 
-    def test_default_invocation_is_unchanged(self):
+    def test_no_school_admin_while_students_exist_fails(self):
+        """S2 review D1."""
+        self.data(self.a)
+        report = self.parity(fail=True)
+        self.assertEqual(report["no_school_admin_while_students_exist"], 1)
+
+    def test_no_school_admin_and_no_students_passes(self):
+        self.assertEqual(self.parity()["users_compared"], 0)
+
+    def test_invalid_active_membership_fails_the_parity_gate(self):
+        """S2 review D3: zero lost rows is not enough while a dormant grant exists."""
+        user = self.member("sa")
+        orphan = self.member("gone")
+        orphan.groups.clear()
+        report = self.parity(fail=True)
+        self.assertEqual((report["memberships_invalid"], report["students_lost"]), (1, 0))
+        SchoolMembership.objects.filter(user=orphan).update(is_active=False)
+        self.assertEqual(self.parity()["memberships_invalid"], 0)
+        self.assertIsNotNone(user.pk)
+
+    def test_not_run_and_run_lines(self):
+        out = StringIO()
+        call_command("compare_access_parity", stdout=out)
+        self.assertIn("multi-school checks: NOT RUN", out.getvalue())
+        out = StringIO()
+        call_command("compare_access_parity", "--multi-school", stdout=out)
+        self.assertIn("multi-school checks: RUN", out.getvalue())
+        self.assertNotIn("NOT RUN", out.getvalue())
+
+    def test_default_invocation_is_unchanged_apart_from_the_not_run_line(self):
         out = StringIO()
         call_command("compare_access_parity", "--json", stdout=out)
         report = json.loads(out.getvalue())
         self.assertNotIn("students_lost", report)
         self.assertIn("students_only_legacy", report)
+        self.assertEqual(report["multi_school_checks"], "NOT RUN")
 
     def test_writes_nothing(self):
         make_user("sa", ADMIN)

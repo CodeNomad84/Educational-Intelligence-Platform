@@ -19,6 +19,8 @@ MULTI_SCHOOL_BLOCKERS = (
     'students_without_school',
     'school_inconsistent_rows',
     'active_memberships_of_platform_admin_users',
+    'memberships_invalid',                       # S2 review D3: a dormant grant is exactly what the gate must catch
+    'no_school_admin_while_students_exist',      # S2 review D1: the gate must not pass vacuously
 )
 
 
@@ -31,6 +33,8 @@ def school_admin_users():
 def readiness_counts():
     r = Counter()
     users = school_admin_users()
+    if not users and Student.objects.exists():
+        r['no_school_admin_while_students_exist'] = 1
     per_school = Counter()
     for user in users:
         ids = school_ids_for_admin(user)
@@ -59,11 +63,11 @@ def readiness_counts():
     rows = classify_memberships()
     active = [m for m in rows if m['is_active']]
     r['active_memberships_of_platform_admin_users'] = sum(1 for m in active if m['user_in_platform_admin'])
-    r['memberships_invalid'] = sum(1 for m in active if m['reason'])  # WARNING: grants nothing (query-time re-check)
+    r['memberships_invalid'] = sum(1 for m in active if m['reason'])  # BLOCKER since the S2 review (D3)
     r['info_schools_count'] = School.objects.count()
     r['info_superusers_mapped_to_school_admin_until_s8'] = get_user_model().objects.filter(
         is_superuser=True, is_active=True).count()
-    report = {k: 0 for k in MULTI_SCHOOL_BLOCKERS + ('memberships_invalid',)}
+    report = {k: 0 for k in MULTI_SCHOOL_BLOCKERS}
     report.update(r)
     report['info_school_admins_per_school'] = {str(k): v for k, v in sorted(per_school.items())}
     return report
@@ -76,7 +80,11 @@ def school_admin_parity():
     total_grades = Grade.objects.count()
     total_attendances = Attendance.objects.count()
     out = Counter()
-    for user in school_admin_users():
+    admins = school_admin_users()
+    if not admins and total_students:
+        out['no_school_admin_while_students_exist'] = 1  # S2 review D1: no vacuous pass
+    out['memberships_invalid'] = sum(1 for m in classify_memberships() if m['is_active'] and m['reason'])  # D3
+    for user in admins:
         ids = school_ids_for_admin(user)
         out['users_compared'] += 1
         kept_students = Student.objects.filter(school_id__in=ids).count() if ids else 0

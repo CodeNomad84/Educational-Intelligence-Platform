@@ -8,6 +8,11 @@ the 4c switch) and prints COUNTS only
 (no names, no ids). Every difference is classified by a documented explanation (each one is a bug fixed by
 the switch, not a regression); a difference that fits none is UNEXPLAINED. Exit code 1 on any unexplained
 difference (owner D-4-6). Nothing here changes access.
+
+Without `--multi-school` the output ends with "multi-school checks: NOT RUN". The multi-school gate (changes/0010, S3) is
+a separate opt-in run: it requires THIS command and `check_access_switch_ready` to be run WITH `--multi-school` and to
+pass. With the flag the enrollment comparison is skipped and each SchoolAdmin's scope is compared instead; it also fails
+when students exist but no SchoolAdmin does (D1) and while active memberships of non-qualifying users exist (D3).
 """
 import json
 from collections import Counter
@@ -139,11 +144,14 @@ class Command(BaseCommand):
         }
         if opts['detail']:
             report['unexplained_signatures'] = dict(unexplained_signatures)
+        report['multi_school_checks'] = 'NOT RUN'
         if opts['json']:
             self.stdout.write(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
         else:
             for key, value in report.items():
-                self.stdout.write(f'{key}: {value}')
+                if key != 'multi_school_checks':
+                    self.stdout.write(f'{key}: {value}')
+            self.stdout.write('multi-school checks: NOT RUN')
         if report['unexplained']:
             raise CommandError(f"{report['unexplained']} unexplained difference(s).")
 
@@ -153,10 +161,20 @@ class Command(BaseCommand):
         report = {'users_compared': 0, 'users_with_differences': 0, 'students_lost': 0, 'grades_lost': 0,
                   'attendances_lost': 0, **school_admin_parity()}
         report['writes'] = 'none'
+        report['multi_school_checks'] = 'RUN'
         if opts['json']:
             self.stdout.write(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
         else:
             for key, value in sorted(report.items()):
-                self.stdout.write(f'{key}: {value}')
+                if key != 'multi_school_checks':
+                    self.stdout.write(f'{key}: {value}')
+            self.stdout.write('multi-school checks: RUN')
+        problems = []
         if report['students_lost'] or report['grades_lost'] or report['attendances_lost']:
-            raise CommandError(f"{report['users_with_differences']} SchoolAdmin(s) would lose rows with the membership scope.")
+            problems.append(f"{report['users_with_differences']} SchoolAdmin(s) would lose rows with the membership scope")
+        if report.get('no_school_admin_while_students_exist'):
+            problems.append('students exist but no SchoolAdmin account exists (the comparison would pass vacuously)')
+        if report.get('memberships_invalid'):
+            problems.append(f"{report['memberships_invalid']} active membership(s) of users who no longer qualify")
+        if problems:
+            raise CommandError('; '.join(problems) + '.')

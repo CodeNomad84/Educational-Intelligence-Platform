@@ -2,6 +2,9 @@
 
     manage.py check_access_switch_ready [--json]
 
+The multi-school gate (changes/0010, S3) is a SEPARATE opt-in run: `--multi-school`. Without it the output ends with
+"multi-school checks: NOT RUN" and READY says nothing about the multi-school scope. The S3 gate requires BOTH this
+command and `compare_access_parity` to be run WITH `--multi-school` and to pass.
 Verdict READY only when every BLOCKER is zero; otherwise NOT READY and the exit code is 1 (owner D-4-6 policy).
 After the switch (4c) a Grade Lead or Subject Teacher sees only students with a CURRENT enrollment, so each
 blocker is a place where staff would see fewer students than today.
@@ -128,10 +131,14 @@ class Command(BaseCommand):
         report['verdict'] = 'READY' if not blockers else 'NOT READY'
         report['blockers_nonzero'] = blockers
         report['writes'] = 'none'
+        status = 'RUN' if opts['multi_school'] else 'NOT RUN'
+        report['multi_school_checks'] = status
         if opts['json']:
             self.stdout.write(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
         else:
             for key, value in report.items():
-                self.stdout.write(f'{key}: {value}')
+                if key != 'multi_school_checks':
+                    self.stdout.write(f'{key}: {value}')
+            self.stdout.write(f'multi-school checks: {status}')
         if blockers:
             raise CommandError(f'NOT READY: {sum(blockers.values())} blocker row(s).')
