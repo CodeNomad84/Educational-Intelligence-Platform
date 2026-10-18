@@ -17,5 +17,6 @@ Established decisions (Django core, FastAPI AI layer, PostgreSQL, React target, 
 | 0008 | LLM provider & data egress | DEFERRED | 7 |
 | 0009 | Data layering & provenance | FUTURE — DEFERRED (renumbered from 0005 on 2026-10-16; no file yet; to be proposed in Phase 4) | 4 |
 | 0010 | Platform role map (all 8 roles; `Admin` naming) | DRAFT 2026-10-16 (PROPOSED; L3) | 2–3 |
+| 0012 | School membership, platform role, per-school student identity | PROPOSED 2026-10-18 (L3; `changes/0010-multi-school-hosting-PROPOSAL.md`) | 2 |
 
 Only 0001–0005 and 0010 (DRAFT) files exist now. 0006–0009 are numbering reservations for future/deferred decisions; each file is created only when its phase begins (no speculative ADRs). Until then, references to them mean "future decision", not an existing record.

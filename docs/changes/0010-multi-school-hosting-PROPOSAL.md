@@ -1,0 +1,214 @@
+# CHANGE PROPOSAL — Multi-school hosting (school membership, PlatformAdmin, school-scoped data and AI layer)
+Level: **L3** (authentication/authorization, tenancy, schema, service boundary) · Status: **PROPOSED — nothing here is approved for implementation** · Date: 2026-10-18
+Numbering: `0008` and `0009` are reserved by `0007-…-PROPOSAL.md` §8 for the 2.2-0 and 2.2 Change Reports; this proposal is therefore `0010`. ADR draft: `docs/adr/0012-school-membership-and-platform-role.md` (PROPOSED).
+Origin: read-only audit for multi-school hosting (owner request, 2026-10-18; audit accepted). Owner decisions applied: **MS-1** multi-school first, then 2.2-0 and 2.2 (2.2-0 is NOT approved to start); **MS-2** separate `PlatformAdmin` group, superuser stays for Django-level administration, removal of "superuser ⇒ ADMIN" is its own revertible stage; **MS-3** Django admin restricted to platform admins, but only after every SchoolAdmin task has a dashboard equivalent; **MS-4** same person in two schools = two `Student` rows, `UniqueConstraint(school, national_id)`; **MS-5** shared database with row-level `school_id` confirmed for now.
+Rule that still applies: **NO REAL STUDENT DATA** until the P3 exit criteria (`SECURITY.md`) are met **and** the 2.4 audit log exists. Synthetic data only. Nothing in this proposal is a reason to load real data of any school.
+
+## 1. Requirement
+Several schools on one platform instance, each with its own SchoolAdmin(s), plus a platform owner above them. A SchoolAdmin must be able to see and change only the data of the school(s) they belong to; a platform administrator manages schools, accounts and technical configuration without being a reader of student data (ADR-0010 position 4).
+
+## 2. Current behavior (CURRENT, repository evidence 2026-10-18)
+- **SchoolAdmin is global.** It is the Django group `SchoolAdmin` (`django_core/students/access.py:20`); a superuser is also treated as that role (`access.py:36`). No model links a user to a school for this role; the user model is Django's default `auth.User` (`AUTH_USER_MODEL` is not set in `config/`; `accounts` is not in `INSTALLED_APPS`, `config/settings/base.py:11-23`).
+- **`visible_students`, `visible_grades`, `visible_attendances` return the unfiltered manager for ADMIN** (`access.py:117`, `:138`, `:154`). Grade Lead, Teacher and Parent branches are filtered, and `_current_enrollment` requires the school (`access.py:57-65`).
+- `IsAdminUser` = superuser or group `SchoolAdmin`, no school check (`students/permissions.py:15-17`). `role_required(ADMIN)` checks the role name only (`dashboard/decorators.py`).
+- `dashboard_view` counts `Student/Grade/Attendance.objects` directly (`dashboard/views.py:59-62`): platform-wide. `demo_intel/views.py:18` does `Student.objects.all()` (demo settings only).
+- `StudentViewSet` writes (create/update/delete/import) are `IsAdminUser` with no school check (`students/views.py:183-212`). `StudentSerializer.school_class` and `StudentForm.school_class` offer every active class of every school; `Student.save()` re-derives `school` from the class (`students/models.py:57-66`), so a SchoolAdmin of A could move a student of B into A's class.
+- **Import:** `Student.national_id` is globally unique (`models.py:12`); the live import upserts by `national_id` alone (`views.py:171`) and overwrites names, grade, phone and parents' jobs of an existing row of any school (`views.py:162-171`). With more than one `School`, `unique_school_id` is `None` (`views.py:96`) and `resolve_class` returns `NO_UNIQUE_SCHOOL` (`class_resolution.py:144-145`): new students are created with `school = NULL`.
+- **`Student.school` is still nullable** (`models.py:34-41`). `Grade`, `Attendance`, `Enrollment`, `ImportBatch`, `TeacherAssignment` have no school key of their own (they reach a school through the student, the academic year or the class). Rows with `school = NULL` are visible to SchoolAdmin/superuser and to a Parent of the row, to no Grade Lead/Teacher.
+- **Management commands:** `rollover_academic_year` and `import_history` take an optional `--school-code` (`rollover_academic_year.py:87-92`, `import_history.py:53-59`); `backfill_enrollments`, `check_access_switch_ready`, `compare_access_parity` and the `check_*` commands have no school argument.
+- **Django admin:** no `get_queryset`/permission override filters by school. `StudentAdmin` (with Grade/Attendance inlines incl. `Attendance.note`), `SchoolClassAdmin`, `TeacherAssignmentAdmin`, `GradeLeadAssignmentAdmin`, `AcademicYearAdmin` and the stock `User`/`Group` admin are all global (`students/admin.py`, `schools/admin.py`). The Admin group receives `schools.*` permissions via `setup_staff_roles --grant-admin-assignments` (`setup_staff_roles.py:21-27`); whether real accounts are `is_staff` or hold Student permissions is NOT VERIFIED.
+- **FastAPI:** the service token carries `sub` and `roles`, no school (`config/service_auth.py`, `fastapi_core/auth.py`). `documents` has no school column; `search_documents` has no `WHERE` (`rag_service.py:151-155`); listing and delete are global (`rag_service.py:245`, `:259`). Chat, search and ingestion are disabled for every role today (`main.py:141-185`); list and delete are SchoolAdmin only.
+- **Platform role:** none. Schools are created by a superuser in the admin (`schools/admin.py:93-97`); SchoolAdmin accounts are made by a superuser (admin user form + group). ADR-0010 positions 2–4 already accept `PlatformAdmin` in principle ("sees no school or student data", superuser = break-glass) but nothing is built.
+- NOT VERIFIED: runtime behaviour of any of this (nothing was run for the audit), templates, `docker-compose.yml`, the real `documents` table schema (Django `students.Document` has no embedding column, so the FastAPI-side table definition must be inspected before the FastAPI stage), permissions held by the real Admin group.
+
+## 3. Desired behavior
+1. **Tenancy:** shared PostgreSQL database, row-level `school_id`, enforced only through the central helpers in `students/access.py` (ADR-0004 §7, unchanged). No tenant middleware, no schema-per-tenant. **Physical separation per customer (own database/host) is done by deploying the same code and the same image with separate configuration (settings, environment, database), never by copying or forking code** (MS-5; `CUSTOMIZATION.md` rule: configuration over custom code).
+2. **SchoolAdmin is bound to schools by membership** (§4) and fails closed without one.
+3. **PlatformAdmin** is a separate explicit group (§5); the superuser is Django-level administration only.
+4. A student is a row of one school; a person in two schools is two rows (§8).
+5. Every read and write path of §6 is school-scoped; FastAPI documents are school-scoped.
+
+## 4. SchoolMembership design
+`schools.SchoolMembership` (new model, additive, integer PK like the rest of `schools`):
+| Field | Notes |
+|---|---|
+| `user` FK `AUTH_USER_MODEL`, `on_delete=CASCADE`, related_name `school_memberships` | |
+| `school` FK `School`, `on_delete=PROTECT` | |
+| `is_active` bool (default True) | |
+| `created_by` FK user, `SET_NULL`, `editable=False`; `created_at`, `updated_at` | same audit fields as `GradeLeadAssignment` |
+| Constraint | `UniqueConstraint(user, school)`; many schools per user, many users per school (many-to-many through this model) |
+Meaning: "this user administers this school". The row grants nothing unless the user also holds the `SchoolAdmin` group (the model carries no role column on purpose: no abstraction beyond what is needed; a second membership role would add a field in its own proposal).
+
+**Same hygiene as `GradeLeadAssignment` (`schools/models.py`):**
+- `clean()` at creation: user active, **not superuser** (a superuser cannot be a school member: platform/Django level only), in group `SchoolAdmin`. `is_staff` is allowed during the transition (SchoolAdmins may use the Django admin until stage S9); S9 adds a report/blocker for `is_staff` SchoolAdmins.
+- **Query-time re-check** (the `_may_hold_scoped_grants` pattern, owner decision 2026-10-16): the membership grants nothing unless, at query time, the user is active, not superuser, in group `SchoolAdmin`, and the membership row is active. A user who leaves the group, is deactivated or becomes superuser immediately loses scope even if rows remain.
+- Resolution helper in `access.py` (single place): `school_ids_for_admin(user)` returns the set of school ids, empty when the above fails. `roles_for` keeps returning `SchoolAdmin` for the group; the **scope** comes only from memberships.
+
+**Fail-closed behavior:** a SchoolAdmin with no valid membership sees nothing: `visible_students/grades/attendances` return `none()`, list endpoints return empty, `get_object_or_404` returns 404, write endpoints return 403/404, dashboard aggregates are zero. A SchoolAdmin with several memberships reads the **union**; the data of an unlisted school is never visible.
+
+**Writes with several memberships:** a write (create student, import, upload document) needs exactly one target school. With one membership it is implicit; with several the request names it (form field/URL/parameter) and the server checks it is in the user's valid memberships. The school is **never taken from an uploaded file** and never from `Student.school` of an existing row.
+
+**`check_access_switch_ready` additions (BLOCKERS, under the command's existing "a place where staff would see fewer rows than today" rule):**
+| Check | Classification |
+|---|---|
+| `school_admins_without_membership`: active, non-superuser users in group `SchoolAdmin` with no active membership | **BLOCKER** (they would see nothing after S3) |
+| `students_without_school`: `Student.school IS NULL` | **BLOCKER** (invisible to every SchoolAdmin after S3) |
+| `school_inconsistent_rows`: student whose `school_class.school` ≠ `student.school`; enrollment whose year's school ≠ student's school; grade/attendance whose `enrollment.student_id` ≠ `student_id` | **BLOCKER** |
+| `memberships_invalid`: membership of a superuser/inactive/non-`SchoolAdmin` user | WARNING (grants nothing; informational) |
+| `schools_count`, `school_admins_per_school` | informational |
+`compare_access_parity` is extended so the SchoolAdmin branch is compared (legacy "all" vs membership scope; with exactly one School and every SchoolAdmin a member the difference must be 0).
+
+## 5. PlatformAdmin and the superuser (two options; owner chooses)
+**Common to both options:** `PlatformAdmin` is an explicit Django group, created by a command like `setup_staff_roles` (`setup_platform_role`, idempotent, lists exactly the permissions it grants). It manages: `School` (add/change), `SchoolMembership`, user accounts and group membership, technical configuration. A `PlatformAdmin` account has `is_staff` (it needs the Django admin) and is **not** superuser. The Django admin is restricted to PlatformAdmin and superuser (stage S9). The superuser stays for installation and recovery; it is never a daily role (ADR-0010 position 3).
+
+| | **Option A — administer-only (RECOMMENDED)** | **Option B — read allowed** |
+|---|---|---|
+| PlatformAdmin / superuser read student data in the application | **No.** `roles_for` gives no student scope; `StudentAdmin`, Grade/Attendance inlines and enrollments are not available to the platform role (no model permissions); dashboard/API deny. | Yes: a PlatformAdmin branch in `visible_*` returns all schools. |
+| Consistent with ADR-0010 position 4 | Yes | **No**: needs an amendment of ADR-0010 |
+| Support / debugging | Cannot see a school's records; support works through the school's SchoolAdmin or on synthetic data; a data repair is a script run by the operator, logged by hand until 2.4 | Faster support, but a universal read path over the data of minors of every school |
+| Exposure of `national_id`, grades, attendance, free text | Smallest | Largest: one account reads every school; unsafe before the 2.4 audit log and P3 exit |
+| Residual | **A superuser can always read the database through the ORM/shell/DB**; this cannot be blocked by application code. It is an organisational control: few named superuser accounts, not used daily, every use recorded in the operations log; automated audit only after 2.4. | If chosen later: only as time-limited, audited break-glass, never standing access, and only after 2.4 |
+**Recommendation: Option A.** Break-glass reading (a time-limited, audited grant) is `DEFERRED` until 2.4 and would be its own proposal.
+
+**Removal of "superuser ⇒ ADMIN" is a separate stage (S8), revertible:** `roles_for` stops adding `SchoolAdmin` for superusers; `IsAdminUser` stops accepting `is_superuser`; FastAPI `ADMIN` stops being implied by a superuser token. Consequences to test and accept: a superuser logging into the dashboard gets 403 (no role); the first `PlatformAdmin` must be created by a superuser (command) before S8; the demo/seed commands and tests that rely on "superuser = admin" are changed in the same stage. Revert = one `git revert` plus the group membership staying in place.
+
+## 6. School scope: exactly what changes
+| Area | Change (stage) |
+|---|---|
+| `visible_students`, `visible_grades`, `visible_attendances` (SchoolAdmin branch) | `Student.filter(school_id__in=school_ids_for_admin(user))`; grades/attendance through `student__school_id__in`. Empty membership ⇒ `none()`. Grade Lead/Teacher/Parent branches unchanged. (S3) |
+| Dashboard aggregates `dashboard/views.py:59-62` | Counts and averages computed from `visible_students/grades/attendances`, not raw managers; per school (union of memberships). (S3) |
+| `StudentViewSet` | `get_queryset` already `visible_students`; writes: `perform_create/update` require the target school ∈ memberships; `import` takes the school from membership. (S4) |
+| `StudentSerializer.school_class`, `StudentForm.school_class` | queryset = active classes of the user's schools only (`parent_user` choices limited to users related to the user's schools, or left to a later proposal; DECISION REQUIRED D-MS-6). (S4) |
+| `Student.save()` | Refuses to change `school` of a persisted student whose `school_id` is not NULL when the new class belongs to another school (raises `ValidationError`; message does not name the other school). Bulk operations (`bulk_create/update/update()`) bypass `save()`: they are covered by `check_access_switch_ready`'s `school_inconsistent_rows` blocker and by tests. (S4) |
+| Live import (`students/views.py`) | School from membership, never from the file. Lookup `Student.objects.filter(school=<target>, national_id=...)` (after S7; before S7, a `national_id` that exists in another school is rejected as a row error `national_id_unavailable` with no school name, no overwrite). Class resolution runs against the target school's classes only, so `NO_UNIQUE_SCHOOL` disappears for a SchoolAdmin with a school. Response contains counts only, not other schools' identifiers. (S4, S7) |
+| Management commands | `--school-code` **required** whenever more than one `School` exists (`rollover_academic_year`, `import_history`, `backfill_enrollments`, `check_*`, `compare_access_parity`, `seed_*`); with one school the current behaviour is kept. `rollover_academic_year` and `backfill_enrollments` must never touch another school's rows (tested). (S4) |
+| Service token | Claim `schools` = sorted list of school ids from `school_ids_for_admin(user)` (SchoolAdmin) in `config/service_auth.py`; empty list for roles without school scope. FastAPI `verify_jwt` validates the claim type. (S5) |
+| `documents` | New nullable-then-required `school_id` (migration owned by Django; FastAPI DB role stays least-privilege, `FASTAPI_DB_ROLE.md`). A document with `school_id IS NULL` is visible to nobody (fail closed). (S5) |
+| Retrieval and listing | `school_id = ANY(token.schools)` is part of the SQL **before** similarity ranking and `LIMIT` (ACL before retrieval, CLAUDE.md §3), also for `get_all_documents`. (S5) |
+| Upload / delete | Upload target school from the token (one school) or an explicit parameter that must be ∈ `token.schools`; delete by `doc_id`/`parent_id` adds `AND school_id = ANY(...)`; 404 when no row matches. (S5) |
+| Django admin | Restricted to PlatformAdmin and superuser (S9, §7). |
+| Unchanged | Parent scope (own children), Grade Lead/Teacher scopes (already school-bound), the enrollment-based rules, `access_legacy.py`. |
+
+## 7. Django admin: what a SchoolAdmin does there today and its dashboard equivalent
+"Dashboard" = the server-rendered Bootstrap pages in `django_core/dashboard/` (urls: login, dashboard, students list/detail/add, upload stub, chat, library, document upload/delete). Source of the admin column: `students/admin.py`, `schools/admin.py`, `setup_staff_roles.py:21-27`.
+| # | Task a SchoolAdmin does in the Django admin | Admin permission needed | Dashboard equivalent today | Status |
+|---|---|---|---|---|
+| 1 | Create a student | `students.add_student` (granted manually; NOT VERIFIED) | `student_create_view` (`/students/add/`) | **EXISTS** (needs school scoping, S4) |
+| 2 | Edit a student (name, grade, class, parent link) | `students.change_student` | none (the API has PUT, no UI) | **MISSING** |
+| 3 | Delete a student | `students.delete_student` | none | **MISSING by design**: ADR-0011 §7 replaces deletion with an anonymisation procedure (not built); PROTECT FKs from enrollments already block deletion of students with history. Needs an owner decision, not a page. |
+| 4 | Enter/edit grades and attendance (inlines) | `change_student` + grade/attendance perms | none | **MISSING** (also the unstarted "C5b/grade entry") |
+| 5 | Import students from a file | n/a (API only) | `upload_students_view` is a stub that only shows a message (`dashboard/views.py` upload view); the real import is `POST /api/students/import/` | **MISSING** as a page |
+| 6 | Create/rename/deactivate classes | `schools.add/change_schoolclass` | none | **MISSING** |
+| 7 | Assign teachers to classes and subjects | `schools.*_teacherassignment` | none | **MISSING** |
+| 8 | Assign Grade Leads to a grade and year | `schools.*_gradeleadassignment` | none | **MISSING** |
+| 9 | Enter academic years and dates, mark current | `schools.add/change_academicyear` | none | **MISSING** |
+| 10 | View school record (name, code) | `schools.view_school` | none | **MISSING** (read-only; low priority) |
+| 11 | Create/disable staff and parent accounts, set groups, reset passwords | **not granted** by design (`setup_staff_roles` never grants `auth.*`); only a superuser does this today | none | **Not a SchoolAdmin task today** (superuser). Under multi-school the platform operator cannot do this per school at scale: **a school-scoped "staff accounts" page is MISSING and needs its own proposal**, or the task stays a PlatformAdmin duty (DECISION REQUIRED D-MS-5). |
+| 12 | Enrollments, rollover, backfill, history import | not in admin (`Enrollment`, `ImportBatch` unregistered) | CLI commands run by an operator | Unchanged: operator/platform task, not a SchoolAdmin UI task today |
+| 13 | RAG documents | n/a | `library_view`, `upload_document_view`, `delete_document_view` | **EXISTS** (upload disabled in Phase 1; list/delete need school scope, S5) |
+Consequence: **rows 2, 4, 5, 6, 7, 8, 9 (and 11 if SchoolAdmins keep managing accounts) must exist as dashboard pages, each school-scoped through `access.py`, before stage S9.** Each is its own L2 proposal (list/forms/permission tests) and is **not** part of this change. Until they exist, SchoolAdmins keep the Django admin and **no second School may be created** (gate, §9). S9 itself does not lock anyone out of a task that has no equivalent: its pre-flight is a checklist of the table above, signed by the owner.
+Alternative if the owner wants a second school earlier than the dashboard pages: an **interim scoped Django admin** (`get_queryset`, `formfield_for_foreignkey`, `has_*_permission` by membership on every ModelAdmin) — extra code that S9 later deletes. Not recommended (two security surfaces to review), listed as DECISION REQUIRED D-MS-4.
+
+## 8. Same person in two schools (decision MS-4) and transfers
+Two `Student` rows, `UniqueConstraint(fields=['school','national_id'])` replacing `unique=True` (stage S7). `national_id` stays a CharField of 10 characters, validation unchanged.
+- **Consequence for history:** a transferring student's data is split across two rows. School A keeps its row, enrollments, grades and attendance; school B starts a new row with no history. There is no automatic link and no cross-school read. Student 360 (0007) shows only the history of the row it is opened on. This is intended isolation, and it means a platform-level "same child" view does not exist (a person-level link table is `DEFERRED`; it would need consent and a policy decision).
+- **Transfer procedure (no new code in this change):** school A sets the enrollment status to `transferred_out` (existing status, `Enrollment.STATUS_CHOICES`), which is not a current status (`CURRENT_STATUSES = ('active','transferred_in')`, `enrollment_sync.py`), so A's scoped staff stop seeing the student; school B creates or imports a new row (status `transferred_in` or `active` per its own import).
+- **Live import:** looks up `(target_school, national_id)`. If the id exists only in another school it **creates** a new row in the target school and reveals nothing about the other school (response counts "created"). If it exists in the target school it updates it as today.
+- **`import_history`:** keeps rejecting students "not in the year's school" (`history_import.py:160-161`) but the lookup is by `(school of the year, national_id)`, so an id existing only elsewhere is `student_not_found` in that school, not a cross-school hint.
+- **`rollover_academic_year`:** is per school (`--school-code`) and moves only that school's enrollments from the old to the new year; it never moves a student between schools and never creates a student.
+- **Parent link:** a parent with children in two schools has two rows linked by `parent_user` and sees both (own-children rule, unchanged).
+- Duplicate-detection report across schools (same `national_id` in two schools) is useful for data quality but is itself a cross-school disclosure; `DEFERRED` to a PlatformAdmin-only count-without-identities report (DECISION REQUIRED D-MS-7).
+
+## 9. Staged plan
+One stage = one commit (several if the stage says so), reversible unless marked, each gated by pre-flight/parity output and tests run on **SQLite and PostgreSQL 16, one at a time, results reported separately** (CLAUDE.md §10). Rehearsal only on scratchpad copies with sha256 before/after; `db.sqlite3`, `demo_db.sqlite3` and `data/postgres` are never touched. After each stage: stop and wait for owner acceptance.
+
+**Hard gate:** a second `School` row may be created only after S1–S9 are accepted (and, for real data, never before P3 exit and 2.4). Until then the platform stays single-school, and the new code is exercised only by test fixtures and scratch databases.
+
+| Stage | Content | Reversible? |
+|---|---|---|
+| S0 | This proposal + ADR-0012 accepted (docs only) | n/a |
+| S1 | `SchoolMembership` model + migration (additive), admin registration for PlatformAdmin/superuser, `setup_platform_role` command (group only, no members), `school_ids_for_admin()` helper, unit tests incl. hygiene and query-time re-check. **No access change.** | Yes (drop table) |
+| S2 | Tooling: `backfill_school_memberships` (dry-run default; with **exactly one** School, every active non-superuser SchoolAdmin gets a membership; otherwise nothing is guessed and the list is printed), `check_access_switch_ready` and `compare_access_parity` additions of §4, `backfill_student_school` (dry-run default; sets `Student.school` from `school_class.school`, else the only School when exactly one exists, else reports). **Runs while only one School exists.** | Yes (memberships/school values are listed in a batch file; revert command) |
+| S3 | SchoolAdmin branch of `visible_*` + dashboard aggregates through the access layer + choke-point guard test extended (`QuerysetChokePointTests`: no raw managers in views/API). Gate: `check_access_switch_ready` READY and `compare_access_parity` 0 differences on a synthetic copy. Fail-closed: availability risk (MS-R1). | Yes (`git revert`; legacy branch kept in `access_legacy.py` style) |
+| S4 | Writes and imports: ViewSet/Form/Serializer school scoping, `Student.save()` cross-school refusal, import by target school, commands require `--school-code` with several schools. Separate commits: (a) API/form/serializer/`save()`, (b) import, (c) commands. | Yes |
+| S5 | FastAPI: `schools` claim, `documents.school_id` (migration), SQL filter before ranking, scoped list/upload/delete. Pre-step: inspect the real `documents` table definition (NOT VERIFIED today). FastAPI suite + live container probes. | Yes (column nullable; claim ignored by old FastAPI) |
+| S6 | **`Student.school` NOT NULL** (and drop the NULL-tolerant branches). **Irreversible-ish:** reverse requires making the column nullable again, but the information that a row was unassigned is gone. Pre-conditions: S2 population done, blocker `students_without_school` = 0, **dry-run report on a copy of synthetic data**, owner sign-off. | Schema reversible, data meaning not |
+| S7 | **`national_id` uniqueness change** to `(school, national_id)`. **Irreversible-ish:** once a second school holds the same id, restoring global uniqueness fails (or needs deletion). Pre-conditions: S6 done, dry-run report on a copy of synthetic data (duplicate scan, import behaviour), live import lookups switched to `(school, national_id)`, owner sign-off. | Only while no duplicate exists |
+| S8 | **Platform split:** PlatformAdmin created; remove "superuser ⇒ ADMIN" (`roles_for`, `IsAdminUser`, FastAPI role derivation, seeds/tests). Own commit(s), own report. | Yes (`git revert`) |
+| S9 | **Django admin restricted to PlatformAdmin/superuser** (model `has_module_permission` / group permission revocation, `setup_staff_roles --grant-admin-assignments` retired). Requires the dashboard equivalents of §7 to exist and the owner's checklist signed. | Yes (re-grant) |
+| S10 | Go-live gate for a second synthetic School in a test environment: full cross-school suite, mutation checks, `/security-review`, Change Report. | n/a |
+Every stage ends with `/security-review` of its diff (L3) and a Change Report; S3, S5, S6, S7, S8 and S9 each need explicit owner approval before implementation.
+
+## 10. Testing strategy
+**Fixture:** two schools (A, B) each with a current year, classes, a SchoolAdmin, a Grade Lead, a Teacher, students, grades, attendance with a non-empty `note`, enrollments; a SchoolAdmin with two memberships; a SchoolAdmin with none; a student with `school = NULL` (until S6); a superuser; a PlatformAdmin.
+
+**Cross-school negative tests (each returns 404/empty/403; none may leak counts or names):**
+1. SchoolAdmin A: student list, search by name and by `national_id`, retrieve, update, delete, `features`, `predict`, dashboard list/detail for a B student.
+2. SchoolAdmin A: grades and attendance of B students through every view/API; `Attendance.note` never shown.
+3. SchoolAdmin A: dashboard aggregates equal A-only counts; adding a B student changes nothing.
+4. SchoolAdmin A creates/updates a student with a B class (API and form): rejected; `parent_user` choices per D-MS-6.
+5. `Student.save()`: moving a persisted A student to a B class raises; bulk paths are caught by the consistency check.
+6. Import by A of a file containing a B-only `national_id`: creates an A row (after S7) / row error without disclosure (before S7); B's row byte-identical afterwards; a B-and-A id updates only A's row.
+7. Commands: `--school-code` missing with two schools ⇒ error; with A ⇒ B rows untouched (row hashes before/after) for `rollover_academic_year`, `backfill_enrollments`, `import_history`.
+8. Membership: none ⇒ sees nothing; two ⇒ exact union; inactive membership, deactivated user, user removed from the group, user turned superuser ⇒ nothing; membership of an unrelated user grants nothing.
+9. FastAPI: token for school A cannot list, retrieve, rank-retrieve or delete B's documents; a document with `school_id` NULL is invisible; a forged/absent `schools` claim ⇒ nothing; upload with a school not in the claim ⇒ 403.
+10. Regression: Grade Lead, Teacher and Parent outputs identical to the pre-change baseline (parity), with the two-school fixture added.
+11. PlatformAdmin and superuser (Option A): no student, grade, attendance or enrollment in HTML, API, search or Django admin; can manage schools and memberships.
+12. Choke-point guard: no raw `Student/Grade/Attendance/Enrollment.objects` in views/serializers/forms outside the access layer and the documented exceptions.
+
+**Mutation checks (each must make at least one named test fail; report the failing test names; local edit restored from a scratchpad copy; report the working tree clean afterwards):**
+1. remove the membership filter from `visible_students` (SchoolAdmin branch);
+2. remove it from `visible_grades` and from `visible_attendances` (one at a time);
+3. remove the school condition from the import lookup/upsert;
+4. remove the `school_id` filter from the FastAPI retrieval SQL (and, separately, from the delete);
+5. remove the membership check from the `school_class` queryset of the form and the serializer (and from `Student.save()`);
+6. regression: remove the school predicate in `_current_enrollment`.
+Additional checks that follow from the design: drop the query-time group/active/superuser re-check in `school_ids_for_admin`; drop the `--school-code` requirement.
+
+**Suites:** SQLite and PostgreSQL 16 (separately), FastAPI suite, `check_access_switch_ready`/`compare_access_parity` on a synthetic copy. Counts reported from real runs only.
+
+## 11. Impact on 0007 (2.2-0 and 2.2) — exact edits, NOT APPLIED (0007 stays untouched until the owner approves)
+1. Header: add "Prerequisite: `0010` multi-school stages S1–S9 accepted. 2.2-0 is NOT approved to start (owner MS-1)."
+2. §1: add a CURRENT bullet "the SchoolAdmin branch of `visible_*` is unscoped (`access.py:117,138,154`); multi-school changes it in `0010` S3".
+3. §2 table row 2.2-0 and §4 bullet on `visible_enrollments`: replace "SchoolAdmin all" with "SchoolAdmin: enrollments of students returned by `visible_students(user)` (i.e. only the schools of the user's active memberships); PlatformAdmin and superuser: `none()` (Option A)". The formula `Enrollment.objects.filter(student__in=visible_students(user))` stays and is the reason no extra SchoolAdmin branch exists in `visible_enrollments`.
+4. §3 table, Path/Academic/Attendance "Role limits": "SchoolAdmin … all years/all" becomes "SchoolAdmin: all years/all rows **of own schools**".
+5. Owner decisions line: D-22-3 "SchoolAdmin sees all sections" becomes "…of the schools of their memberships".
+6. §4 Option B bullet "Full-tier grants (SchoolAdmin, Grade Lead, Parent) are unchanged by 2.2-0": clarify "SchoolAdmin scope is changed by `0010` S3, not by 2.2-0; 2.2-0 tests run against the membership-scoped SchoolAdmin".
+7. §4 first bullet: add "an unseen student, including one of another school, is a 404".
+8. §9 tests: replace "Grade Lead and SchoolAdmin: `visible_grades` unchanged (regression)" with "Grade Lead unchanged; SchoolAdmin scoped by membership"; add the cross-school negatives for `visible_enrollments` (SchoolAdmin A gets no B enrollment; zero-membership SchoolAdmin gets none; PlatformAdmin/superuser get none); add a two-school fixture to all 2.2-0 tests; mutation check 5: drop the membership filter reached through `visible_students` and show `visible_enrollments` tests fail.
+9. §9 2.2 tests: add "360 page of a B student for SchoolAdmin A = 404"; "transfer: only the opened row's history is shown".
+10. §3 Path row note: "a transferred student's earlier school is a separate row; history of the other school is not shown (0010 §8)".
+11. §10 risks R2/R6: add "cross-school exposure (R-MS)"; §8 Documentation: Change Reports `0008`/`0009` stay reserved.
+
+## 12. ADR changes (drafts, PROPOSED; only the owner marks ACCEPTED)
+- **New** `docs/adr/0012-school-membership-and-platform-role.md` (written in this commit): membership model, fail-closed rule, PlatformAdmin vs superuser, `(school, national_id)`, shared DB / separate deployment by configuration.
+- **ADR-0004 §8 amendment** (applied to ADR-0004 only on acceptance; draft text is in ADR-0012): "`Student.national_id` is unique per school: `UniqueConstraint(school, national_id)`; `Student.school` is required (stage S6/S7 of `changes/0010`)". Decisions 3 ("`Student.school` nullable until a later migration") and 8 are the ones affected.
+- ADR-0010: positions 2–4 are completed, not changed, by ADR-0012 (Option A matches them); Option B would require an ADR-0010 amendment.
+- ADR index (`docs/adr/README.md`): row for 0012 PROPOSED (done in this commit).
+
+## 13. Documentation impact (NOT edited now; each at its stage)
+`SECURITY.md` (authorization matrix: SchoolAdmin = own schools; PlatformAdmin column; new risk rows MS-R1..MS-R7), `CHANGE_GUIDE.md` (new rows: membership, school scope, FastAPI claim; bump `Verified-at`), `MODULE_MAP.md`, `TRACEABILITY.md`, `TESTING.md` (two-school fixture, counts), `ROADMAP.md` (new row "multi-school hosting" before 2.2-0), `DATA_AND_ARTIFACTS.md:4` (no longer "no school key on any table" once S6/S7 land), `DEPLOYMENT.md` D10 and `PRODUCT_SCOPE.md` P6 (resolved: one instance, many schools; separate deployments by configuration), `CUSTOMIZATION.md` (physical separation = same image, separate configuration), `AI_GOVERNANCE.md` (per-school RAG documents). Deferred docs are not created.
+
+## 14. Risks
+- **MS-R1 availability:** fail-closed scope hides data from SchoolAdmins without a membership (4c-R1 pattern). Mitigation: S2 backfill + blockers + parity.
+- **MS-R2 unscoped surfaces remain until S9:** the Django admin and any raw manager. Mitigation: the hard gate (no second School), choke-point guard test.
+- **MS-R3 irreversible-ish S6/S7:** dry-run on a synthetic copy, owner sign-off, separate commits.
+- **MS-R4 FastAPI shared table and shared secret:** one filter bug is a cross-tenant leak; one `SERVICE_JWT_SECRET` for all schools; the `schools` claim is only as trustworthy as that secret.
+- **MS-R5 superuser remains technically omnipotent** (Option A is a policy, not a technical wall); no audit log before 2.4.
+- **MS-R6 transfers lose history continuity** by design (§8).
+- **MS-R7 scope creep:** S9 depends on up to eight dashboard pages (§7), each an L2 proposal; they dominate the schedule, not the access code.
+- Real data of a second school is forbidden until P3 exit **and** 2.4; the gate proven on synthetic data must be re-run on real data first (4c-R1).
+- NOT VERIFIED: PostgreSQL behaviour of the new constraints, the real `documents` schema, templates, deployment files.
+
+## 15. Recommendation and DECISION REQUIRED items
+Approve the staged plan (L3). Start with S0 (this proposal + ADR-0012 accepted), then S1 only on explicit approval; stop after each stage.
+| ID | Decision | Recommendation |
+|---|---|---|
+| D-MS-1 | PlatformAdmin / superuser read of student data | **Option A, administer-only** (§5) |
+| D-MS-2 | Denormalise `school` onto `Grade`/`Attendance`/`Enrollment` | **No** now: reach the school through `student.school` (NOT NULL after S6); consistency enforced by the blocker check; revisit if performance requires |
+| D-MS-3 | Writes with several memberships | explicit target school, validated against memberships (§4) |
+| D-MS-4 | Interim scoped Django admin vs dashboard pages first | **Dashboard pages first**; no second School before S9 |
+| D-MS-5 | Who manages staff/parent accounts per school | a school-scoped accounts page (own proposal) **or** PlatformAdmin duty; owner decides before S9 |
+| D-MS-6 | `parent_user` choices in forms/serializer | limit to parents already linked to the school's students plus an explicit "create parent" flow (later); until then the current global list is a known cross-school leak to fix in S4 |
+| D-MS-7 | Cross-school duplicate-id report | PlatformAdmin counts only, later |
+| D-MS-8 | `documents` rows with NULL school | invisible to every school (fail closed) |
