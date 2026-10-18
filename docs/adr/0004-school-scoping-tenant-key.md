@@ -1,5 +1,5 @@
 # ADR-0004: School scoping / tenant key
-- Status: ACCEPTED (owner decisions of 2026-10-13, Phase 2.1.0 design review; effective for Phase 2). **Extended by ADR-0005 (decisions 1–9 ACCEPTED 2026-10-16): see Amendments; the original text is kept unchanged.**
+- Status: ACCEPTED (owner decisions of 2026-10-13, Phase 2.1.0 design review; effective for Phase 2). **Extended by ADR-0005 (decisions 1–9 ACCEPTED 2026-10-16) and amended by ADR-0012 (decisions 3 and 8, ACCEPTED 2026-10-19): see Amendments; the original text is kept unchanged.**
 - Date: 2026-10-03 (revised 2026-10-13, accepted 2026-10-13)
 - Decider: owner
 
@@ -43,5 +43,15 @@ D-06, D-09; `django_core/students/models.py`; scaffold `schools/models.py` (pres
 - `GradeLeadAssignment`: unique (user, school, grade, academic_year); user must be active, non-staff, in group `GradeLead`; admin picks `academic_year` from existing class years and warns (non-blocking) when the school has no class of that year. Grants no access until C5a.
 - `SchoolClass.grade`: report/class-view attribute only; students are not used to back-fill it.
 
+## Amendments (2026-10-19, through ADR-0012, ACCEPTED; effective as stages S6 and S7 of `changes/0010` ship; nothing is implemented yet)
+
+The original text above is kept unchanged.
+
+| Item | Status | Change |
+|---|---|---|
+| Decision 3 (`Student.school` nullable, required later) | **AMENDED; NOT YET IMPLEMENTED** | `Student.school` is made required by stage S6 of `changes/0010`, after population while exactly one School exists (S2) and after every student-creation path assigns a school explicitly (S2b, no hidden default). S6 runs before the SchoolAdmin read scope is switched on (S3). |
+| Decision 8 (`national_id` globally unique, DEFERRED) | **AMENDED; NOT YET IMPLEMENTED** | `Student.national_id` is unique per school: `UniqueConstraint(school, national_id)` (stage S7). The same person in two schools is two rows; no cross-school identity link exists. |
+| Decisions 1, 2, 4, 5, 6, 7 | UNCHANGED | Decision 7 (row-level scoping in one database) is confirmed by ADR-0012. |
+
 ## Supersedes / superseded by
-Extended by ADR-0005 (decisions 1–9 ACCEPTED 2026-10-16).
+Extended by ADR-0005 (decisions 1–9 ACCEPTED 2026-10-16). Amended by ADR-0012 (decisions 3 and 8, ACCEPTED 2026-10-19; see Amendments).
