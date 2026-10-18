@@ -200,6 +200,65 @@ class GradeLeadAssignment(models.Model):
         return f"هیچ کلاسی در این مدرسه با سال تحصیلی «{self.academic_year}» وجود ندارد."
 
 
+class SchoolMembership(models.Model):
+    """A user administers a school (ADR-0012, proposal changes/0010, stage S1).
+
+    Many-to-many between users and schools through this model. The row grants nothing unless the user also
+    holds the ``SchoolAdmin`` group, is active and is not a superuser; ``students.access.school_ids_for_admin``
+    re-checks all of that at query time. **Stage S1 only stores the entity: nothing reads it for visibility
+    yet** (the SchoolAdmin branch of ``visible_*`` is switched in S3), so creating a row changes no access.
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="school_memberships",
+        verbose_name="کاربر",
+    )
+    school = models.ForeignKey(
+        School, on_delete=models.PROTECT, related_name="memberships", verbose_name="مدرسه")
+    is_active = models.BooleanField(default=True, verbose_name="فعال")
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        editable=False,
+        related_name="+",
+        verbose_name="ثبت‌کننده",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "عضویت در مدرسه"
+        verbose_name_plural = "عضویت‌ها در مدرسه"
+        ordering = ["school", "user"]
+        constraints = [
+            models.UniqueConstraint(fields=["user", "school"], name="uniq_schoolmembership_user_school"),
+        ]
+
+    def __str__(self):
+        return f"{self.user} → {self.school}"
+
+    def clean(self):
+        """Only an active, non-superuser account in group ``SchoolAdmin`` may be a member (re-checked at query
+        time by ``school_ids_for_admin``). ``is_staff`` is allowed until the Django admin is restricted (S9)."""
+        from students.access import ADMIN  # lazy: keeps role names in one place, avoids an import cycle
+
+        errors = {}
+        if self.user_id:
+            user = self.user
+            if not user.is_active:
+                errors["user"] = "کاربر غیرفعال است."
+            elif user.is_superuser:
+                errors["user"] = "حساب superuser نمی‌تواند عضو مدرسه باشد."
+            elif not user.groups.filter(name=ADMIN).exists():
+                errors["user"] = f"کاربر باید عضو گروه «{ADMIN}» باشد."
+        if errors:
+            raise ValidationError(errors)
+
+
 class AcademicYear(models.Model):
     """One school year of one school (ADR-0011). Dates are entered by a SchoolAdmin, never computed.
 

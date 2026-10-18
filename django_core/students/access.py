@@ -26,6 +26,9 @@ GRADE_LEAD = 'GradeLead'  # ADR-0005; group created by setup_staff_roles; read s
 COUNSELOR = 'Counselor'  # ADR-0005; same, access arrives with referrals (2.6)
 PARENT = 'Parent'
 ALL_ROLES = (ADMIN, TEACHER, GRADE_LEAD, PARENT)
+# ADR-0012 / changes/0010: platform role (stage S1 creates the empty group only). Deliberately NOT in ALL_ROLES:
+# ``roles_for`` and the FastAPI token do not recognise it yet, so adding it changes nobody's access.
+PLATFORM_ADMIN = 'PlatformAdmin'
 
 
 def roles_for(user):
@@ -40,6 +43,25 @@ def roles_for(user):
 
 def has_any_role(user, *roles):
     return bool(roles_for(user) & set(roles))
+
+
+def school_ids_for_admin(user):
+    """Ids of the schools a SchoolAdmin administers (ADR-0012; stage S1: defined and tested, NOT used by any
+    visibility rule yet; the SchoolAdmin branch of ``visible_*`` still returns everything until S3).
+
+    Empty set for anonymous, inactive and superuser accounts, for users outside the ``SchoolAdmin`` group
+    (checked on the group itself, never through ``roles_for``, which maps a superuser to SchoolAdmin) and for
+    inactive memberships. Account state, group and membership are all re-checked here, at query time.
+    """
+    if user is None or not getattr(user, 'is_authenticated', False):
+        return set()
+    if not user.is_active or user.is_superuser:
+        return set()
+    if not user.groups.filter(name=ADMIN).exists():
+        return set()
+    from schools.models import SchoolMembership  # lazy: keeps the import graph acyclic
+
+    return set(SchoolMembership.objects.filter(user=user, is_active=True).values_list('school_id', flat=True))
 
 
 def _any(parts):

@@ -8,7 +8,7 @@ from django import forms
 from django.contrib import admin, messages
 from django.contrib.auth import get_user_model
 
-from .models import AcademicYear, GradeLeadAssignment, School, SchoolClass, TeacherAssignment
+from .models import AcademicYear, GradeLeadAssignment, School, SchoolClass, SchoolMembership, TeacherAssignment
 
 
 @admin.register(School)
@@ -123,3 +123,54 @@ class AcademicYearAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return request.user.is_superuser  # enrollments protect the row; deletion is never routine
+
+
+def _platform_level(request):
+    """Superuser or a member of the ``PlatformAdmin`` group (ADR-0012). A SchoolAdmin never qualifies."""
+    from students.access import PLATFORM_ADMIN
+
+    user = request.user
+    return bool(user.is_active and (user.is_superuser or user.groups.filter(name=PLATFORM_ADMIN).exists()))
+
+
+@admin.register(SchoolMembership)
+class SchoolMembershipAdmin(admin.ModelAdmin):
+    """Memberships are managed at platform level only (superuser or PlatformAdmin), and only when the account also
+    holds the normal Django model permission. Stage S1: the row changes no access."""
+
+    list_display = ("user", "school", "is_active", "created_by", "created_at")
+    list_filter = ("school", "is_active")
+    search_fields = ("user__username", "school__name", "school__code")
+    readonly_fields = ("created_by", "created_at", "updated_at")
+
+    def has_module_permission(self, request):
+        return _platform_level(request) and super().has_module_permission(request)
+
+    def has_view_permission(self, request, obj=None):
+        return _platform_level(request) and super().has_view_permission(request, obj)
+
+    def has_add_permission(self, request):
+        return _platform_level(request) and super().has_add_permission(request)
+
+    def has_change_permission(self, request, obj=None):
+        return _platform_level(request) and super().has_change_permission(request, obj)
+
+    def has_delete_permission(self, request, obj=None):
+        return _platform_level(request) and super().has_delete_permission(request, obj)
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        from students.access import ADMIN
+
+        if db_field.name == "user":
+            kwargs["queryset"] = (
+                get_user_model().objects
+                .filter(is_active=True, is_superuser=False, groups__name=ADMIN)
+                .order_by("username")
+                .distinct()
+            )
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+    def save_model(self, request, obj, form, change):
+        if not change and obj.created_by_id is None:
+            obj.created_by = request.user
+        super().save_model(request, obj, form, change)

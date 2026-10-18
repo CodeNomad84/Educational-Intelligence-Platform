@@ -1,6 +1,6 @@
 # CHANGE GUIDE — "If I want to change X, where do I look?"
 
-Verified-at: `3404a1a` + Phase 1 branch `phase-1/boot-security`; the commit `3404a1a` is resolvable in this repository's history (verified 2026-10-13); Phase 1 closed at `4c096de`. Paths re-checked against the working tree on 2026-10-12. Schools/vocabulary rows re-verified 2026-10-16 (C4b). Access-rule rows re-verified 2026-10-16 (2.2a-4c switch: `students/access.py` decides Grade Lead / Subject Teacher scope by current enrollment). Rows marked NOT YET IMPLEMENTED have no location yet; classify via `CHANGE_PROCESS.md`. Any change touching auth/data is at least L2.
+Verified-at: `3404a1a` + Phase 1 branch `phase-1/boot-security`; the commit `3404a1a` is resolvable in this repository's history (verified 2026-10-13); Phase 1 closed at `4c096de`. Paths re-checked against the working tree on 2026-10-12. Schools/vocabulary rows re-verified 2026-10-16 (C4b). Membership/PlatformAdmin rows added 2026-10-19 (multi-school S1). Access-rule rows re-verified 2026-10-16 (2.2a-4c switch: `students/access.py` decides Grade Lead / Subject Teacher scope by current enrollment). Rows marked NOT YET IMPLEMENTED have no location yet; classify via `CHANGE_PROCESS.md`. Any change touching auth/data is at least L2.
 
 | I want to change… | Look at | Notes |
 |---|---|---|
@@ -29,6 +29,7 @@ Verified-at: `3404a1a` + Phase 1 branch `phase-1/boot-security`; the commit `340
 | Create the staff role groups / grant Admin school-structure permissions | `django_core/schools/management/commands/setup_staff_roles.py` (`manage.py setup_staff_roles [--fix] [--grant-admin-assignments]`); constants in `students/access.py` | L2 |
 | Subject / grade vocabulary; report assignment subjects not in it | `django_core/schools/vocabulary.py` (re-exported by `students/models.py`); `manage.py check_assignment_subjects [--json]` (read-only) | L3 if a value changes (data migration) |
 | Grade Lead assignments (model, admin, year picker) | `django_core/schools/models.py` (`GradeLeadAssignment`), `schools/admin.py`; access reading it is C5a, NOT YET IMPLEMENTED | L3 |
+| School membership of a SchoolAdmin; empty `PlatformAdmin` group; helper `school_ids_for_admin` (multi-school S1: stored and tested, read by NO visibility rule yet; the SchoolAdmin branch of `visible_*` still returns everything until S3) | `django_core/schools/models.py` (`SchoolMembership`), `schools/migrations/0004_schoolmembership.py`, `schools/admin.py` (`SchoolMembershipAdmin`, superuser/PlatformAdmin only), `schools/management/commands/setup_platform_role.py`, `students/access.py` (`PLATFORM_ADMIN`, `school_ids_for_admin`), `schools/test_school_membership.py`; plan `docs/changes/0010-multi-school-hosting-PROPOSAL.md`, report `0011` | L3 |
 | Settings / secrets / ports | `config/settings/`, `docker-compose.yml`, FastAPI `auth.py` | never print secrets (S-03) |
 | Tests | `django_core/{students,dashboard}/tests.py`, `fastapi_core/tests/test_security.py`; commands in `docs/TESTING.md` | |
 | Reports | NOT YET IMPLEMENTED | |
