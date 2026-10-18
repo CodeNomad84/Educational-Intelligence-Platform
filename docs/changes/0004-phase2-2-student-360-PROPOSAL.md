@@ -1,5 +1,5 @@
 # CHANGE PROPOSAL — Phase 2.2: staff Student 360 read view (REVISED: depends on 2.2a)
-Level: **L2** once 2.2a is implemented (reads through the access layer; no new authorization model) · Status: **PROPOSED, BLOCKED by `0003` (2.2a)** · 2026-10-16
+Level: **L2** once 2.2a is implemented (reads through the access layer; no new authorization model) · Status: **SUPERSEDED by 0007** (`0007-phase2-2-student-360-staff-read-view-PROPOSAL.md`; kept on record; was: PROPOSED, BLOCKED by `0003` (2.2a)) · 2026-10-16
 Owner decisions applied: D-22-1 = option (b) extended (not built on the flat model); D-22-2 Parent staff-only (Parent keeps the existing detail page); D-22-3 SchoolAdmin sees all sections.
 Supersedes the earlier chat proposal of the same phase (single-year page, "all years, all entered by" label).
 
