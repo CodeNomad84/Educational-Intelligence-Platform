@@ -21,6 +21,7 @@ MULTI_SCHOOL_BLOCKERS = (
     'active_memberships_of_platform_admin_users',
     'memberships_invalid',                       # S2 review D3: a dormant grant is exactly what the gate must catch
     'no_school_admin_while_students_exist',      # S2 review D1: the gate must not pass vacuously
+    'schools_with_students_but_no_school_admin',  # S2 review E1: per school, not only "no admin at all"
 )
 
 
@@ -30,11 +31,27 @@ def school_admin_users():
         groups__name=ADMIN, is_active=True, is_superuser=False).distinct().order_by('pk'))
 
 
+def schools_without_admin_cover(admins=None):
+    """Ids of the Schools that have students but are covered by NO valid SchoolAdmin (S2 review E1).
+
+    A school is covered when ``school_ids_for_admin`` of at least one active, non-superuser SchoolAdmin account
+    contains it, i.e. through an ACTIVE membership of a user who still qualifies (a dual-role, inactive or
+    out-of-group user covers nothing). Students without a school are a separate blocker.
+    """
+    admins = school_admin_users() if admins is None else admins
+    covered = set()
+    for user in admins:
+        covered |= school_ids_for_admin(user)
+    with_students = set(Student.objects.filter(school__isnull=False).values_list('school_id', flat=True).distinct())
+    return sorted(with_students - covered)
+
+
 def readiness_counts():
     r = Counter()
     users = school_admin_users()
     if not users and Student.objects.exists():
         r['no_school_admin_while_students_exist'] = 1
+    r['schools_with_students_but_no_school_admin'] = len(schools_without_admin_cover(users))
     per_school = Counter()
     for user in users:
         ids = school_ids_for_admin(user)
@@ -84,6 +101,7 @@ def school_admin_parity():
     if not admins and total_students:
         out['no_school_admin_while_students_exist'] = 1  # S2 review D1: no vacuous pass
     out['memberships_invalid'] = sum(1 for m in classify_memberships() if m['is_active'] and m['reason'])  # D3
+    out['schools_with_students_but_no_school_admin'] = len(schools_without_admin_cover(admins))  # E1
     for user in admins:
         ids = school_ids_for_admin(user)
         out['users_compared'] += 1

@@ -203,7 +203,9 @@ class ReadinessTests(Base):
         self.student(self.a)
         report = self.ready("--multi-school", fail=True)
         self.assertEqual(report["no_school_admin_while_students_exist"], 1)
-        self.assertEqual(report["blockers_nonzero"], {"no_school_admin_while_students_exist": 1})
+        # the school of that student is also uncovered (E1); D1 stays the blocker for installations without any admin
+        self.assertEqual(report["blockers_nonzero"], {"no_school_admin_while_students_exist": 1,
+                                                      "schools_with_students_but_no_school_admin": 1})
 
     def test_no_school_admin_zero_cases(self):
         self.assertEqual(self.ready("--multi-school")["no_school_admin_while_students_exist"], 0)  # no students
@@ -353,3 +355,109 @@ class SchoolAdminParityTests(Base):
         before = (Student.objects.count(), SchoolMembership.objects.count(), Grade.objects.count())
         self.parity(fail=True)
         self.assertEqual((Student.objects.count(), SchoolMembership.objects.count(), Grade.objects.count()), before)
+
+
+class SchoolsWithoutAdminCoverTests(Base):
+    """S2 review E1: a school that has students needs a valid SchoolAdmin of its own, not just 'some admin exists'."""
+
+    def ready(self, *args):
+        out = StringIO()
+        try:
+            call_command("check_access_switch_ready", "--json", "--multi-school", *args, stdout=out)
+        except CommandError:
+            pass
+        return json.loads(out.getvalue())
+
+    def parity(self):
+        out = StringIO()
+        try:
+            call_command("compare_access_parity", "--multi-school", "--json", stdout=out)
+            failed = False
+        except CommandError:
+            failed = True
+        return json.loads(out.getvalue()), failed
+
+    def two_schools(self):
+        self.b = School.objects.create(name="B", code="b")
+        self.year(self.b)
+        self.member("admin_a", self.a)
+        self.student(self.a)
+        self.student(self.b)
+
+    def test_school_with_students_and_no_admin_is_a_blocker_even_when_another_school_has_one(self):
+        self.two_schools()
+        report = self.ready()
+        self.assertEqual(report["schools_with_students_but_no_school_admin"], 1)
+        self.assertEqual(report["no_school_admin_while_students_exist"], 0)  # D1 does not fire: an admin exists
+        self.assertIn("schools_with_students_but_no_school_admin", report["blockers_nonzero"])
+        self.assertEqual(report["verdict"], "NOT READY")
+
+    def test_zero_case_every_school_with_students_has_an_admin(self):
+        self.two_schools()
+        self.member("admin_b", self.b)
+        self.assertEqual(self.ready()["schools_with_students_but_no_school_admin"], 0)
+
+    def test_one_admin_member_of_both_schools_covers_both(self):
+        self.two_schools()
+        user = User.objects.get(username="admin_a")
+        SchoolMembership.objects.create(user=user, school=self.b)
+        self.assertEqual(self.ready()["schools_with_students_but_no_school_admin"], 0)
+
+    def test_a_school_without_students_needs_no_admin(self):
+        self.member("admin_a", self.a)
+        self.student(self.a)
+        School.objects.create(name="B", code="b")
+        self.assertEqual(self.ready()["schools_with_students_but_no_school_admin"], 0)
+
+    def test_students_without_a_school_are_not_counted_here(self):
+        self.member("admin_a", self.a)
+        self.student(None)
+        report = self.ready()
+        self.assertEqual(report["schools_with_students_but_no_school_admin"], 0)
+        self.assertEqual(report["students_without_school"], 1)
+
+    def test_only_a_valid_admin_covers_a_school(self):
+        self.two_schools()
+        for name, kwargs in (("off", {"is_active": False}), ("root", {"is_superuser": True})):
+            user = make_user(name, ADMIN, **kwargs)
+            SchoolMembership.objects.create(user=user, school=self.b)  # bypasses clean()
+        dual = self.member("dual", self.b)
+        dual.groups.add(Group.objects.get_or_create(name=PLATFORM_ADMIN)[0])
+        gone = self.member("gone", self.b)
+        gone.groups.clear()
+        inactive_row = make_user("rowoff", ADMIN)
+        SchoolMembership.objects.create(user=inactive_row, school=self.b, is_active=False)
+        self.assertEqual(self.ready()["schools_with_students_but_no_school_admin"], 1)
+
+    def test_a_valid_admin_added_to_the_uncovered_school_clears_it(self):
+        self.two_schools()
+        self.assertEqual(self.ready()["schools_with_students_but_no_school_admin"], 1)
+        self.member("admin_b", self.b)
+        self.assertEqual(self.ready()["schools_with_students_but_no_school_admin"], 0)
+
+    def test_count_is_per_school(self):
+        self.two_schools()
+        third = School.objects.create(name="C", code="c")
+        self.year(third)
+        self.student(third)
+        self.assertEqual(self.ready()["schools_with_students_but_no_school_admin"], 2)
+
+    def test_parity_fails_on_an_uncovered_school_and_reports_the_count(self):
+        self.two_schools()
+        report, failed = self.parity()
+        self.assertTrue(failed)
+        self.assertEqual(report["schools_with_students_but_no_school_admin"], 1)
+
+    def test_parity_zero_case(self):
+        self.member("admin_a", self.a)
+        self.student(self.a)
+        report, failed = self.parity()
+        self.assertFalse(failed)
+        self.assertEqual(report["schools_with_students_but_no_school_admin"], 0)
+
+    def test_parity_is_not_misled_by_a_second_admin_of_the_covered_school(self):
+        self.two_schools()
+        self.member("admin_a2", self.a)
+        report, failed = self.parity()
+        self.assertTrue(failed)
+        self.assertEqual(report["schools_with_students_but_no_school_admin"], 1)

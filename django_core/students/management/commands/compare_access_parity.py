@@ -12,7 +12,8 @@ difference (owner D-4-6). Nothing here changes access.
 Without `--multi-school` the output ends with "multi-school checks: NOT RUN". The multi-school gate (changes/0010, S3) is
 a separate opt-in run: it requires THIS command and `check_access_switch_ready` to be run WITH `--multi-school` and to
 pass. With the flag the enrollment comparison is skipped and each SchoolAdmin's scope is compared instead; it also fails
-when students exist but no SchoolAdmin does (D1) and while active memberships of non-qualifying users exist (D3).
+when students exist but no SchoolAdmin does (D1), when a school has students but no valid SchoolAdmin covers it (E1)
+and while active memberships of non-qualifying users exist (D3).
 """
 import json
 from collections import Counter
@@ -174,6 +175,9 @@ class Command(BaseCommand):
             problems.append(f"{report['users_with_differences']} SchoolAdmin(s) would lose rows with the membership scope")
         if report.get('no_school_admin_while_students_exist'):
             problems.append('students exist but no SchoolAdmin account exists (the comparison would pass vacuously)')
+        if report.get('schools_with_students_but_no_school_admin'):
+            problems.append(f"{report['schools_with_students_but_no_school_admin']} school(s) have students but no "
+                            'SchoolAdmin who would still see them')
         if report.get('memberships_invalid'):
             problems.append(f"{report['memberships_invalid']} active membership(s) of users who no longer qualify")
         if problems:
