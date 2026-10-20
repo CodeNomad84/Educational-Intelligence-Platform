@@ -8,6 +8,7 @@ verifies every row it touches against the values recorded here and undoes only t
 """
 import json
 import os
+import stat
 from datetime import datetime, timezone
 
 from django.core.management.base import CommandError
@@ -55,13 +56,21 @@ def write_batch(path, command, payload):
         raise CommandError(f'Cannot create the batch file: {exc.strerror}')
     except (ValueError, TypeError):
         raise CommandError('The batch file path is not valid (empty, NUL byte or wrong type).')
-    created = os.fstat(fd)  # identity of the file THIS call created
+    created = None   # identity of the file THIS call created (set inside the try: the fstat itself can fail)
+    handle = None
     try:
-        with os.fdopen(fd, 'w', encoding='utf-8') as handle:
+        created = os.fstat(fd)
+        handle = os.fdopen(fd, 'w', encoding='utf-8')
+        with handle:
             json.dump(data, handle, indent=2, sort_keys=True)
             handle.flush()
             os.fsync(handle.fileno())
     except BaseException as exc:  # incl. KeyboardInterrupt/MemoryError: clean up, then let it propagate
+        if handle is None:
+            try:
+                os.close(fd)  # never leak the descriptor when fdopen was not reached
+            except OSError:
+                pass
         _remove_if_same_file(path, created)
         if isinstance(exc, (OSError, ValueError, TypeError)):
             raise CommandError(f'Cannot write the batch file: {getattr(exc, "strerror", None) or "write failed"}')
@@ -70,10 +79,20 @@ def write_batch(path, command, payload):
 
 
 def _remove_if_same_file(path, created):
-    """Unlink ``path`` only if it is still the file this call created (never a file swapped in meanwhile)."""
+    """Unlink ``path`` only if it is still the file this call created (never a file or symlink swapped in meanwhile).
+
+    ``lstat`` does not follow symlinks: a symlink put at the path is never removed through its target's identity.
+    When the identity of the created file is unknown (the fstat itself failed) only a still-empty regular file is removed.
+    """
     try:
-        current = os.stat(path)
-        if (current.st_dev, current.st_ino) == (created.st_dev, created.st_ino):
+        current = os.lstat(path)
+        if not stat.S_ISREG(current.st_mode):
+            return
+        if created is None:
+            same = current.st_size == 0
+        else:
+            same = (current.st_dev, current.st_ino) == (created.st_dev, created.st_ino)
+        if same:
             os.unlink(path)
     except OSError:
         pass
@@ -87,9 +106,9 @@ def read_batch(path, command):
         raise CommandError('The batch file cannot be read as JSON.')
     if not isinstance(data, dict) or data.get('command') != command:
         raise CommandError(f'This is not a batch file of "{command}".')
-    if data.get('version') != VERSION:
-        found = data.get('version')
-        found = found if isinstance(found, int) and not isinstance(found, bool) else 'unknown'
+    version = data.get('version')
+    if type(version) is not int or version != VERSION:  # exact int: True and 1.0 are not versions
+        found = version if type(version) is int else 'unknown'
         raise CommandError(
             f'Unsupported batch version {found}: this tool reads version {VERSION}. A batch written by an older '
             'version must be reverted with the code version that wrote it.')

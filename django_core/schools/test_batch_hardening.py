@@ -577,3 +577,231 @@ class LockQuerySqlTests(Base):
         for sql in locking:
             self.assertNotIn("JOIN", sql, sql)
             self.assertRegex(sql, r'ORDER BY "(schools_schoolmembership|students_student)"\."id" ASC|ORDER BY 1 ASC', sql)
+
+
+class StrictVersionTests(Base):
+    """S2 review H2: the version must be exactly the integer VERSION (True and 2.0 are not versions)."""
+
+    def test_non_int_versions_are_rejected_as_unsupported_unknown(self):
+        for command in (CHECK, BACKFILL_M, BACKFILL_S):
+            for version in (True, 2.0, "2", [2], {"v": 2}, None):
+                path = self.write("v.json", {"command": command, "version": version, "memberships": [],
+                                             "assignments": [], "school_id": 1})
+                with self.subTest(command=command, version=repr(version)), self.assertRaises(CommandError) as err:
+                    self.run_cmd(command, "--revert-batch", path)
+                self.assertIn("Unsupported batch version unknown", str(err.exception))
+
+    def test_the_exact_integer_version_is_accepted(self):
+        for command in (CHECK, BACKFILL_M, BACKFILL_S):
+            path = self.write("ok.json", {"command": command, "version": batch_log.VERSION, "memberships": [],
+                                          "assignments": [], "school_id": 1})
+            self.assertEqual(self.run_json(command, "--revert-batch", path)["writes"], "reverted")
+
+
+class WriteBatchIdentityTests(Base):
+    def open_fds(self):
+        return len(os.listdir("/proc/self/fd"))
+
+    def test_fstat_failure_is_handled_closes_the_descriptor_and_removes_the_empty_file(self):
+        target = self.path("fstat.json")
+        before = self.open_fds()
+        with mock.patch("schools.batch_log.os.fstat", side_effect=OSError(5, "I/O error")):
+            with self.assertRaises(CommandError):
+                batch_log.write_batch(target, "x", {})
+        self.assertFalse(os.path.exists(target))
+        self.assertEqual(self.open_fds(), before)
+
+    def test_fstat_failure_does_not_remove_a_non_empty_file_swapped_in(self):
+        target = self.path("swapped.json")
+
+        def swap_then_fail(fd):
+            os.unlink(target)
+            with open(target, "w", encoding="utf-8") as other:
+                other.write("somebody else's file")
+            raise OSError(5, "I/O error")
+
+        with mock.patch("schools.batch_log.os.fstat", side_effect=swap_then_fail):
+            with self.assertRaises(CommandError):
+                batch_log.write_batch(target, "x", {})
+        with open(target, encoding="utf-8") as handle:
+            self.assertEqual(handle.read(), "somebody else's file")
+
+    def test_a_symlink_swapped_onto_the_path_is_not_followed_or_removed(self):
+        """lstat, not stat: a symlink whose target is (a hard link of) the created file must survive."""
+        target = self.path("link-swap.json")
+        alias = self.path("alias.json")
+
+        def swap_then_fail(*args, **kwargs):
+            os.link(target, alias)          # same inode as the created file
+            os.unlink(target)
+            os.symlink(alias, target)       # the path now holds a symlink to that inode
+            raise OSError(28, "No space left on device")
+
+        with mock.patch("schools.batch_log.json.dump", side_effect=swap_then_fail):
+            with self.assertRaises(CommandError):
+                batch_log.write_batch(target, "x", {})
+        self.assertTrue(os.path.islink(target))
+
+    def test_a_directory_swapped_onto_the_path_is_left_alone(self):
+        target = self.path("dir-swap.json")
+
+        def swap_then_fail(*args, **kwargs):
+            os.unlink(target)
+            os.mkdir(target)
+            raise OSError(28, "No space left on device")
+
+        with mock.patch("schools.batch_log.json.dump", side_effect=swap_then_fail):
+            with self.assertRaises(CommandError):
+                batch_log.write_batch(target, "x", {})
+        self.assertTrue(os.path.isdir(target))
+
+
+class GatePassedKeyTests(Base):
+    """S2 review H1: the S3 gate is  multi_school_checks_run true AND multi_school_passed true AND exit code 0."""
+
+    COMMANDS = ("check_access_switch_ready", "compare_access_parity")
+
+    def run_gate(self, command, *flags):
+        out = StringIO()
+        rc = 0
+        try:
+            call_command(command, "--json", *flags, stdout=out)
+        except CommandError:
+            rc = 1
+        return json.loads(out.getvalue()), rc
+
+    def gate(self, *flags):
+        """The documented S3 gate, evaluated on both commands."""
+        results = {c: self.run_gate(c, *flags) for c in self.COMMANDS}
+        passed = all(r["multi_school_checks_run"] is True and r["multi_school_passed"] is True and rc == 0
+                     for r, rc in results.values())
+        return passed, results
+
+    def clean_state(self):
+        from datetime import date
+        from .models import AcademicYear
+
+        AcademicYear.objects.get_or_create(school=self.school, code="1404-1405", defaults=dict(
+            start_date=date(2025, 9, 23), end_date=date(2026, 6, 21), is_current=True))
+        user = make_user("sa", ADMIN)
+        SchoolMembership.objects.create(user=user, school=self.school)
+        student = Student.objects.create(first_name="S", last_name="1", national_id="7000000001", grade=7,
+                                         phone_number="1")
+        Student.objects.filter(pk=student.pk).update(school=self.school)
+
+    def test_not_passed_without_the_flag_in_both_commands(self):
+        self.clean_state()
+        for command in self.COMMANDS:
+            report, _rc = self.run_gate(command)
+            with self.subTest(command=command):
+                self.assertIs(report["multi_school_passed"], False)
+                self.assertIs(report["multi_school_checks_run"], False)
+        self.assertFalse(self.gate()[0])
+
+    def test_clean_state_passes_the_documented_gate(self):
+        self.clean_state()
+        passed, results = self.gate("--multi-school")
+        self.assertTrue(passed, results)
+        self.assertEqual(results["check_access_switch_ready"][0]["verdict"], "READY")
+        self.assertEqual(results["compare_access_parity"][0]["verdict"], "PASS")
+
+    def test_a_failing_run_gives_multi_school_passed_false_with_run_true(self):
+        self.clean_state()
+        make_user("sa2", ADMIN)  # a SchoolAdmin without a membership
+        passed, results = self.gate("--multi-school")
+        self.assertFalse(passed)
+        for command, (report, rc) in results.items():
+            with self.subTest(command=command):
+                self.assertIs(report["multi_school_checks_run"], True)
+                self.assertIs(report["multi_school_passed"], False)
+                self.assertEqual(rc, 1)
+        self.assertEqual(results["check_access_switch_ready"][0]["verdict"], "NOT READY")
+        self.assertEqual(results["compare_access_parity"][0]["verdict"], "FAIL")
+
+    def test_each_blocker_alone_fails_the_readiness_side(self):
+        self.clean_state()
+        orphan = make_user("orphan", ADMIN)
+        SchoolMembership.objects.create(user=orphan, school=self.school)
+        orphan.groups.clear()  # memberships_invalid only
+        report, rc = self.run_gate("check_access_switch_ready", "--multi-school")
+        self.assertEqual((report["multi_school_passed"], rc), (False, 1))
+        self.assertEqual(report["blockers_nonzero"], {"memberships_invalid": 1})
+
+    def test_passed_is_false_when_only_a_pre_existing_enrollment_blocker_fires(self):
+        """passed means READY overall, not just 'the new multi-school blockers are zero'."""
+        from .models import SchoolClass
+
+        self.clean_state()
+        klass = SchoolClass.objects.create(school=self.school, title="7-A", academic_year="1404-1405", grade=7)
+        student = Student.objects.get(national_id="7000000001")
+        Student.objects.filter(pk=student.pk).update(school_class=klass)  # class without a current enrollment
+        report, rc = self.run_gate("check_access_switch_ready", "--multi-school")
+        self.assertEqual(report["blockers_nonzero"], {"students_missing_current_enrollment": 1})
+        self.assertEqual((report["multi_school_passed"], rc), (False, 1))
+
+    def test_parity_verdict_exists_only_with_the_flag(self):
+        self.clean_state()
+        default, _ = self.run_gate("compare_access_parity")
+        self.assertNotIn("verdict", default)
+        flagged, _ = self.run_gate("compare_access_parity", "--multi-school")
+        self.assertEqual(flagged["verdict"], "PASS")
+
+    def test_text_output_states_passed_true_or_false(self):
+        self.clean_state()
+        for command in self.COMMANDS:
+            out = StringIO()
+            call_command(command, "--multi-school", stdout=out)
+            self.assertIn("multi-school passed: true", out.getvalue())
+            out = StringIO()
+            try:
+                call_command(command, stdout=out)
+            except CommandError:
+                pass
+            self.assertIn("multi-school passed: false", out.getvalue())
+        make_user("sa2", ADMIN)
+        for command in self.COMMANDS:
+            out = StringIO()
+            try:
+                call_command(command, "--multi-school", stdout=out)
+            except CommandError:
+                pass
+            self.assertIn("multi-school passed: false", out.getvalue())
+
+    def test_the_gate_recipe_rejects_a_key_only_reading(self):
+        """The key alone is not a pass: a failing run has run=true."""
+        self.clean_state()
+        make_user("sa2", ADMIN)
+        _passed, results = self.gate("--multi-school")
+        self.assertTrue(all(r["multi_school_checks_run"] is True for r, _rc in results.values()))
+        self.assertFalse(_passed)
+
+
+class RemoveIfSameFileUnitTests(SimpleTestCase):
+    """Direct tests of the unlink guard with fake stat results (filesystems differ in directory sizes)."""
+
+    @staticmethod
+    def fake_stat(mode, size=0, dev=1, ino=7):
+        return os.stat_result((mode, ino, dev, 1, 0, 0, size, 0, 0, 0))
+
+    def run_guard(self, created, current):
+        with mock.patch("schools.batch_log.os.lstat", return_value=current), \
+                mock.patch("schools.batch_log.os.unlink") as unlink:
+            batch_log._remove_if_same_file("/x/y.json", created)
+        return unlink.called
+
+    def test_same_regular_file_is_removed(self):
+        reg = self.fake_stat(0o100600)
+        self.assertTrue(self.run_guard(reg, reg))
+
+    def test_other_inode_is_kept(self):
+        self.assertFalse(self.run_guard(self.fake_stat(0o100600, ino=7), self.fake_stat(0o100600, ino=8)))
+
+    def test_unknown_identity_removes_only_an_empty_regular_file(self):
+        self.assertTrue(self.run_guard(None, self.fake_stat(0o100600, size=0)))
+        self.assertFalse(self.run_guard(None, self.fake_stat(0o100600, size=5)))
+
+    def test_directories_and_symlinks_are_never_removed_even_when_the_identity_matches_or_is_unknown(self):
+        for mode in (0o040755, 0o120777):
+            current = self.fake_stat(mode, size=0)
+            self.assertFalse(self.run_guard(current, current), oct(mode))
+            self.assertFalse(self.run_guard(None, current), oct(mode))

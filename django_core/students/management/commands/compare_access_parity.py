@@ -15,7 +15,8 @@ pass. With the flag the enrollment comparison is skipped and each SchoolAdmin's 
 when students exist but no SchoolAdmin does (D1), when a school has students but no valid SchoolAdmin covers it (E1)
 and while active memberships of non-qualifying users exist (D3).
 Machine check: with `--json` BOTH gate outputs (this one and `check_access_switch_ready`) must contain
-`"multi_school_checks_run": true`; a bare exit code of 0 or a READY verdict is not enough.
+`"multi_school_checks_run": true` AND `"multi_school_passed": true` and exit 0; with `--multi-school` the output also
+carries `verdict` (PASS or FAIL). A bare exit code of 0 or a READY verdict is not enough.
 """
 import json
 from collections import Counter
@@ -149,13 +150,15 @@ class Command(BaseCommand):
             report['unexplained_signatures'] = dict(unexplained_signatures)
         report['multi_school_checks'] = 'NOT RUN'
         report['multi_school_checks_run'] = False
+        report['multi_school_passed'] = False
         if opts['json']:
             self.stdout.write(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
         else:
             for key, value in report.items():
-                if key not in ('multi_school_checks', 'multi_school_checks_run'):
+                if key not in ('multi_school_checks', 'multi_school_checks_run', 'multi_school_passed'):
                     self.stdout.write(f'{key}: {value}')
             self.stdout.write('multi-school checks: NOT RUN')
+            self.stdout.write('multi-school passed: false')
         if report['unexplained']:
             raise CommandError(f"{report['unexplained']} unexplained difference(s).")
 
@@ -165,15 +168,6 @@ class Command(BaseCommand):
         report = {'users_compared': 0, 'users_with_differences': 0, 'students_lost': 0, 'grades_lost': 0,
                   'attendances_lost': 0, **school_admin_parity()}
         report['writes'] = 'none'
-        report['multi_school_checks'] = 'RUN'
-        report['multi_school_checks_run'] = True
-        if opts['json']:
-            self.stdout.write(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
-        else:
-            for key, value in sorted(report.items()):
-                if key not in ('multi_school_checks', 'multi_school_checks_run'):
-                    self.stdout.write(f'{key}: {value}')
-            self.stdout.write('multi-school checks: RUN')
         problems = []
         if report['students_lost'] or report['grades_lost'] or report['attendances_lost']:
             problems.append(f"{report['users_with_differences']} SchoolAdmin(s) would lose rows with the membership scope")
@@ -184,5 +178,17 @@ class Command(BaseCommand):
                             'SchoolAdmin who would still see them')
         if report.get('memberships_invalid'):
             problems.append(f"{report['memberships_invalid']} active membership(s) of users who no longer qualify")
+        report['multi_school_checks'] = 'RUN'
+        report['multi_school_checks_run'] = True
+        report['multi_school_passed'] = not problems
+        report['verdict'] = 'PASS' if not problems else 'FAIL'
+        if opts['json']:
+            self.stdout.write(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
+        else:
+            for key, value in sorted(report.items()):
+                if key not in ('multi_school_checks', 'multi_school_checks_run', 'multi_school_passed'):
+                    self.stdout.write(f'{key}: {value}')
+            self.stdout.write('multi-school checks: RUN')
+            self.stdout.write(f"multi-school passed: {'true' if report['multi_school_passed'] else 'false'}")
         if problems:
             raise CommandError('; '.join(problems) + '.')

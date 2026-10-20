@@ -5,7 +5,8 @@
 The multi-school gate (changes/0010, S3) is a SEPARATE opt-in run: `--multi-school`. Without it the output ends with
 "multi-school checks: NOT RUN" and READY says nothing about the multi-school scope. The S3 gate requires BOTH this
 command and `compare_access_parity` to be run WITH `--multi-school` and to pass. Machine check: with `--json` BOTH outputs
-must contain `"multi_school_checks_run": true` (a bare READY or an exit code of 0 is not enough).
+must contain `"multi_school_checks_run": true` AND `"multi_school_passed": true`, and both commands must exit 0 (a bare
+READY or an exit code of 0 is not enough; `multi_school_passed` is false in every failing or not-run output).
 Verdict READY only when every BLOCKER is zero; otherwise NOT READY and the exit code is 1 (owner D-4-6 policy).
 After the switch (4c) a Grade Lead or Subject Teacher sees only students with a CURRENT enrollment, so each
 blocker is a place where staff would see fewer students than today.
@@ -135,12 +136,15 @@ class Command(BaseCommand):
         status = 'RUN' if opts['multi_school'] else 'NOT RUN'
         report['multi_school_checks'] = status
         report['multi_school_checks_run'] = bool(opts['multi_school'])
+        # S3 gate (H1): true only when the multi-school checks RAN and every blocker is zero; never true without the flag
+        report['multi_school_passed'] = bool(opts['multi_school']) and not blockers
         if opts['json']:
             self.stdout.write(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
         else:
             for key, value in report.items():
-                if key not in ('multi_school_checks', 'multi_school_checks_run'):
+                if key not in ('multi_school_checks', 'multi_school_checks_run', 'multi_school_passed'):
                     self.stdout.write(f'{key}: {value}')
             self.stdout.write(f'multi-school checks: {status}')
+            self.stdout.write(f"multi-school passed: {'true' if report['multi_school_passed'] else 'false'}")
         if blockers:
             raise CommandError(f'NOT READY: {sum(blockers.values())} blocker row(s).')
