@@ -3,6 +3,7 @@
 import json
 from datetime import date
 from io import StringIO
+from unittest import mock
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
@@ -461,3 +462,99 @@ class SchoolsWithoutAdminCoverTests(Base):
         report, failed = self.parity()
         self.assertTrue(failed)
         self.assertEqual(report["schools_with_students_but_no_school_admin"], 1)
+
+
+class ParityCoverageTests(Base):
+    """S2 review J1: every counter school_admin_parity() can return must be classified, or the gate cannot pass."""
+
+    @staticmethod
+    def produced_keys():
+        """String keys written into the result Counter by school_admin_parity (read from its source)."""
+        import ast
+        import inspect
+
+        from . import multischool_checks
+
+        tree = ast.parse(inspect.getsource(multischool_checks.school_admin_parity).lstrip())
+        keys = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Subscript) and isinstance(node.value, ast.Name) and node.value.id == "out":
+                index = node.slice
+                if isinstance(index, ast.Constant) and isinstance(index.value, str):
+                    keys.add(index.value)
+        return keys
+
+    def test_every_produced_counter_is_classified_as_problem_or_info(self):
+        from .multischool_checks import PARITY_INFO_KEYS, PARITY_PROBLEM_KEYS
+
+        produced = self.produced_keys()
+        self.assertTrue(produced)  # the reader works
+        self.assertEqual(sorted(produced - set(PARITY_PROBLEM_KEYS) - set(PARITY_INFO_KEYS)), [])
+
+    def test_the_two_lists_are_disjoint_and_every_problem_has_a_text(self):
+        from .multischool_checks import PARITY_INFO_KEYS, PARITY_PROBLEM_KEYS, PARITY_PROBLEM_TEXT
+
+        self.assertEqual(set(PARITY_PROBLEM_KEYS) & set(PARITY_INFO_KEYS), set())
+        self.assertEqual(set(PARITY_PROBLEM_KEYS), set(PARITY_PROBLEM_TEXT))
+
+    def test_every_problem_key_is_produced_or_defaulted(self):
+        """No dead entries: each problem key comes from school_admin_parity or from the command's zero defaults."""
+        from .multischool_checks import PARITY_PROBLEM_KEYS
+
+        defaults = {"students_lost", "grades_lost", "attendances_lost"}
+        self.assertEqual(set(PARITY_PROBLEM_KEYS) - self.produced_keys() - defaults, set())
+
+    def test_an_unclassified_counter_makes_the_command_fail_closed_even_when_everything_else_is_clean(self):
+        self.member("sa")
+        self.student(self.a)
+        from . import multischool_checks
+
+        real = multischool_checks.school_admin_parity
+        with mock.patch.object(multischool_checks, "school_admin_parity", lambda: {**real(), "dummy_counter": 3}):
+            out = StringIO()
+            with self.assertRaises(CommandError) as err:
+                call_command("compare_access_parity", "--multi-school", "--json", stdout=out)
+        report = json.loads(out.getvalue())
+        self.assertIs(report["multi_school_checks_run"], True)
+        self.assertIs(report["multi_school_passed"], False)
+        self.assertEqual(report["verdict"], "FAIL")
+        self.assertEqual(report["unclassified_counters"], ["dummy_counter"])
+        self.assertIn("dummy_counter", str(err.exception))
+
+    def test_the_same_clean_state_passes_without_the_dummy_counter(self):
+        self.member("sa")
+        self.student(self.a)
+        out = StringIO()
+        call_command("compare_access_parity", "--multi-school", "--json", stdout=out)
+        report = json.loads(out.getvalue())
+        self.assertIs(report["multi_school_passed"], True)
+        self.assertNotIn("unclassified_counters", report)
+
+    def test_each_problem_key_alone_fails_the_gate(self):
+        from . import multischool_checks
+
+        self.member("sa")
+        self.student(self.a)
+        real = multischool_checks.school_admin_parity
+        for key in multischool_checks.PARITY_PROBLEM_KEYS:
+            with self.subTest(key=key), mock.patch.object(
+                    multischool_checks, "school_admin_parity", lambda key=key: {**real(), key: 1}):
+                out = StringIO()
+                with self.assertRaises(CommandError):
+                    call_command("compare_access_parity", "--multi-school", "--json", stdout=out)
+                report = json.loads(out.getvalue())
+                self.assertIs(report["multi_school_passed"], False)
+                self.assertEqual(report["verdict"], "FAIL")
+
+    def test_informational_keys_alone_never_fail_the_gate(self):
+        from . import multischool_checks
+
+        self.member("sa")
+        self.student(self.a)
+        real = multischool_checks.school_admin_parity
+        for key in multischool_checks.PARITY_INFO_KEYS:
+            with self.subTest(key=key), mock.patch.object(
+                    multischool_checks, "school_admin_parity", lambda key=key: {**real(), key: 5}):
+                out = StringIO()
+                call_command("compare_access_parity", "--multi-school", "--json", stdout=out)
+                self.assertIs(json.loads(out.getvalue())["multi_school_passed"], True)

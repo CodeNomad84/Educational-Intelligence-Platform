@@ -163,21 +163,16 @@ class Command(BaseCommand):
             raise CommandError(f"{report['unexplained']} unexplained difference(s).")
 
     def _multi_school(self, opts):
-        from schools.multischool_checks import school_admin_parity
+        from schools.multischool_checks import parity_problems, school_admin_parity, unaccounted_parity_keys
 
+        result = school_admin_parity()
+        unaccounted = unaccounted_parity_keys(result)
         report = {'users_compared': 0, 'users_with_differences': 0, 'students_lost': 0, 'grades_lost': 0,
-                  'attendances_lost': 0, **school_admin_parity()}
+                  'attendances_lost': 0, **result}
         report['writes'] = 'none'
-        problems = []
-        if report['students_lost'] or report['grades_lost'] or report['attendances_lost']:
-            problems.append(f"{report['users_with_differences']} SchoolAdmin(s) would lose rows with the membership scope")
-        if report.get('no_school_admin_while_students_exist'):
-            problems.append('students exist but no SchoolAdmin account exists (the comparison would pass vacuously)')
-        if report.get('schools_with_students_but_no_school_admin'):
-            problems.append(f"{report['schools_with_students_but_no_school_admin']} school(s) have students but no "
-                            'SchoolAdmin who would still see them')
-        if report.get('memberships_invalid'):
-            problems.append(f"{report['memberships_invalid']} active membership(s) of users who no longer qualify")
+        problems = parity_problems(report, unaccounted)  # the SAME list decides passed, verdict and the exit code
+        if unaccounted:
+            report['unclassified_counters'] = unaccounted
         report['multi_school_checks'] = 'RUN'
         report['multi_school_checks_run'] = True
         report['multi_school_passed'] = not problems

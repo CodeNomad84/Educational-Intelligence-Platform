@@ -25,6 +25,49 @@ MULTI_SCHOOL_BLOCKERS = (
 )
 
 
+# Every counter ``school_admin_parity()`` can return is either a PROBLEM (the gate fails while it is non-zero) or
+# INFORMATIONAL. ``compare_access_parity --multi-school`` derives ``multi_school_passed``, ``verdict`` and the exit code
+# from PARITY_PROBLEM_KEYS and treats a counter that is in neither tuple as a problem (fail closed); a test reads the
+# source of ``school_admin_parity`` and fails when a counter is added without being classified here (S2 review J1).
+PARITY_PROBLEM_KEYS = (
+    'students_lost',
+    'grades_lost',
+    'attendances_lost',
+    'no_school_admin_while_students_exist',
+    'schools_with_students_but_no_school_admin',
+    'memberships_invalid',
+)
+PARITY_INFO_KEYS = (
+    'users_compared',
+    'users_with_differences',
+    'explained_by_student_without_school',
+    'explained_by_student_in_school_without_membership',
+    'explained_by_no_valid_membership',
+)
+PARITY_PROBLEM_TEXT = {
+    'students_lost': 'student rows would be hidden from a SchoolAdmin by the membership scope',
+    'grades_lost': 'grade rows would be hidden from a SchoolAdmin by the membership scope',
+    'attendances_lost': 'attendance rows would be hidden from a SchoolAdmin by the membership scope',
+    'no_school_admin_while_students_exist': 'students exist but no SchoolAdmin account exists (the comparison would pass vacuously)',
+    'schools_with_students_but_no_school_admin': 'school(s) have students but no valid SchoolAdmin covers them',
+    'memberships_invalid': 'active membership(s) of users who no longer qualify',
+}
+
+
+def unaccounted_parity_keys(result):
+    """Counters of a ``school_admin_parity()`` result that are in neither PARITY_PROBLEM_KEYS nor PARITY_INFO_KEYS."""
+    return sorted(set(result) - set(PARITY_PROBLEM_KEYS) - set(PARITY_INFO_KEYS))
+
+
+def parity_problems(report, unaccounted):
+    """Human-readable problems of a parity report; a counter nobody classified is a problem (fail closed)."""
+    problems = [f'{report[key]} {PARITY_PROBLEM_TEXT[key]}' for key in PARITY_PROBLEM_KEYS if report.get(key)]
+    if unaccounted:
+        problems.append('unclassified parity counter(s) ' + ', '.join(unaccounted)
+                        + ': add them to PARITY_PROBLEM_KEYS or PARITY_INFO_KEYS')
+    return problems
+
+
 def school_admin_users():
     """Active, non-superuser accounts of group ``SchoolAdmin`` (the accounts S3 scopes by membership)."""
     return list(get_user_model().objects.filter(
