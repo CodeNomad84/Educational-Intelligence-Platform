@@ -346,3 +346,234 @@ class FlagCombinationTests(Base):
         self.run_cmd(CHECK, "--deactivate")
         self.run_cmd(CHECK, "--deactivate", "--apply", "--batch-file", self.path("b.json"))
         self.run_cmd(BACKFILL_S, "--apply", "--batch-file", self.path("c.json"), "--accept-visibility-change")
+
+
+class EmptyAndOddOptionValueTests(Base):
+    """S2 review R2: a GIVEN option with an empty value is an error, never 'absent' (no silent dry-run)."""
+
+    def valid_batch(self, command):
+        return self.write("v.json", {"command": command, "version": batch_log.VERSION, "school_id": 1,
+                                     "memberships": [], "assignments": []})
+
+    def test_empty_revert_batch_is_an_error_not_a_dry_run(self):
+        make_user("orphan", ADMIN).groups.clear()
+        for command in (CHECK, BACKFILL_M, BACKFILL_S):
+            for value in ("", "   "):
+                with self.subTest(command=command, value=repr(value), style="argv"), self.assertRaises(CommandError):
+                    self.run_cmd(command, "--revert-batch", value)
+                with self.subTest(command=command, value=repr(value), style="kwargs"), self.assertRaises(CommandError):
+                    call_command(command, revert_batch=value, stdout=StringIO())
+
+    def test_empty_batch_file_is_an_error_even_without_apply(self):
+        for command in (CHECK, BACKFILL_M, BACKFILL_S):
+            for args in (("--batch-file", ""), ("--apply", "--batch-file", ""), ("--apply", "--batch-file", " ")):
+                extra = ("--deactivate",) if command == CHECK and "--apply" in args else ()
+                with self.subTest(command=command, args=args), self.assertRaises(CommandError):
+                    self.run_cmd(command, *extra, *args)
+
+    def test_nul_byte_in_a_path_option_is_rejected_up_front_before_any_database_work(self):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        for command in (CHECK, BACKFILL_M, BACKFILL_S):
+            with self.subTest(command=command, option="revert"):
+                with CaptureQueriesContext(connection) as ctx, self.assertRaises(CommandError) as err:
+                    call_command(command, revert_batch="a\0b.json", stdout=StringIO())
+                self.assertIn("NUL byte", str(err.exception))
+                self.assertEqual(len(ctx.captured_queries), 0)
+            with self.subTest(command=command, option="batch"):
+                extra = {"deactivate": True} if command == CHECK else {}
+                with CaptureQueriesContext(connection) as ctx, self.assertRaises(CommandError) as err:
+                    call_command(command, apply=True, batch_file="a\0b.json", stdout=StringIO(), **extra)
+                self.assertIn("NUL byte", str(err.exception))
+                self.assertEqual(len(ctx.captured_queries), 0)
+
+    def test_write_batch_itself_turns_a_nul_path_into_a_command_error(self):
+        with self.assertRaises(CommandError):
+            batch_log.write_batch("a\0b.json", "x", {})
+
+    def test_empty_options_write_nothing(self):
+        user = make_user("sa", ADMIN)
+        before = SchoolMembership.objects.count()
+        for command in (CHECK, BACKFILL_M, BACKFILL_S):
+            with self.assertRaises(CommandError):
+                self.run_cmd(command, "--apply", *(("--deactivate",) if command == CHECK else ()), "--batch-file", "")
+        self.assertEqual(SchoolMembership.objects.count(), before)
+        self.assertIsNotNone(user.pk)
+
+    def test_a_normal_path_still_works(self):
+        for command in (CHECK, BACKFILL_M, BACKFILL_S):
+            self.assertEqual(self.run_json(command, "--revert-batch", self.valid_batch(command))["writes"], "reverted")
+
+
+class VersionMessageTests(Base):
+    def test_unsupported_version_is_named_and_distinct_from_a_wrong_command(self):
+        for command in (CHECK, BACKFILL_M, BACKFILL_S):
+            path = self.write("old.json", {"command": command, "version": 1})
+            with self.assertRaises(CommandError) as ctx:
+                self.run_cmd(command, "--revert-batch", path)
+            self.assertIn("Unsupported batch version 1", str(ctx.exception))
+            self.assertIn("older version", str(ctx.exception))
+            path = self.write("foreign.json", {"command": "other", "version": batch_log.VERSION})
+            with self.assertRaises(CommandError) as ctx:
+                self.run_cmd(command, "--revert-batch", path)
+            self.assertIn("not a batch file", str(ctx.exception))
+            self.assertNotIn("Unsupported", str(ctx.exception))
+
+    def test_a_hostile_version_value_is_not_echoed(self):
+        path = self.write("v.json", {"command": CHECK, "version": "<script>x</script>"})
+        with self.assertRaises(CommandError) as ctx:
+            self.run_cmd(CHECK, "--revert-batch", path)
+        self.assertIn("Unsupported batch version unknown", str(ctx.exception))
+        self.assertNotIn("script", str(ctx.exception))
+
+
+class WriteBatchCleanupTests(Base):
+    def test_keyboard_interrupt_and_memory_error_remove_the_file_roll_back_and_propagate(self):
+        make_user("sa", ADMIN)
+        for exc in (KeyboardInterrupt, MemoryError):
+            with self.subTest(exc=exc.__name__):
+                with mock.patch("schools.batch_log.json.dump", side_effect=exc()):
+                    with self.assertRaises(exc):
+                        self.run_cmd(BACKFILL_M, "--apply", "--batch-file", self.path())
+                self.assertFalse(os.path.exists(self.path()))
+                self.assertEqual(SchoolMembership.objects.count(), 0)
+
+    def test_only_the_file_this_call_created_is_removed(self):
+        """A file swapped onto the path while the write was failing must survive."""
+        target = self.path("swap.json")
+
+        def swap_then_fail(*args, **kwargs):
+            os.unlink(target)
+            with open(target, "w", encoding="utf-8") as other:
+                other.write("somebody else's file")
+            raise OSError(28, "No space left on device")
+
+        with mock.patch("schools.batch_log.json.dump", side_effect=swap_then_fail):
+            with self.assertRaises(CommandError):
+                batch_log.write_batch(target, "x", {})
+        with open(target, encoding="utf-8") as handle:
+            self.assertEqual(handle.read(), "somebody else's file")
+
+    def test_the_created_file_is_removed_when_it_is_still_the_same_file(self):
+        target = self.path("same.json")
+        with mock.patch("schools.batch_log.json.dump", side_effect=OSError(5, "I/O error")):
+            with self.assertRaises(CommandError):
+                batch_log.write_batch(target, "x", {})
+        self.assertFalse(os.path.exists(target))
+
+    def test_mode_is_0600(self):
+        batch_log.write_batch(self.path("m.json"), "x", {})
+        self.assertEqual(os.stat(self.path("m.json")).st_mode & 0o777, 0o600)
+
+
+class RowLockTests(Base):
+    """S2 review R8: the row locks name only the table being changed ('self') and use a stable primary-key order,
+    so PostgreSQL does not also lock the joined School rows (observed on PostgreSQL 16, see Change Report 0012)."""
+
+    def record(self):
+        from django.db.models.query import QuerySet
+
+        calls = []
+        original = QuerySet.select_for_update
+
+        def wrapper(qs, *args, **kwargs):
+            calls.append((qs.model.__name__, kwargs.get("of"), args))
+            return original(qs, *args, **kwargs)
+
+        return calls, mock.patch.object(QuerySet, "select_for_update", wrapper)
+
+    def test_every_lock_in_the_three_commands_names_self_only(self):
+        calls, patch = self.record()
+        user = make_user("sa", ADMIN)
+        orphan = make_user("orphan", ADMIN)
+        SchoolMembership.objects.create(user=orphan, school=self.school)
+        orphan.groups.clear()
+        Student.objects.create(first_name="S", last_name="1", national_id="6100000001", grade=7, phone_number="1")
+        Student.objects.update(school=None)
+        with patch:
+            self.run_cmd(CHECK, "--deactivate", "--apply", "--batch-file", self.path("a.json"))
+            self.run_cmd(CHECK, "--revert-batch", self.path("a.json"))
+            self.run_cmd(BACKFILL_M, "--apply", "--batch-file", self.path("b.json"))
+            self.run_cmd(BACKFILL_M, "--revert-batch", self.path("b.json"))
+            self.run_cmd(BACKFILL_S, "--apply", "--batch-file", self.path("c.json"))
+        self.assertTrue(calls)
+        self.assertEqual({(model, of) for model, of, _args in calls},
+                         {("SchoolMembership", ("self",)), ("Student", ("self",))})
+        self.assertIsNotNone(user.pk)
+
+    def test_locked_rows_come_back_in_primary_key_order(self):
+        users = [make_user(f"o{i}", ADMIN) for i in range(3)]
+        rows = [SchoolMembership.objects.create(user=u, school=self.school) for u in users]
+        for u in users:
+            u.groups.clear()
+        self.run_cmd(CHECK, "--deactivate", "--apply", "--batch-file", self.path())
+        with open(self.path(), encoding="utf-8") as handle:
+            ids = [m["id"] for m in json.load(handle)["memberships"]]
+        self.assertEqual(ids, sorted(r.pk for r in rows))
+
+
+class MachineReadableGateKeyTests(Base):
+    """The documented S3 gate relies on `multi_school_checks_run` in the JSON of BOTH commands."""
+
+    def test_key_is_false_without_and_true_with_the_flag_in_both_commands(self):
+        for command in ("check_access_switch_ready", "compare_access_parity"):
+            for flag, expected in (((), False), (("--multi-school",), True)):
+                out = StringIO()
+                try:
+                    call_command(command, "--json", *flag, stdout=out)
+                except CommandError:
+                    pass
+                report = json.loads(out.getvalue())
+                with self.subTest(command=command, flag=flag):
+                    self.assertIs(report["multi_school_checks_run"], expected)
+                    self.assertEqual(report["multi_school_checks"], "RUN" if expected else "NOT RUN")
+
+    def test_key_is_present_even_when_the_command_fails(self):
+        make_user("sa", ADMIN)  # a SchoolAdmin without membership: both gate commands fail
+        Student.objects.create(first_name="S", last_name="1", national_id="6200000001", grade=7, phone_number="1")
+        Student.objects.update(school=self.school)
+        for command in ("check_access_switch_ready", "compare_access_parity"):
+            out = StringIO()
+            with self.assertRaises(CommandError):
+                call_command(command, "--json", "--multi-school", stdout=out)
+            self.assertIs(json.loads(out.getvalue())["multi_school_checks_run"], True)
+
+    def test_text_output_does_not_print_the_json_only_key(self):
+        for command in ("check_access_switch_ready", "compare_access_parity"):
+            out = StringIO()
+            try:
+                call_command(command, stdout=out)
+            except CommandError:
+                pass
+            self.assertNotIn("multi_school_checks_run", out.getvalue())
+            self.assertIn("multi-school checks: NOT RUN", out.getvalue())
+
+
+class LockQuerySqlTests(Base):
+    """The lock queries carry no join and are ordered by primary key (SQL as executed; FOR UPDATE itself is a no-op
+    on SQLite and is checked on PostgreSQL separately)."""
+
+    def test_no_join_and_primary_key_order(self):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        users = [make_user(f"o{i}", ADMIN) for i in range(2)]
+        for u in users:
+            SchoolMembership.objects.create(user=u, school=self.school)
+            u.groups.clear()
+        Student.objects.create(first_name="S", last_name="1", national_id="6300000001", grade=7, phone_number="1")
+        Student.objects.update(school=None)
+        with CaptureQueriesContext(connection) as ctx:
+            self.run_cmd(CHECK, "--deactivate", "--apply", "--batch-file", self.path("a.json"))
+            self.run_cmd(CHECK, "--revert-batch", self.path("a.json"))
+            self.run_cmd(BACKFILL_S, "--apply", "--batch-file", self.path("c.json"))
+        locking = [q["sql"] for q in ctx.captured_queries
+                   if q["sql"].startswith("SELECT") and "ORDER BY" in q["sql"]
+                   and ('"schools_schoolmembership"."id" IN (' in q["sql"] or '"students_student"."school_id" IS NULL' in q["sql"]
+                        and '"students_student"."id" IN (' in q["sql"]
+                        or 'WHERE "schools_schoolmembership"."id" =' in q["sql"])]
+        self.assertTrue(locking)
+        for sql in locking:
+            self.assertNotIn("JOIN", sql, sql)
+            self.assertRegex(sql, r'ORDER BY "(schools_schoolmembership|students_student)"\."id" ASC|ORDER BY 1 ASC', sql)

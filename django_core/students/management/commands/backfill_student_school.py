@@ -67,7 +67,7 @@ class Command(BaseCommand):
     def handle(self, *args, **opts):
         batch_log.reject_flag_combinations(
             opts, revert='revert_batch', needs_apply=('batch_file', 'accept_visibility_change'))
-        if opts['revert_batch']:
+        if opts['revert_batch'] is not None:
             return self._revert(opts)
         school_ids = list(School.objects.order_by('pk').values_list('pk', flat=True))
         null_rows = list(Student.objects.filter(school__isnull=True).values_list('pk', 'school_class__school_id'))
@@ -89,7 +89,7 @@ class Command(BaseCommand):
             'writes': 'none',
         }
         if opts['apply']:
-            if not opts['batch_file']:
+            if opts['batch_file'] is None:
                 raise CommandError('--apply needs --batch-file (a new file that records the affected students).')
             if widened and not opts['accept_visibility_change']:
                 raise CommandError(
@@ -104,8 +104,8 @@ class Command(BaseCommand):
                 for sid, pks in sorted(grouped.items()):
                     for chunk in _chunks(sorted(pks)):
                         # lock the rows that are STILL NULL: the batch records the rows actually written
-                        ids = list(Student.objects.select_for_update().filter(
-                            pk__in=chunk, school__isnull=True).values_list('pk', flat=True))
+                        ids = list(Student.objects.select_for_update(of=('self',)).filter(
+                            pk__in=chunk, school__isnull=True).order_by('pk').values_list('pk', flat=True))
                         if Student.objects.filter(pk__in=ids, school__isnull=True).update(school_id=sid) != len(ids):
                             raise CommandError('The rows changed while writing; nothing was written. Re-run.')
                         items.extend({'student_id': pk, 'school_id': sid} for pk in ids)

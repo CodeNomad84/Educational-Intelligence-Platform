@@ -14,6 +14,8 @@ a separate opt-in run: it requires THIS command and `check_access_switch_ready` 
 pass. With the flag the enrollment comparison is skipped and each SchoolAdmin's scope is compared instead; it also fails
 when students exist but no SchoolAdmin does (D1), when a school has students but no valid SchoolAdmin covers it (E1)
 and while active memberships of non-qualifying users exist (D3).
+Machine check: with `--json` BOTH gate outputs (this one and `check_access_switch_ready`) must contain
+`"multi_school_checks_run": true`; a bare exit code of 0 or a READY verdict is not enough.
 """
 import json
 from collections import Counter
@@ -146,11 +148,12 @@ class Command(BaseCommand):
         if opts['detail']:
             report['unexplained_signatures'] = dict(unexplained_signatures)
         report['multi_school_checks'] = 'NOT RUN'
+        report['multi_school_checks_run'] = False
         if opts['json']:
             self.stdout.write(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
         else:
             for key, value in report.items():
-                if key != 'multi_school_checks':
+                if key not in ('multi_school_checks', 'multi_school_checks_run'):
                     self.stdout.write(f'{key}: {value}')
             self.stdout.write('multi-school checks: NOT RUN')
         if report['unexplained']:
@@ -163,11 +166,12 @@ class Command(BaseCommand):
                   'attendances_lost': 0, **school_admin_parity()}
         report['writes'] = 'none'
         report['multi_school_checks'] = 'RUN'
+        report['multi_school_checks_run'] = True
         if opts['json']:
             self.stdout.write(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
         else:
             for key, value in sorted(report.items()):
-                if key != 'multi_school_checks':
+                if key not in ('multi_school_checks', 'multi_school_checks_run'):
                     self.stdout.write(f'{key}: {value}')
             self.stdout.write('multi-school checks: RUN')
         problems = []

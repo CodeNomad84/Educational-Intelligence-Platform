@@ -35,7 +35,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **opts):
         batch_log.reject_flag_combinations(opts, revert='revert_batch', needs_apply=('batch_file',))
-        if opts['revert_batch']:
+        if opts['revert_batch'] is not None:
             return self._revert(opts)
         User = get_user_model()
         school_ids = list(School.objects.order_by('pk').values_list('pk', flat=True))
@@ -73,7 +73,7 @@ class Command(BaseCommand):
         school_id = school_ids[0]
         report['would_create'] = len(eligible)
         if opts['apply']:
-            if not opts['batch_file']:
+            if opts['batch_file'] is None:
                 raise CommandError('--apply needs --batch-file (a new file that records the created rows).')
             batch_log.ensure_new(opts['batch_file'])
             with transaction.atomic():
@@ -99,7 +99,7 @@ class Command(BaseCommand):
         deleted = changed = missing = 0
         with transaction.atomic():
             for entry in entries:
-                row = SchoolMembership.objects.select_for_update().filter(pk=entry['id']).first()
+                row = SchoolMembership.objects.select_for_update(of=('self',)).filter(pk=entry['id']).order_by('pk').first()
                 if row is None:
                     missing += 1
                 elif row.user_id != entry['user_id'] or row.school_id != school_id or not row.is_active:

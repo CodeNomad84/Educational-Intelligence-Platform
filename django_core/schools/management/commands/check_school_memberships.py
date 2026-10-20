@@ -41,7 +41,7 @@ class Command(BaseCommand):
     def handle(self, *args, **opts):
         batch_log.reject_flag_combinations(
             opts, revert='revert_batch', apply_requires='deactivate', needs_apply=('batch_file',))
-        if opts['revert_batch']:
+        if opts['revert_batch'] is not None:
             return self._revert(opts)
         rows = classify_memberships()
         active = [r for r in rows if r['is_active']]
@@ -60,14 +60,14 @@ class Command(BaseCommand):
             ids = sorted(r['id'] for r in orphans_active)
             report['would_deactivate'] = len(ids)
             if opts['apply']:
-                if not opts['batch_file']:
+                if opts['batch_file'] is None:
                     raise CommandError('--apply needs --batch-file (a new file that records the affected rows).')
                 batch_log.ensure_new(opts['batch_file'])
                 with transaction.atomic():
                     # re-classify inside the transaction and lock the rows: the batch records the rows ACTUALLY updated
                     current = sorted(r['id'] for r in classify_memberships() if r['is_active'] and r['reason'])
-                    locked = list(SchoolMembership.objects.select_for_update().filter(
-                        pk__in=current, is_active=True).values('id', 'user_id', 'school_id'))
+                    locked = list(SchoolMembership.objects.select_for_update(of=('self',)).filter(
+                        pk__in=current, is_active=True).order_by('pk').values('id', 'user_id', 'school_id'))
                     updated = SchoolMembership.objects.filter(
                         pk__in=[row['id'] for row in locked], is_active=True).update(
                         is_active=False, updated_at=timezone.now())
@@ -88,7 +88,7 @@ class Command(BaseCommand):
         reactivated = mismatch = missing = already_active = 0
         with transaction.atomic():
             for entry in rows:
-                row = SchoolMembership.objects.select_for_update().filter(pk=entry['id']).first()
+                row = SchoolMembership.objects.select_for_update(of=('self',)).filter(pk=entry['id']).order_by('pk').first()
                 if row is None:
                     missing += 1
                 elif row.user_id != entry['user_id'] or row.school_id != entry['school_id']:

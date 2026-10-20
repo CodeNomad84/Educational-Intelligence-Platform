@@ -21,6 +21,23 @@ def valid_id(value):
     return isinstance(value, int) and not isinstance(value, bool) and 0 < value <= MAX_ID
 
 
+def _given(opts, name):
+    return opts.get(name) is not None
+
+
+def check_path_options(opts):
+    """An option that was GIVEN must be a usable path: an empty or whitespace-only value (typically an unset shell
+    variable) and a path containing a NUL byte are errors, never 'absent' (S2 review R2)."""
+    for name in ('batch_file', 'revert_batch'):
+        value = opts.get(name)
+        if value is None:
+            continue
+        if not isinstance(value, str) or not value.strip():
+            raise CommandError(f'--{name.replace("_", "-")} was given an empty value; give a path.')
+        if '\0' in value:
+            raise CommandError(f'--{name.replace("_", "-")} contains a NUL byte; give a valid path.')
+
+
 def ensure_new(path):
     """Fail early (before any database work) when the batch file path is already taken."""
     if os.path.lexists(path):
@@ -36,18 +53,30 @@ def write_batch(path, command, payload):
         raise CommandError('The batch file already exists; it is never overwritten. Choose a new path.')
     except OSError as exc:
         raise CommandError(f'Cannot create the batch file: {exc.strerror}')
+    except (ValueError, TypeError):
+        raise CommandError('The batch file path is not valid (empty, NUL byte or wrong type).')
+    created = os.fstat(fd)  # identity of the file THIS call created
     try:
         with os.fdopen(fd, 'w', encoding='utf-8') as handle:
             json.dump(data, handle, indent=2, sort_keys=True)
             handle.flush()
             os.fsync(handle.fileno())
-    except (OSError, ValueError, TypeError) as exc:
-        try:
-            os.unlink(path)  # never leave a truncated batch behind
-        except OSError:
-            pass
-        raise CommandError(f'Cannot write the batch file: {getattr(exc, "strerror", None) or "write failed"}')
+    except BaseException as exc:  # incl. KeyboardInterrupt/MemoryError: clean up, then let it propagate
+        _remove_if_same_file(path, created)
+        if isinstance(exc, (OSError, ValueError, TypeError)):
+            raise CommandError(f'Cannot write the batch file: {getattr(exc, "strerror", None) or "write failed"}')
+        raise
     return data
+
+
+def _remove_if_same_file(path, created):
+    """Unlink ``path`` only if it is still the file this call created (never a file swapped in meanwhile)."""
+    try:
+        current = os.stat(path)
+        if (current.st_dev, current.st_ino) == (created.st_dev, created.st_ino):
+            os.unlink(path)
+    except OSError:
+        pass
 
 
 def read_batch(path, command):
@@ -56,8 +85,14 @@ def read_batch(path, command):
             data = json.load(handle)
     except (OSError, ValueError, RecursionError):
         raise CommandError('The batch file cannot be read as JSON.')
-    if not isinstance(data, dict) or data.get('command') != command or data.get('version') != VERSION:
-        raise CommandError(f'This is not a batch file of "{command}" (version {VERSION}).')
+    if not isinstance(data, dict) or data.get('command') != command:
+        raise CommandError(f'This is not a batch file of "{command}".')
+    if data.get('version') != VERSION:
+        found = data.get('version')
+        found = found if isinstance(found, int) and not isinstance(found, bool) else 'unknown'
+        raise CommandError(
+            f'Unsupported batch version {found}: this tool reads version {VERSION}. A batch written by an older '
+            'version must be reverted with the code version that wrote it.')
     return data
 
 
@@ -83,12 +118,14 @@ def reject_flag_combinations(opts, *, revert, apply_requires=None, needs_apply=(
     ``revert``: name of the revert option (excludes every other write option); ``apply_requires``: option that
     ``--apply`` needs to be meaningful (or None); ``needs_apply``: options that are only valid together with --apply.
     """
-    if opts.get(revert):
-        others = [name for name in ('apply', 'batch_file', 'deactivate', 'accept_visibility_change') if opts.get(name)]
+    check_path_options(opts)
+    if _given(opts, revert):
+        others = [name for name in ('apply', 'batch_file', 'deactivate', 'accept_visibility_change')
+                  if (_given(opts, name) if name == 'batch_file' else opts.get(name))]
         if others:
             raise CommandError('--revert-batch cannot be combined with ' + ', '.join('--' + n.replace('_', '-') for n in others) + '.')
     if opts.get('apply') and apply_requires and not opts.get(apply_requires):
         raise CommandError(f'--apply needs --{apply_requires.replace("_", "-")}.')
     for name in needs_apply:
-        if opts.get(name) and not opts.get('apply'):
+        if (_given(opts, name) if name == 'batch_file' else opts.get(name)) and not opts.get('apply'):
             raise CommandError(f'--{name.replace("_", "-")} only works together with --apply.')
