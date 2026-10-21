@@ -123,13 +123,27 @@ class Command(BaseCommand):
 
         blocker_keys = BLOCKERS
         extra = {}
+        unclassified = missing = []
         if opts['multi_school']:
-            from schools.multischool_checks import MULTI_SCHOOL_BLOCKERS, readiness_counts
+            from schools.multischool_checks import (
+                READINESS_PROBLEM_KEYS, missing_readiness_keys, readiness_counts, readiness_defaults,
+                unclassified_readiness_keys)
             extra = readiness_counts()
-            blocker_keys = BLOCKERS + MULTI_SCHOOL_BLOCKERS
+            unclassified = unclassified_readiness_keys(extra)
+            missing = missing_readiness_keys(extra)
+            extra = {**readiness_defaults(), **extra}
+            blocker_keys = BLOCKERS + READINESS_PROBLEM_KEYS
         report = {k: r.get(k, 0) for k in sorted(set(r) | set(BLOCKERS))}
         report.update(extra)
         blockers = {k: report.get(k, 0) for k in blocker_keys if report.get(k, 0)}
+        # S2 review K1: a counter outside the declared schema, and a declared counter that is no longer reported,
+        # are blockers themselves (fail closed), whatever their value
+        if unclassified:
+            report['unclassified_counters'] = unclassified
+            blockers['unclassified_counters'] = len(unclassified)
+        if missing:
+            report['missing_counters'] = missing
+            blockers['missing_counters'] = len(missing)
         report['verdict'] = 'READY' if not blockers else 'NOT READY'
         report['blockers_nonzero'] = blockers
         report['writes'] = 'none'

@@ -14,7 +14,11 @@ from students.models import Attendance, Enrollment, Grade, Student
 from .membership_audit import classify_memberships
 from .models import School
 
-MULTI_SCHOOL_BLOCKERS = (
+# DECLARED SCHEMA of ``readiness_counts()`` (S2 review K1): every key it returns is either a PROBLEM (a blocker of
+# ``check_access_switch_ready --multi-school``) or INFORMATIONAL, and it always returns ALL of them (zero-initialised).
+# The command treats a key outside the schema (unclassified) and a declared key that is absent (missing) as blockers,
+# i.e. it fails closed; tests read the source of ``readiness_counts`` and compare its behaviour with the schema.
+READINESS_PROBLEM_KEYS = (
     'school_admins_without_membership',
     'students_without_school',
     'school_inconsistent_rows',
@@ -23,6 +27,38 @@ MULTI_SCHOOL_BLOCKERS = (
     'no_school_admin_while_students_exist',      # S2 review D1: the gate must not pass vacuously
     'schools_with_students_but_no_school_admin',  # S2 review E1: per school, not only "no admin at all"
 )
+MULTI_SCHOOL_BLOCKERS = READINESS_PROBLEM_KEYS   # name used by the commands and older tests
+READINESS_INFO_KEYS = (
+    'info_schools_count',
+    'info_superusers_mapped_to_school_admin_until_s8',
+    'info_school_admins_per_school',
+)
+
+
+def readiness_defaults():
+    """Shared zero defaults of the readiness schema (a fresh copy each time)."""
+    return {**{key: 0 for key in READINESS_PROBLEM_KEYS},
+            'info_schools_count': 0, 'info_superusers_mapped_to_school_admin_until_s8': 0,
+            'info_school_admins_per_school': {}}
+
+
+def unclassified_keys(result, problem_keys, info_keys):
+    """Keys of ``result`` that are in neither tuple of the declared schema."""
+    return sorted(set(result) - set(problem_keys) - set(info_keys))
+
+
+def missing_keys(result, problem_keys, info_keys):
+    """Declared keys that ``result`` does not contain (a producer that stopped reporting a counter)."""
+    return sorted((set(problem_keys) | set(info_keys)) - set(result))
+
+
+def unclassified_readiness_keys(result):
+    return unclassified_keys(result, READINESS_PROBLEM_KEYS, READINESS_INFO_KEYS)
+
+
+def missing_readiness_keys(result):
+    return missing_keys(result, READINESS_PROBLEM_KEYS, READINESS_INFO_KEYS)
+
 
 
 # Every counter ``school_admin_parity()`` can return is either a PROBLEM (the gate fails while it is non-zero) or
@@ -54,17 +90,29 @@ PARITY_PROBLEM_TEXT = {
 }
 
 
+def parity_defaults():
+    """Shared zero defaults of the parity schema (a fresh copy each time)."""
+    return {key: 0 for key in PARITY_PROBLEM_KEYS + PARITY_INFO_KEYS}
+
+
 def unaccounted_parity_keys(result):
     """Counters of a ``school_admin_parity()`` result that are in neither PARITY_PROBLEM_KEYS nor PARITY_INFO_KEYS."""
-    return sorted(set(result) - set(PARITY_PROBLEM_KEYS) - set(PARITY_INFO_KEYS))
+    return unclassified_keys(result, PARITY_PROBLEM_KEYS, PARITY_INFO_KEYS)
 
 
-def parity_problems(report, unaccounted):
-    """Human-readable problems of a parity report; a counter nobody classified is a problem (fail closed)."""
+def missing_parity_keys(result):
+    return missing_keys(result, PARITY_PROBLEM_KEYS, PARITY_INFO_KEYS)
+
+
+def parity_problems(report, unaccounted, missing=()):
+    """Human-readable problems of a parity report; a counter nobody classified, and a declared counter that is no
+    longer reported, are problems (fail closed)."""
     problems = [f'{report[key]} {PARITY_PROBLEM_TEXT[key]}' for key in PARITY_PROBLEM_KEYS if report.get(key)]
     if unaccounted:
         problems.append('unclassified parity counter(s) ' + ', '.join(unaccounted)
                         + ': add them to PARITY_PROBLEM_KEYS or PARITY_INFO_KEYS')
+    if missing:
+        problems.append('declared parity counter(s) not reported: ' + ', '.join(missing))
     return problems
 
 
@@ -127,7 +175,7 @@ def readiness_counts():
     r['info_schools_count'] = School.objects.count()
     r['info_superusers_mapped_to_school_admin_until_s8'] = get_user_model().objects.filter(
         is_superuser=True, is_active=True).count()
-    report = {k: 0 for k in MULTI_SCHOOL_BLOCKERS}
+    report = readiness_defaults()
     report.update(r)
     report['info_school_admins_per_school'] = {str(k): v for k, v in sorted(per_school.items())}
     return report
@@ -139,7 +187,7 @@ def school_admin_parity():
     total_students = Student.objects.count()
     total_grades = Grade.objects.count()
     total_attendances = Attendance.objects.count()
-    out = Counter()
+    out = Counter(parity_defaults())  # declared schema: every key is always reported
     admins = school_admin_users()
     if not admins and total_students:
         out['no_school_admin_while_students_exist'] = 1  # S2 review D1: no vacuous pass

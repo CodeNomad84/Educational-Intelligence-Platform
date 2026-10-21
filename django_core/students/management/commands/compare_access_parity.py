@@ -163,16 +163,19 @@ class Command(BaseCommand):
             raise CommandError(f"{report['unexplained']} unexplained difference(s).")
 
     def _multi_school(self, opts):
-        from schools.multischool_checks import parity_problems, school_admin_parity, unaccounted_parity_keys
+        from schools.multischool_checks import (
+            missing_parity_keys, parity_defaults, parity_problems, school_admin_parity, unaccounted_parity_keys)
 
         result = school_admin_parity()
         unaccounted = unaccounted_parity_keys(result)
-        report = {'users_compared': 0, 'users_with_differences': 0, 'students_lost': 0, 'grades_lost': 0,
-                  'attendances_lost': 0, **result}
+        missing = missing_parity_keys(result)
+        report = {**parity_defaults(), **result}
         report['writes'] = 'none'
-        problems = parity_problems(report, unaccounted)  # the SAME list decides passed, verdict and the exit code
+        problems = parity_problems(report, unaccounted, missing)  # the SAME list decides passed, verdict and exit code
         if unaccounted:
             report['unclassified_counters'] = unaccounted
+        if missing:
+            report['missing_counters'] = missing
         report['multi_school_checks'] = 'RUN'
         report['multi_school_checks_run'] = True
         report['multi_school_passed'] = not problems

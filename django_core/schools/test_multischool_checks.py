@@ -497,12 +497,39 @@ class ParityCoverageTests(Base):
         self.assertEqual(set(PARITY_PROBLEM_KEYS) & set(PARITY_INFO_KEYS), set())
         self.assertEqual(set(PARITY_PROBLEM_KEYS), set(PARITY_PROBLEM_TEXT))
 
-    def test_every_problem_key_is_produced_or_defaulted(self):
-        """No dead entries: each problem key comes from school_admin_parity or from the command's zero defaults."""
-        from .multischool_checks import PARITY_PROBLEM_KEYS
+    def test_school_admin_parity_always_reports_the_declared_schema(self):
+        """Declared schema (K1/R-g): every classified key is reported, none other, in clean and in busy states."""
+        from .multischool_checks import PARITY_INFO_KEYS, PARITY_PROBLEM_KEYS, school_admin_parity
 
-        defaults = {"students_lost", "grades_lost", "attendances_lost"}
-        self.assertEqual(set(PARITY_PROBLEM_KEYS) - self.produced_keys() - defaults, set())
+        declared = set(PARITY_PROBLEM_KEYS) | set(PARITY_INFO_KEYS)
+        self.assertEqual(set(school_admin_parity()), declared)  # empty database
+        self.member("sa")
+        self.student(self.a)
+        self.assertEqual(set(school_admin_parity()), declared)
+        make_user("noone", ADMIN)  # admin without membership: the explained_by_* branches
+        self.student(None)
+        self.assertEqual(set(school_admin_parity()), declared)
+
+    def test_a_declared_counter_that_is_no_longer_reported_fails_the_gate_closed(self):
+        from . import multischool_checks
+
+        self.member("sa")
+        self.student(self.a)
+        real = multischool_checks.school_admin_parity
+        for key in multischool_checks.PARITY_PROBLEM_KEYS + multischool_checks.PARITY_INFO_KEYS:
+            def without(key=key):
+                result = dict(real())
+                result.pop(key)
+                return result
+
+            with self.subTest(key=key), mock.patch.object(multischool_checks, "school_admin_parity", without):
+                out = StringIO()
+                with self.assertRaises(CommandError):
+                    call_command("compare_access_parity", "--multi-school", "--json", stdout=out)
+                report = json.loads(out.getvalue())
+                self.assertEqual(report["missing_counters"], [key])
+                self.assertIs(report["multi_school_passed"], False)
+                self.assertEqual(report["verdict"], "FAIL")
 
     def test_an_unclassified_counter_makes_the_command_fail_closed_even_when_everything_else_is_clean(self):
         self.member("sa")
@@ -558,3 +585,170 @@ class ParityCoverageTests(Base):
                 out = StringIO()
                 call_command("compare_access_parity", "--multi-school", "--json", stdout=out)
                 self.assertIs(json.loads(out.getvalue())["multi_school_passed"], True)
+
+
+class ReadinessCoverageTests(Base):
+    """S2 review K1 (R-e, R-f, R-g): check_access_switch_ready --multi-school classifies every counter of
+    readiness_counts(); an unclassified or a missing counter is a blocker (fail closed)."""
+
+    def clean(self):
+        self.member("sa")
+        self.student(self.a)
+
+    def gate(self, patched=None):
+        from . import multischool_checks
+
+        out = StringIO()
+        rc = 0
+        context = mock.patch.object(multischool_checks, "readiness_counts", patched) if patched else mock.MagicMock()
+        with context:
+            try:
+                call_command("check_access_switch_ready", "--multi-school", "--json", stdout=out)
+            except CommandError:
+                rc = 1
+        return json.loads(out.getvalue()), rc
+
+    @staticmethod
+    def source_report():
+        """(literal keys written, problems) found in the source of readiness_counts via ast."""
+        import ast
+        import inspect
+
+        from . import multischool_checks
+
+        tree = ast.parse(inspect.getsource(multischool_checks.readiness_counts).lstrip())
+        keys, problems = set(), []
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Subscript) and isinstance(node.value, ast.Name) and node.value.id in ("r", "report"):
+                if isinstance(node.slice, ast.Constant) and isinstance(node.slice.value, str):
+                    keys.add(node.slice.value)
+                else:
+                    problems.append(f"non-literal key on {node.value.id}")
+            if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                    and isinstance(node.func.value, ast.Name) and node.func.value.id in ("r", "report")
+                    and node.func.attr in ("update", "setdefault", "pop", "popitem", "clear")):
+                if not (node.func.value.id == "report" and node.func.attr == "update"
+                        and len(node.args) == 1 and isinstance(node.args[0], ast.Name) and node.args[0].id == "r"):
+                    problems.append(f"{node.func.value.id}.{node.func.attr}(...)")
+        return keys, problems
+
+    def test_every_literal_key_written_is_classified_and_no_indirect_write_exists(self):
+        from .multischool_checks import READINESS_INFO_KEYS, READINESS_PROBLEM_KEYS
+
+        keys, problems = self.source_report()
+        self.assertTrue(keys)
+        self.assertEqual(sorted(keys - set(READINESS_PROBLEM_KEYS) - set(READINESS_INFO_KEYS)), [])
+        self.assertEqual(problems, [])
+
+    def test_the_two_tuples_are_disjoint_and_the_blocker_name_is_the_problem_tuple(self):
+        from .multischool_checks import MULTI_SCHOOL_BLOCKERS, READINESS_INFO_KEYS, READINESS_PROBLEM_KEYS
+
+        self.assertEqual(set(READINESS_PROBLEM_KEYS) & set(READINESS_INFO_KEYS), set())
+        self.assertIs(MULTI_SCHOOL_BLOCKERS, READINESS_PROBLEM_KEYS)
+
+    def test_readiness_counts_always_reports_exactly_the_declared_schema(self):
+        from .multischool_checks import READINESS_INFO_KEYS, READINESS_PROBLEM_KEYS, readiness_counts
+
+        declared = set(READINESS_PROBLEM_KEYS) | set(READINESS_INFO_KEYS)
+        self.assertEqual(set(readiness_counts()), declared)  # empty database
+        self.clean()
+        self.assertEqual(set(readiness_counts()), declared)
+        make_user("noone", ADMIN)
+        self.student(None)
+        self.assertEqual(set(readiness_counts()), declared)
+
+    def test_clean_state_passes_and_reports_no_unclassified_or_missing_counters(self):
+        self.clean()
+        report, rc = self.gate()
+        self.assertEqual((report["verdict"], report["multi_school_passed"], rc), ("READY", True, 0))
+        self.assertNotIn("unclassified_counters", report)
+        self.assertNotIn("missing_counters", report)
+
+    def test_each_problem_key_alone_fails_the_gate(self):
+        from . import multischool_checks
+
+        self.clean()
+        real = multischool_checks.readiness_counts
+        for key in multischool_checks.READINESS_PROBLEM_KEYS:
+            with self.subTest(key=key):
+                report, rc = self.gate(lambda key=key: {**real(), key: 1})
+                self.assertEqual(rc, 1)
+                self.assertEqual(report["verdict"], "NOT READY")
+                self.assertIs(report["multi_school_checks_run"], True)
+                self.assertIs(report["multi_school_passed"], False)
+                self.assertEqual(report["blockers_nonzero"], {key: 1})
+
+    def test_each_info_key_alone_never_fails_the_gate(self):
+        from . import multischool_checks
+
+        self.clean()
+        real = multischool_checks.readiness_counts
+        for key in multischool_checks.READINESS_INFO_KEYS:
+            with self.subTest(key=key):
+                value = {"9": 9} if key == "info_school_admins_per_school" else 5
+                report, rc = self.gate(lambda key=key, value=value: {**real(), key: value})
+                self.assertEqual((report["verdict"], report["multi_school_passed"], rc), ("READY", True, 0))
+
+    def test_a_dummy_counter_in_readiness_counts_fails_the_gate_closed(self):
+        from . import multischool_checks
+
+        self.clean()
+        real = multischool_checks.readiness_counts
+        report, rc = self.gate(lambda: {**real(), "dummy_counter": 3})
+        self.assertEqual(rc, 1)
+        self.assertEqual(report["verdict"], "NOT READY")
+        self.assertIs(report["multi_school_checks_run"], True)
+        self.assertIs(report["multi_school_passed"], False)
+        self.assertEqual(report["unclassified_counters"], ["dummy_counter"])
+        self.assertEqual(report["blockers_nonzero"], {"unclassified_counters": 1})
+
+    def test_even_a_zero_valued_dummy_counter_fails_closed(self):
+        from . import multischool_checks
+
+        self.clean()
+        real = multischool_checks.readiness_counts
+        report, rc = self.gate(lambda: {**real(), "dummy_counter": 0})
+        self.assertEqual((rc, report["multi_school_passed"]), (1, False))
+
+    def test_a_removed_problem_key_fails_the_gate_closed(self):
+        from . import multischool_checks
+
+        self.clean()
+        real = multischool_checks.readiness_counts
+        for key in multischool_checks.READINESS_PROBLEM_KEYS + multischool_checks.READINESS_INFO_KEYS:
+            def without(key=key):
+                result = dict(real())
+                result.pop(key)
+                return result
+
+            with self.subTest(key=key):
+                report, rc = self.gate(without)
+                self.assertEqual(rc, 1)
+                self.assertEqual(report["missing_counters"], [key])
+                self.assertEqual(report["blockers_nonzero"], {"missing_counters": 1})
+                self.assertEqual(report["verdict"], "NOT READY")
+                self.assertIs(report["multi_school_passed"], False)
+
+    def test_a_missing_counter_is_still_present_in_the_output_as_zero(self):
+        from . import multischool_checks
+
+        self.clean()
+        real = multischool_checks.readiness_counts
+
+        def without():
+            result = dict(real())
+            result.pop("students_without_school")
+            return result
+
+        report, _rc = self.gate(without)
+        self.assertEqual(report["students_without_school"], 0)  # shared zero default keeps the output complete
+
+    def test_without_the_flag_none_of_this_runs(self):
+        from . import multischool_checks
+
+        with mock.patch.object(multischool_checks, "readiness_counts", side_effect=AssertionError("must not run")):
+            out = StringIO()
+            call_command("check_access_switch_ready", "--json", stdout=out)
+        report = json.loads(out.getvalue())
+        self.assertNotIn("unclassified_counters", report)
+        self.assertIs(report["multi_school_passed"], False)
