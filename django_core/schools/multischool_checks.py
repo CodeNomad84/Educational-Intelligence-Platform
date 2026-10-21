@@ -52,6 +52,38 @@ def missing_keys(result, problem_keys, info_keys):
     return sorted((set(problem_keys) | set(info_keys)) - set(result))
 
 
+def invalid_counter_values(result, problem_keys, info_keys, dict_info_keys=('info_school_admins_per_school',)):
+    """Names of declared counters (present in ``result``) whose value is not valid (S2 review K-F2): a counter must be a
+    real ``int`` >= 0 (so not None, bool, float, str, list, dict or a negative number); an info counter named in
+    ``dict_info_keys`` must be a dict of str -> int >= 0. An invalid value is a blocker, whatever it is."""
+    def good_int(value):
+        return type(value) is int and value >= 0
+
+    bad = []
+    for key in problem_keys:
+        if key in result and not good_int(result[key]):
+            bad.append(key)
+    for key in info_keys:
+        if key not in result:
+            continue
+        value = result[key]
+        if key in dict_info_keys:
+            ok = type(value) is dict and all(type(k) is str and good_int(v) for k, v in value.items())
+        else:
+            ok = good_int(value)
+        if not ok:
+            bad.append(key)
+    return sorted(bad)
+
+
+def invalid_readiness_values(result):
+    return invalid_counter_values(result, READINESS_PROBLEM_KEYS, READINESS_INFO_KEYS)
+
+
+def invalid_parity_values(result):
+    return invalid_counter_values(result, PARITY_PROBLEM_KEYS, PARITY_INFO_KEYS, dict_info_keys=())
+
+
 def unclassified_readiness_keys(result):
     return unclassified_keys(result, READINESS_PROBLEM_KEYS, READINESS_INFO_KEYS)
 
@@ -104,15 +136,18 @@ def missing_parity_keys(result):
     return missing_keys(result, PARITY_PROBLEM_KEYS, PARITY_INFO_KEYS)
 
 
-def parity_problems(report, unaccounted, missing=()):
+def parity_problems(report, unaccounted, missing=(), invalid=()):
     """Human-readable problems of a parity report; a counter nobody classified, and a declared counter that is no
     longer reported, are problems (fail closed)."""
-    problems = [f'{report[key]} {PARITY_PROBLEM_TEXT[key]}' for key in PARITY_PROBLEM_KEYS if report.get(key)]
+    problems = [f'{report[key]} {PARITY_PROBLEM_TEXT[key]}' for key in PARITY_PROBLEM_KEYS
+                if type(report.get(key)) is int and report[key] > 0]
     if unaccounted:
         problems.append('unclassified parity counter(s) ' + ', '.join(unaccounted)
                         + ': add them to PARITY_PROBLEM_KEYS or PARITY_INFO_KEYS')
     if missing:
         problems.append('declared parity counter(s) not reported: ' + ', '.join(missing))
+    if invalid:
+        problems.append('parity counter(s) with an invalid value (must be an integer >= 0): ' + ', '.join(invalid))
     return problems
 
 
@@ -137,21 +172,8 @@ def schools_without_admin_cover(admins=None):
     return sorted(with_students - covered)
 
 
-def readiness_counts():
-    r = Counter()
-    users = school_admin_users()
-    if not users and Student.objects.exists():
-        r['no_school_admin_while_students_exist'] = 1
-    r['schools_with_students_but_no_school_admin'] = len(schools_without_admin_cover(users))
-    per_school = Counter()
-    for user in users:
-        ids = school_ids_for_admin(user)
-        if not ids:
-            r['school_admins_without_membership'] += 1
-        for school_id in ids:
-            per_school[school_id] += 1
-    r['students_without_school'] = Student.objects.filter(school__isnull=True).count()
-
+def _inconsistent_school_rows():
+    """Rows whose school links disagree (blocker ``school_inconsistent_rows``)."""
     inconsistent = 0
     # a student whose school differs from its class's school
     inconsistent += sum(1 for sid, csid in Student.objects.filter(school_class__isnull=False, school__isnull=False)
@@ -166,50 +188,61 @@ def readiness_counts():
     for model in (Grade, Attendance):
         inconsistent += sum(1 for sid, esid in model.objects.filter(enrollment__isnull=False)
                             .values_list('student_id', 'enrollment__student_id') if sid != esid)
-    r['school_inconsistent_rows'] = inconsistent
+    return inconsistent
 
+
+def readiness_counts():
+    """The multi-school readiness counters. S2 review K-F1: NO pre-filled defaults. Every declared key is computed by
+    ONE assignment ``report['<key>'] = <expression>`` below, so deleting a counter's computation makes the key missing
+    (the command then fails closed); a test reads this source and requires the written keys to equal the declared
+    schema exactly. Zero defaults are applied by the command only for the OUTPUT, after the checks."""
+    report = {}
+    users = school_admin_users()
+    scopes = [school_ids_for_admin(user) for user in users]
     rows = classify_memberships()
     active = [m for m in rows if m['is_active']]
-    r['active_memberships_of_platform_admin_users'] = sum(1 for m in active if m['user_in_platform_admin'])
-    r['memberships_invalid'] = sum(1 for m in active if m['reason'])  # BLOCKER since the S2 review (D3)
-    r['info_schools_count'] = School.objects.count()
-    r['info_superusers_mapped_to_school_admin_until_s8'] = get_user_model().objects.filter(
+    per_school = Counter(school_id for ids in scopes for school_id in ids)
+    report['no_school_admin_while_students_exist'] = 1 if (not users and Student.objects.exists()) else 0
+    report['schools_with_students_but_no_school_admin'] = len(schools_without_admin_cover(users))
+    report['school_admins_without_membership'] = sum(1 for ids in scopes if not ids)
+    report['students_without_school'] = Student.objects.filter(school__isnull=True).count()
+    report['school_inconsistent_rows'] = _inconsistent_school_rows()
+    report['active_memberships_of_platform_admin_users'] = sum(1 for m in active if m['user_in_platform_admin'])
+    report['memberships_invalid'] = sum(1 for m in active if m['reason'])
+    report['info_schools_count'] = School.objects.count()
+    report['info_superusers_mapped_to_school_admin_until_s8'] = get_user_model().objects.filter(
         is_superuser=True, is_active=True).count()
-    report = readiness_defaults()
-    report.update(r)
     report['info_school_admins_per_school'] = {str(k): v for k, v in sorted(per_school.items())}
     return report
 
 
 def school_admin_parity():
     """Counts only. A SchoolAdmin sees every student, grade and attendance row today; with S3 only the rows of the
-    schools of the valid memberships."""
+    schools of the valid memberships. S2 review K-F1: no pre-filled defaults; every declared key is computed by ONE
+    assignment ``result['<key>'] = <expression>`` (read by a test), see ``readiness_counts``."""
+    result = {}
     total_students = Student.objects.count()
     total_grades = Grade.objects.count()
     total_attendances = Attendance.objects.count()
-    out = Counter(parity_defaults())  # declared schema: every key is always reported
+    students_without_school = Student.objects.filter(school__isnull=True).count()
     admins = school_admin_users()
-    if not admins and total_students:
-        out['no_school_admin_while_students_exist'] = 1  # S2 review D1: no vacuous pass
-    out['memberships_invalid'] = sum(1 for m in classify_memberships() if m['is_active'] and m['reason'])  # D3
-    out['schools_with_students_but_no_school_admin'] = len(schools_without_admin_cover(admins))  # E1
-    for user in admins:
-        ids = school_ids_for_admin(user)
-        out['users_compared'] += 1
-        kept_students = Student.objects.filter(school_id__in=ids).count() if ids else 0
-        lost = total_students - kept_students
-        if lost:
-            out['users_with_differences'] += 1
-        out['students_lost'] += lost
-        if ids:
-            out['grades_lost'] += total_grades - Grade.objects.filter(student__school_id__in=ids).count()
-            out['attendances_lost'] += total_attendances - Attendance.objects.filter(
-                student__school_id__in=ids).count()
-            out['explained_by_student_without_school'] += Student.objects.filter(school__isnull=True).count()
-            out['explained_by_student_in_school_without_membership'] += Student.objects.filter(
-                school__isnull=False).exclude(school_id__in=ids).count()
-        else:
-            out['grades_lost'] += total_grades
-            out['attendances_lost'] += total_attendances
-            out['explained_by_no_valid_membership'] += lost
-    return dict(out)
+    scopes = [school_ids_for_admin(user) for user in admins]
+    kept_students = [Student.objects.filter(school_id__in=ids).count() if ids else 0 for ids in scopes]
+    result['no_school_admin_while_students_exist'] = 1 if (not admins and total_students) else 0
+    result['memberships_invalid'] = sum(1 for m in classify_memberships() if m['is_active'] and m['reason'])
+    result['schools_with_students_but_no_school_admin'] = len(schools_without_admin_cover(admins))
+    result['users_compared'] = len(admins)
+    result['users_with_differences'] = sum(1 for kept in kept_students if total_students - kept)
+    result['students_lost'] = sum(total_students - kept for kept in kept_students)
+    result['grades_lost'] = sum(
+        total_grades - Grade.objects.filter(student__school_id__in=ids).count() if ids else total_grades
+        for ids in scopes)
+    result['attendances_lost'] = sum(
+        total_attendances - Attendance.objects.filter(student__school_id__in=ids).count() if ids
+        else total_attendances for ids in scopes)
+    result['explained_by_student_without_school'] = students_without_school * sum(1 for ids in scopes if ids)
+    result['explained_by_student_in_school_without_membership'] = sum(
+        Student.objects.filter(school__isnull=False).exclude(school_id__in=ids).count() for ids in scopes if ids)
+    result['explained_by_no_valid_membership'] = sum(
+        total_students - kept for ids, kept in zip(scopes, kept_students) if not ids)
+    return result

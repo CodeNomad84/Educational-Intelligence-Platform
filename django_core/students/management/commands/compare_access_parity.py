@@ -164,18 +164,23 @@ class Command(BaseCommand):
 
     def _multi_school(self, opts):
         from schools.multischool_checks import (
-            missing_parity_keys, parity_defaults, parity_problems, school_admin_parity, unaccounted_parity_keys)
+            invalid_parity_values, missing_parity_keys, parity_defaults, parity_problems, school_admin_parity,
+            unaccounted_parity_keys)
 
         result = school_admin_parity()
+        # all checks run on the RAW result; the zero defaults only complete the OUTPUT afterwards (S2 review K-F1)
         unaccounted = unaccounted_parity_keys(result)
         missing = missing_parity_keys(result)
+        invalid = invalid_parity_values(result)
         report = {**parity_defaults(), **result}
         report['writes'] = 'none'
-        problems = parity_problems(report, unaccounted, missing)  # the SAME list decides passed, verdict and exit code
+        problems = parity_problems(report, unaccounted, missing, invalid)  # SAME list: passed, verdict, exit code
         if unaccounted:
             report['unclassified_counters'] = unaccounted
         if missing:
             report['missing_counters'] = missing
+        if invalid:
+            report['invalid_counters'] = invalid
         report['multi_school_checks'] = 'RUN'
         report['multi_school_checks_run'] = True
         report['multi_school_passed'] = not problems

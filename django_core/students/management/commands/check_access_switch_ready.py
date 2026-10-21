@@ -123,19 +123,26 @@ class Command(BaseCommand):
 
         blocker_keys = BLOCKERS
         extra = {}
-        unclassified = missing = []
+        unclassified, missing, invalid = [], [], []
         if opts['multi_school']:
             from schools.multischool_checks import (
-                READINESS_PROBLEM_KEYS, missing_readiness_keys, readiness_counts, readiness_defaults,
-                unclassified_readiness_keys)
+                READINESS_PROBLEM_KEYS, invalid_readiness_values, missing_readiness_keys, readiness_counts,
+                readiness_defaults, unclassified_readiness_keys)
             extra = readiness_counts()
+            # all checks run on the RAW result; the zero defaults only complete the OUTPUT afterwards (S2 review K-F1)
             unclassified = unclassified_readiness_keys(extra)
             missing = missing_readiness_keys(extra)
+            invalid = invalid_readiness_values(extra)
             extra = {**readiness_defaults(), **extra}
             blocker_keys = BLOCKERS + READINESS_PROBLEM_KEYS
         report = {k: r.get(k, 0) for k in sorted(set(r) | set(BLOCKERS))}
         report.update(extra)
-        blockers = {k: report.get(k, 0) for k in blocker_keys if report.get(k, 0)}
+        # only a valid (int >= 0) value can be a blocker count; an invalid value is a blocker of its own (K-F2)
+        blockers = {k: report[k] for k in blocker_keys
+                    if type(report.get(k)) is int and report[k] > 0}
+        if invalid:
+            report['invalid_counters'] = invalid
+            blockers['invalid_counter_values'] = len(invalid)
         # S2 review K1: a counter outside the declared schema, and a declared counter that is no longer reported,
         # are blockers themselves (fail closed), whatever their value
         if unclassified:

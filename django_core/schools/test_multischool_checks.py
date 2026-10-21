@@ -478,7 +478,7 @@ class ParityCoverageTests(Base):
         tree = ast.parse(inspect.getsource(multischool_checks.school_admin_parity).lstrip())
         keys = set()
         for node in ast.walk(tree):
-            if isinstance(node, ast.Subscript) and isinstance(node.value, ast.Name) and node.value.id == "out":
+            if isinstance(node, ast.Subscript) and isinstance(node.value, ast.Name) and node.value.id == "result":
                 index = node.slice
                 if isinstance(index, ast.Constant) and isinstance(index.value, str):
                     keys.add(index.value)
@@ -619,17 +619,15 @@ class ReadinessCoverageTests(Base):
         tree = ast.parse(inspect.getsource(multischool_checks.readiness_counts).lstrip())
         keys, problems = set(), []
         for node in ast.walk(tree):
-            if isinstance(node, ast.Subscript) and isinstance(node.value, ast.Name) and node.value.id in ("r", "report"):
+            if isinstance(node, ast.Subscript) and isinstance(node.value, ast.Name) and node.value.id == "report":
                 if isinstance(node.slice, ast.Constant) and isinstance(node.slice.value, str):
                     keys.add(node.slice.value)
                 else:
                     problems.append(f"non-literal key on {node.value.id}")
             if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
-                    and isinstance(node.func.value, ast.Name) and node.func.value.id in ("r", "report")
+                    and isinstance(node.func.value, ast.Name) and node.func.value.id == "report"
                     and node.func.attr in ("update", "setdefault", "pop", "popitem", "clear")):
-                if not (node.func.value.id == "report" and node.func.attr == "update"
-                        and len(node.args) == 1 and isinstance(node.args[0], ast.Name) and node.args[0].id == "r"):
-                    problems.append(f"{node.func.value.id}.{node.func.attr}(...)")
+                problems.append(f"report.{node.func.attr}(...)")
         return keys, problems
 
     def test_every_literal_key_written_is_classified_and_no_indirect_write_exists(self):
@@ -752,3 +750,196 @@ class ReadinessCoverageTests(Base):
         report = json.loads(out.getvalue())
         self.assertNotIn("unclassified_counters", report)
         self.assertIs(report["multi_school_passed"], False)
+
+
+class ProducerSourceTests(TestCase):
+    """S2 review K-F1: the producers hold NO pre-filled defaults; each declared key is computed by exactly one
+    literal-key assignment, so deleting a counter's computation is visible (to this test and to the gate)."""
+
+    @staticmethod
+    def analyse(func, name):
+        import ast
+        import inspect
+
+        tree = ast.parse(inspect.getsource(func).lstrip())
+        written, problems, inits = [], [], []
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name) and target.id == name:
+                        inits.append(ast.dump(node.value))
+                    if isinstance(target, ast.Subscript) and isinstance(target.value, ast.Name) and target.value.id == name:
+                        if isinstance(target.slice, ast.Constant) and isinstance(target.slice.value, str):
+                            written.append(target.slice.value)
+                        else:
+                            problems.append("non-literal key")
+            if isinstance(node, ast.AugAssign) and isinstance(node.target, ast.Subscript) \
+                    and isinstance(node.target.value, ast.Name) and node.target.value.id == name:
+                problems.append("augmented assignment")
+            if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                    and isinstance(node.func.value, ast.Name) and node.func.value.id == name):
+                problems.append(f"{name}.{node.func.attr}(...)")
+        return written, problems, inits
+
+    def check(self, func, name, problem_keys, info_keys):
+        written, problems, inits = self.analyse(func, name)
+        declared = set(problem_keys) | set(info_keys)
+        self.assertEqual(problems, [])
+        self.assertEqual(inits, [__import__("ast").dump(__import__("ast").parse("{}").body[0].value)])  # name = {} only
+        self.assertEqual(sorted(set(written) - declared), [], "written but not declared")
+        self.assertEqual(sorted(declared - set(written)), [], "declared but never written by the producer")
+        self.assertEqual(len(written), len(set(written)), "a key is assigned more than once")
+
+    def test_readiness_counts_writes_exactly_the_declared_keys_once_each(self):
+        from .multischool_checks import READINESS_INFO_KEYS, READINESS_PROBLEM_KEYS, readiness_counts
+
+        self.check(readiness_counts, "report", READINESS_PROBLEM_KEYS, READINESS_INFO_KEYS)
+
+    def test_school_admin_parity_writes_exactly_the_declared_keys_once_each(self):
+        from .multischool_checks import PARITY_INFO_KEYS, PARITY_PROBLEM_KEYS, school_admin_parity
+
+        self.check(school_admin_parity, "result", PARITY_PROBLEM_KEYS, PARITY_INFO_KEYS)
+
+    def test_the_analyser_detects_the_forbidden_patterns(self):
+        """Self-test of the reader: a pre-fill, an update, a non-literal key and an augmented write are all reported."""
+        def bad():
+            report = dict(x=0)
+            report.update({"a": 1})
+            report[key] = 2
+            report["b"] += 1
+            return report
+
+        written, problems, inits = self.analyse(bad, "report")
+        self.assertIn("report.update(...)", problems)
+        self.assertIn("non-literal key", problems)
+        self.assertIn("augmented assignment", problems)
+        self.assertNotEqual(inits, [__import__("ast").dump(__import__("ast").parse("{}").body[0].value)])
+
+
+class CounterValueValidationTests(Base):
+    """S2 review K-F2: a counter must be an int >= 0 (bool, None, list, dict, float, str, negative are invalid);
+    an invalid value is a blocker of its own, whatever its truthiness."""
+
+    BAD = (None, [], {}, True, False, -1, -7, 1.0, "1", "", [1], {"a": 1})
+
+    def clean(self):
+        self.member("sa")
+        self.student(self.a)
+
+    def readiness(self, patched):
+        from . import multischool_checks
+
+        out = StringIO()
+        rc = 0
+        with mock.patch.object(multischool_checks, "readiness_counts", patched):
+            try:
+                call_command("check_access_switch_ready", "--multi-school", "--json", stdout=out)
+            except CommandError:
+                rc = 1
+        return json.loads(out.getvalue()), rc
+
+    def parity(self, patched):
+        from . import multischool_checks
+
+        out = StringIO()
+        rc = 0
+        with mock.patch.object(multischool_checks, "school_admin_parity", patched):
+            try:
+                call_command("compare_access_parity", "--multi-school", "--json", stdout=out)
+            except CommandError:
+                rc = 1
+        return json.loads(out.getvalue()), rc
+
+    def test_invalid_problem_values_fail_the_readiness_gate_and_are_listed(self):
+        from . import multischool_checks
+
+        self.clean()
+        real = multischool_checks.readiness_counts
+        for key in multischool_checks.READINESS_PROBLEM_KEYS:
+            for bad in self.BAD:
+                with self.subTest(key=key, value=repr(bad)):
+                    report, rc = self.readiness(lambda key=key, bad=bad: {**real(), key: bad})
+                    self.assertEqual(rc, 1)
+                    self.assertEqual(report["invalid_counters"], [key])
+                    self.assertEqual(report["blockers_nonzero"], {"invalid_counter_values": 1})
+                    self.assertEqual(report["verdict"], "NOT READY")
+                    self.assertIs(report["multi_school_passed"], False)
+                    self.assertIs(report["multi_school_checks_run"], True)
+
+    def test_invalid_info_values_fail_the_readiness_gate_too(self):
+        from . import multischool_checks
+
+        self.clean()
+        real = multischool_checks.readiness_counts
+        for key in ("info_schools_count", "info_superusers_mapped_to_school_admin_until_s8"):
+            for bad in self.BAD:
+                with self.subTest(key=key, value=repr(bad)):
+                    report, rc = self.readiness(lambda key=key, bad=bad: {**real(), key: bad})
+                    self.assertEqual((rc, report["invalid_counters"]), (1, [key]))
+        for bad in (None, [], 5, True, "x", {"1": -1}, {"1": True}, {1: 2}, {"1": 1.5}):
+            with self.subTest(key="info_school_admins_per_school", value=repr(bad)):
+                report, rc = self.readiness(lambda bad=bad: {**real(), "info_school_admins_per_school": bad})
+                self.assertEqual((rc, report["invalid_counters"]), (1, ["info_school_admins_per_school"]))
+
+    def test_valid_values_pass_including_zero_and_large_ints(self):
+        from . import multischool_checks
+
+        self.clean()
+        real = multischool_checks.readiness_counts
+        for good in (0, 3):
+            report, rc = self.readiness(lambda good=good: {**real(), "info_schools_count": good})
+            self.assertEqual((rc, report["multi_school_passed"]), (0, True))
+        report, rc = self.readiness(lambda: {**real(), "info_school_admins_per_school": {"1": 0, "22": 4}})
+        self.assertEqual((rc, report["multi_school_passed"]), (0, True))
+
+    def test_a_valid_positive_problem_value_is_a_normal_blocker_not_an_invalid_value(self):
+        from . import multischool_checks
+
+        self.clean()
+        real = multischool_checks.readiness_counts
+        report, rc = self.readiness(lambda: {**real(), "students_without_school": 4})
+        self.assertEqual(report["blockers_nonzero"], {"students_without_school": 4})
+        self.assertNotIn("invalid_counters", report)
+
+    def test_a_non_numeric_truthy_value_no_longer_breaks_the_error_message(self):
+        from . import multischool_checks
+
+        self.clean()
+        real = multischool_checks.readiness_counts
+        out = StringIO()
+        with mock.patch.object(multischool_checks, "readiness_counts", lambda: {**real(), "students_without_school": "x"}):
+            with self.assertRaises(CommandError) as err:
+                call_command("check_access_switch_ready", "--multi-school", "--json", stdout=out)
+        self.assertIn("NOT READY", str(err.exception))
+
+    def test_invalid_values_fail_the_parity_gate_and_are_listed(self):
+        from . import multischool_checks
+
+        self.clean()
+        real = multischool_checks.school_admin_parity
+        for key in multischool_checks.PARITY_PROBLEM_KEYS + multischool_checks.PARITY_INFO_KEYS:
+            for bad in self.BAD:
+                with self.subTest(key=key, value=repr(bad)):
+                    report, rc = self.parity(lambda key=key, bad=bad: {**real(), key: bad})
+                    self.assertEqual(rc, 1)
+                    self.assertEqual(report["invalid_counters"], [key])
+                    self.assertEqual(report["verdict"], "FAIL")
+                    self.assertIs(report["multi_school_passed"], False)
+
+    def test_parity_valid_values_pass(self):
+        from . import multischool_checks
+
+        self.clean()
+        real = multischool_checks.school_admin_parity
+        report, rc = self.parity(lambda: {**real(), "users_compared": 9})
+        self.assertEqual((rc, report["multi_school_passed"]), (0, True))
+
+    def test_checks_run_on_the_raw_result_so_defaults_cannot_hide_an_invalid_or_missing_value(self):
+        from . import multischool_checks
+
+        self.clean()
+        real = multischool_checks.readiness_counts
+        report, rc = self.readiness(lambda: {k: v for k, v in real().items() if k != "memberships_invalid"})
+        self.assertEqual(report["missing_counters"], ["memberships_invalid"])
+        self.assertEqual(report["memberships_invalid"], 0)  # output completed by the default, gate failed anyway
+        self.assertEqual((rc, report["multi_school_passed"]), (1, False))
