@@ -97,6 +97,19 @@ class RolloverTests(Base):
         self.assertEqual((g.grade, g.school_class_id), (12, self.old[12].pk))  # graduate's mirror untouched
         self.assertEqual(ImportBatch.objects.get(pk=report['import_batch']).kind, 'rollover')
 
+    def test_a_school_less_student_is_skipped_in_the_plan_and_apply_does_not_abort(self):
+        # S6: save() will not give a legacy row a school; the plan says so and the apply run is not rolled back
+        ok = self.student(7, self.old[7])
+        legacy = self.student(8, self.old[8])
+        Student.objects.filter(pk=legacy.pk).update(school=None, school_class=None)  # S6-2:retire
+        args = ('--to', '1405-1406', '--class-map', self.class_map(), '--default', 'promote')
+        plan = self.run_cmd(*args)
+        self.assertEqual(plan['skipped'].get('student_without_school'), 1)
+        applied = self.run_cmd(*args, '--apply')
+        self.assertEqual(applied['skipped'].get('student_without_school'), 1)
+        self.assertTrue(Enrollment.objects.filter(student=ok, academic_year=self.nxt).exists())
+        self.assertFalse(Enrollment.objects.filter(student=legacy, academic_year=self.nxt).exists())
+
     def test_idempotent(self):
         self.student(7, self.old[7])
         args = ('--to', '1405-1406', '--class-map', self.class_map(), '--default', 'promote', '--apply')

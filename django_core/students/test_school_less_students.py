@@ -148,6 +148,42 @@ class FormAndSaveTests(Base):
         student.save(update_fields=['first_name'])
         self.assertEqual(Student.objects.get(pk=self.legacy.pk).first_name, 'Renamed')
 
+    def test_a_deferred_school_field_does_not_disarm_the_guard(self):
+        for load in (lambda: Student.objects.only('first_name').get(pk=self.legacy.pk),
+                     lambda: Student.objects.defer('school').get(pk=self.legacy.pk)):
+            student = load()
+            student.school_id = self.a.pk
+            with self.assertRaises(SchoolAssignmentRefused):
+                student.save()
+            student = load()
+            student.school_class = self.class_a
+            with self.assertRaises(SchoolAssignmentRefused):
+                student.save()
+        self.assertUntouched()
+
+    def test_refreshing_other_fields_does_not_re_record_a_locally_assigned_school(self):
+        student = Student.objects.get(pk=self.legacy.pk)
+        student.school_id = self.a.pk
+        student.refresh_from_db(fields=['first_name'])
+        student.school_id = self.a.pk
+        with self.assertRaises(SchoolAssignmentRefused):
+            student.save()
+        self.assertUntouched()
+
+    def test_an_unsaved_instance_with_the_pk_of_a_school_less_row_cannot_overwrite_it(self):
+        clone = Student(pk=self.legacy.pk, first_name='Old', last_name='Row', national_id=NID, grade=7,
+                        phone_number='0', school=self.a)
+        with self.assertRaises(SchoolAssignmentRefused):
+            clone.save()
+        self.assertUntouched()
+
+    def test_an_instance_created_without_a_school_stays_guarded(self):
+        fresh = Student.objects.create(first_name='N', last_name='S', national_id='9300000003', grade=7,
+                                       phone_number='0', school=None)  # S6-2:retire
+        fresh.school = self.a
+        with self.assertRaises(SchoolAssignmentRefused):
+            fresh.save()
+
     def test_a_refreshed_instance_sees_the_school_the_backfill_wrote(self):
         student = Student.objects.get(pk=self.legacy.pk)
         Student.objects.filter(pk=student.pk).update(school=self.a)

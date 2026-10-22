@@ -3,8 +3,8 @@
     manage.py check_student_school_ready [--json]
 
 It only SELECTs: it never writes, migrates or assigns a school. Run it on a COPY of the synthetic data (SQLite file or a
-restored PostgreSQL dump) before the S6 migration. Verdict READY only when no student has ``school IS NULL``; otherwise
-NOT READY and the exit code is 1. The NOT NULL migration itself refuses to run in that case (S6-2); this report shows
+restored PostgreSQL dump) before the S6 migration. Verdict READY only when no student has ``school IS NULL`` and no student's
+school differs from its class's school; otherwise NOT READY and the exit code is 1. The NOT NULL migration itself refuses to run in that case (S6-2); this report shows
 what is left to do and what ``backfill_student_school`` would resolve (same rule, same function, so the two never
 disagree). Exit codes: 0 READY, 1 NOT READY.
 """

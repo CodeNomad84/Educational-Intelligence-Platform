@@ -5,6 +5,9 @@ from schools.vocabulary import GRADE_CHOICES, SUBJECT_CHOICES
 
 User = get_user_model()
 
+_UNKNOWN = object()
+
+
 class SchoolAssignmentRefused(Exception):
     """``Student.save()`` was asked to give an existing school-less student a school (S6 requirement 1)."""
 
@@ -78,16 +81,28 @@ class Student(models.Model):
         instance._remember_loaded_school()
         return instance
 
-    def refresh_from_db(self, *args, **kwargs):
-        super().refresh_from_db(*args, **kwargs)
-        self._remember_loaded_school()
+    def refresh_from_db(self, using=None, fields=None, **kwargs):
+        super().refresh_from_db(using=using, fields=fields, **kwargs)
+        # a refresh of OTHER fields does not reload the school: keep what was recorded when it was last read
+        if fields is None or {'school', 'school_id'} & set(fields):
+            self._remember_loaded_school()
 
     def _remember_loaded_school(self):
-        # S6: the school this row had when it was read; absent (deferred field) = unknown = not guarded.
+        # S6: the school this row had when it was last read or written; absent (deferred / never stored) = unknown,
+        # which save() resolves with one query instead of trusting the instance (fail closed).
         if 'school_id' in self.__dict__:
             self._loaded_school_id = self.__dict__['school_id']
         else:
             self.__dict__.pop('_loaded_school_id', None)
+
+    def _would_adopt_a_school(self):
+        """True when this save would give a school (or a class, which derives one) to a stored row that has none."""
+        if self.pk is None or (self.__dict__.get('school_id') is None and self.__dict__.get('school_class_id') is None):
+            return False
+        loaded = self.__dict__.get('_loaded_school_id', _UNKNOWN)
+        if loaded is _UNKNOWN:
+            return Student.objects.filter(pk=self.pk, school__isnull=True).exists()
+        return loaded is None
 
     def save(self, *args, **kwargs):
         """Keep ``school`` and the ``class_name`` mirror consistent with ``school_class``.
@@ -100,8 +115,7 @@ class Student(models.Model):
         ``update_fields`` is extended so a partial save of ``school_class`` still persists both.
         Bulk operations (``bulk_create``/``bulk_update``/``update``) bypass this method.
         """
-        if (not self._state.adding and self.__dict__.get('_loaded_school_id', 0) is None
-                and (self.school_id is not None or self.school_class_id is not None)):
+        if self._would_adopt_a_school():
             raise SchoolAssignmentRefused(
                 'An existing student without a school cannot be given one by save(); use backfill_student_school.')
         if self.school_class_id is not None:
@@ -112,6 +126,7 @@ class Student(models.Model):
             if update_fields is not None and {'school_class', 'school_class_id'} & set(update_fields):
                 kwargs['update_fields'] = set(update_fields) | {'school', 'class_name'}
         super().save(*args, **kwargs)
+        self._remember_loaded_school()
 
 class Grade(models.Model):
     SUBJECT_CHOICES = SUBJECT_CHOICES  # shared vocabulary, defined in schools/vocabulary.py
