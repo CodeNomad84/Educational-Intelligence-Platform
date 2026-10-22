@@ -260,6 +260,17 @@ class StartConfigurationTests(TestCase):
     def test_launcher_script(self):
         text = SCRIPT.read_text()
         self.assertTrue(SCRIPT.stat().st_mode & 0o111, "start_demo.sh must be executable")
+
+    def test_reseed_deletes_only_the_demo_db_before_migrating_and_explains_a_migrate_failure(self):
+        """An old demo_db.sqlite3 (students without school) must never block --reseed: the file is removed BEFORE migrate."""
+        text = SCRIPT.read_text(encoding="utf-8")
+        rm = text.index('rm -f -- "$DEMO_DB"')
+        self.assertLess(rm, text.index("manage.py migrate --noinput"))
+        self.assertIn('DEMO_DB="$APP/demo_db.sqlite3"', text)
+        self.assertIn('"$(basename "$DEMO_DB")" = "demo_db.sqlite3"', text)
+        self.assertEqual(text.count("rm -f"), 1)                      # nothing else is ever deleted
+        self.assertIn("MIGRATE FAILED", text)
+        self.assertIn("scripts/start_demo.sh --reseed", text)
         for needle in ("config.settings.demo", "--noreload", "DEMO MODE ACTIVE" if False else "demo_check",
                        "REFUSING TO START"):
             self.assertIn(needle, text)

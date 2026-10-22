@@ -2,7 +2,7 @@
 # DEMO SCOPE — whole file. Safe launcher for the school-meeting demo.
 #
 #   scripts/start_demo.sh            preflight + start server (127.0.0.1:${DEMO_PORT:-8000}, --noreload)
-#   scripts/start_demo.sh --reseed   migrate + seed_demo --reset first (use on the day of the meeting)
+#   scripts/start_demo.sh --reseed   delete demo_db.sqlite3, migrate, seed_demo --reset (use on the day of the meeting)
 #   scripts/start_demo.sh --check    preflight only
 #
 # Always uses config.settings.demo (demo_db.sqlite3). It can not start against the real db.sqlite3.
@@ -49,8 +49,18 @@ export SECRET_KEY="$DEMO_SECRET_KEY"
 cd "$APP"
 
 if [ "$RESEED" = 1 ]; then
-  echo ">> Re-seeding demo database (demo_db.sqlite3 only)"
-  "$PY" manage.py migrate --noinput
+  echo ">> Re-seeding demo database (demo_db.sqlite3 only): the old file is deleted first, then recreated"
+  # Only this one file (fixed name, inside django_core). An old demo DB must never block --reseed: a stale seed can
+  # contain students that a newer migration (students.0015, school NOT NULL) refuses to carry over.
+  DEMO_DB="$APP/demo_db.sqlite3"
+  [ "$(basename "$DEMO_DB")" = "demo_db.sqlite3" ] || { echo "REFUSING: unexpected demo database name." >&2; exit 1; }
+  rm -f -- "$DEMO_DB" "$DEMO_DB-journal" "$DEMO_DB-wal" "$DEMO_DB-shm"
+  if ! "$PY" manage.py migrate --noinput; then
+    echo >&2
+    echo "MIGRATE FAILED on a fresh demo database. Check the error above (missing dependency or a broken migration)." >&2
+    echo "Fix: from django_core run '$PY manage.py migrate' to see the error, then rerun: scripts/start_demo.sh --reseed" >&2
+    exit 1
+  fi
   SEED_ARGS=(--reset)
   [ -n "${DEMO_PASSWORD:-}" ] && SEED_ARGS+=(--password "$DEMO_PASSWORD")
   "$PY" manage.py seed_demo "${SEED_ARGS[@]}"
