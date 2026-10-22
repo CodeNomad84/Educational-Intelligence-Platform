@@ -602,7 +602,8 @@ class ImportExistingLinkTests(ClassImportCase):
         self.assertEqual((data['preserved_links'], data['linked'], data['class_blank']), (2, 1, 0))
 
     def test_a_student_of_another_school_is_not_moved_or_linked(self):
-        """FK integrity makes this reachable only when the School set is mocked: the guard is defensive."""
+        """S3: the planning reads are scoped to the importer's school, so another school's student is invisible to the
+        class planning and is refused at write with the generic message (no unmatched-class entry, no oracle)."""
         first, second = self.two_schools()
         klass = self.klass(first, '9-A')
         Student.objects.create(first_name='S', last_name='K', national_id=nid(1), grade=9, phone_number='1',
@@ -612,8 +613,9 @@ class ImportExistingLinkTests(ClassImportCase):
             resp = self.post(sheet(line(nid(1), 9, '9-A')))
         s = self.student(nid(1))
         self.assertEqual((s.school_id, s.school_class_id), (second.pk, None))
-        self.assertEqual(resp.json()['unmatched_classes'],
-                         [{'row': 2, 'value': '9-A', 'reason': 'no_unique_school'}])
+        data = resp.json()
+        self.assertEqual((data['created'], data['updated'], data['linked'], data['unmatched_classes']), (0, 0, 0, []))
+        self.assertEqual(len(data['errors']), 1)
         self.assertEqual(klass.students.count(), 0)
 
     def test_linked_counts_only_new_class_relationships_not_school_assignment(self):

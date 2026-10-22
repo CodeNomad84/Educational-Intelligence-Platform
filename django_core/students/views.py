@@ -23,6 +23,7 @@ from .student_school import StudentSchoolError, resolve_student_school
 from .permissions import IsAdminUser  # فقط ادمین بتواند آپلود کند
 from django.core.exceptions import ImproperlyConfigured
 from config.service_auth import service_headers
+from . import import_store
 from .enrollment_sync import ensure_current_enrollment
 from .access import search_students, visible_attendances, visible_grades, visible_students
 
@@ -91,13 +92,9 @@ def _chunks(items, size=IMPORT_CHUNK):
         yield items[start:start + size]
 
 
-def _linked_national_ids(rows):
-    """National ids (among ``rows``) of students that already have a class link."""
-    found = set()
-    for chunk in _chunks({r.national_id for r in rows}):
-        found.update(Student.objects.filter(national_id__in=chunk, school_class__isnull=False)
-                     .values_list('national_id', flat=True))
-    return found
+def _linked_national_ids(rows, school_id):
+    """National ids (among ``rows``) of students OF THE IMPORT SCHOOL that already have a class link."""
+    return import_store.linked_national_ids(school_id, {r.national_id for r in rows})
 
 
 def _plan_class_links(rows, school_id):
@@ -109,11 +106,10 @@ def _plan_class_links(rows, school_id):
     plan = ClassLinkPlan(school_id)
     candidates = [ClassCandidate.from_model(c) for c in SchoolClass.objects.filter(school_id=school_id)]
 
-    existing = {}  # national_id -> (school_id, school_class_id)
-    for chunk in _chunks({r.national_id for r in rows}):
-        for nid, school_id, class_id in Student.objects.filter(national_id__in=chunk).values_list(
-                'national_id', 'school_id', 'school_class_id'):
-            existing[nid] = (school_id, class_id)
+    # students of the import school only: a national id of another school is invisible here and is refused at write
+    existing = {nid: (school_id, class_id)
+                for nid, class_id in import_store.existing_state(school_id, {r.national_id for r in rows}).items()}
+    # (a candidate class is always a class of the import school, so a link can never leave the school)
 
     by_student = defaultdict(list)
     for row in rows:
@@ -126,12 +122,9 @@ def _plan_class_links(rows, school_id):
         if state is not None and state[1] is not None:   # already linked: immutable, uploaded class ignored
             plan.preserved_links += 1
             continue
-        other_school = state is not None and state[0] is not None and state[0] != plan.school_id
         per_row = []
         for row in student_rows:
             res = resolve_class(row.class_cell, school_ids=school_ids, candidates=candidates)
-            if other_school and res.resolved:   # never link into a School the student does not belong to
-                res = Resolution(NO_UNIQUE_SCHOOL, title=res.title)
             per_row.append((row, res))
         if len({res.candidate.pk for _row, res in per_row if res.resolved}) > 1:
             # duplicate rows of one student naming different classes: no order-dependent pick
@@ -146,11 +139,7 @@ def _plan_class_links(rows, school_id):
     # this file were written before this call, so a successful change is already visible here and a failed
     # one is not assumed.
     targets = {res.candidate.pk for res in resolutions.values() if res.resolved}
-    existing_grades = defaultdict(list)
-    for chunk in _chunks(targets):
-        for grade, class_id in Student.objects.filter(school_class_id__in=chunk).values_list(
-                'grade', 'school_class_id'):
-            existing_grades[class_id].append(grade)
+    existing_grades = defaultdict(list, import_store.grades_by_class(school_id, targets))
 
     final = apply_grade_guard([(resolutions[r.index], r.data['grade']) for r in eligible], existing_grades)
     for row, res in zip(eligible, final):
@@ -169,8 +158,7 @@ def _write_import_row(row, plan):
     with transaction.atomic():
         # Row lock where the database supports it (PostgreSQL); a no-op on SQLite. It also re-reads the
         # student's link state at write time, so a link created meanwhile is never overwritten.
-        current = (Student.objects.select_for_update().filter(national_id=row.national_id)
-                   .values('school_id', 'school_class_id').first())
+        current = import_store.locked_state(row.national_id)
         if current is not None and current['school_id'] != plan.school_id:
             # another school's student, or a legacy student WITHOUT a school: never overwritten, moved or adopted here
             # (S6: only ``backfill_student_school`` gives an existing student a school)
@@ -183,7 +171,12 @@ def _write_import_row(row, plan):
             if class_pk is not None:
                 defaults['school_class_id'] = class_pk
                 link = True
-        student, created = Student.objects.update_or_create(national_id=row.national_id, defaults=defaults)
+        if class_pk is not None and 'school_class_id' in defaults and not SchoolClass.objects.filter(
+                pk=class_pk, school_id=plan.school_id).exists():
+            raise ImportSchoolConflict()   # a planned link into a class of ANOTHER school would move the student: refuse
+        student, created = import_store.write_row(row.national_id, defaults)
+        if student.school_id != plan.school_id:
+            raise ImportSchoolConflict()   # belt and braces, inside the row's transaction: the row is rolled back
         ensure_current_enrollment(student, source='import')
         return student, created, link
 
@@ -367,7 +360,7 @@ class StudentViewSet(viewsets.ModelViewSet):
 
             # Pass 2a: students that ALREADY have a class are written first. Their rows never change a link,
             # but may change a grade, and class decisions must see the grades that were really stored.
-            already_linked = _linked_national_ids(parsed)
+            already_linked = _linked_national_ids(parsed, import_school_id)
             no_links = ClassLinkPlan(import_school_id)
             for item in parsed:
                 if item.national_id in already_linked:

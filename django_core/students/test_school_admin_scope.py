@@ -161,3 +161,22 @@ class ApiAndDashboardScopeTests(Base):
         self.client.force_login(self.admin('none'))
         body = self.client.get('/api/students/').json()
         self.assertEqual(body['results'] if isinstance(body, dict) else body, [])
+
+
+class DashboardAggregateScopeTests(Base):
+    def counts(self, user):
+        self.client.force_login(user)
+        context = self.client.get('/dashboard/').context
+        return context['total_students'], context['total_grades'], context['total_attendances'], context['avg_grade_all']
+
+    def test_aggregates_cover_the_memberships_schools_only(self):
+        self.assertEqual(self.counts(self.admin('one', self.a)), (2, 2, 2, 15))
+        self.assertEqual(self.counts(self.admin('other', self.b)), (1, 1, 1, 15))
+        self.assertEqual(self.counts(self.admin('both', self.a, self.b)), (3, 3, 3, 15))
+
+    def test_an_empty_school_set_gives_zero_aggregates(self):
+        self.assertEqual(self.counts(self.admin('none')), (0, 0, 0, 0))
+        self.assertEqual(self.counts(self.admin('off', self.a, active=False)), (0, 0, 0, 0))
+
+    def test_the_superuser_branch_still_sees_every_school(self):
+        self.assertEqual(self.counts(self.admin('root', superuser=True)), (3, 3, 3, 15))

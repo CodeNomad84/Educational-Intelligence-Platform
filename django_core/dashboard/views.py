@@ -55,11 +55,13 @@ def dashboard_view(request):
         from demo_intel.views import school_dashboard
         return school_dashboard(request)
     # DEMO SCOPE end
-    # access: SchoolAdmin only (ADMIN in roles was checked above), school-wide aggregates by design
-    total_students = Student.objects.count()
-    total_grades = Grade.objects.count()
-    total_attendances = Attendance.objects.count()
-    avg_grade_all = Grade.objects.aggregate(avg=models.Avg('score'))['avg'] or 0
+    # access: SchoolAdmin only (ADMIN in roles was checked above); S3: the aggregates cover the schools of the
+    # user's memberships only (a superuser: every school, until S8), through the same access layer as the lists
+    visible_grade_rows = visible_grades(request.user)
+    total_students = visible_students(request.user).count()
+    total_grades = visible_grade_rows.count()
+    total_attendances = visible_attendances(request.user).count()
+    avg_grade_all = visible_grade_rows.aggregate(avg=models.Avg('score'))['avg'] or 0
         
     context = {
         'total_students': total_students,

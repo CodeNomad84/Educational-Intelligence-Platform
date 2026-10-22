@@ -383,17 +383,15 @@ class DashboardHtmlTests(Base):
 
 class QuerysetChokePointTests(TestCase):
     """Grep-style guard: every Student/Grade/Attendance read in the student/dashboard views and the
-    serializers goes through the access layer, except functions reviewed as SchoolAdmin-only."""
+    serializers goes through the access layer. S3: the allow-list is EMPTY (the aggregates use ``visible_*``; the import
+    reads/writes live in ``students/import_store.py``, whose functions are scoped to the import school)."""
 
     ROOT = Path(__file__).resolve().parents[1]
     PATTERN = re.compile(r"\b(Student|Grade|Attendance)\.objects\b|\.grades\b|\.attendances\b")
     FILES = {
-        "students/views.py": {
-            # SchoolAdmin only (get_permissions -> IsAdminUser for import_students); no user-supplied scope
-            "_linked_national_ids", "_plan_class_links", "_write_import_row", "import_students",
-        },
+        "students/views.py": set(),
         "students/serializers.py": set(),
-        "dashboard/views.py": {"dashboard_view"},  # aggregates behind `ADMIN not in roles`
+        "dashboard/views.py": set(),
     }
 
     def functions(self, relpath):
@@ -428,8 +426,9 @@ class QuerysetChokePointTests(TestCase):
         self.assertIn("visible_grades(request.user)", dash)
         self.assertIn("visible_attendances(request.user)", dash)
 
-    def test_allowlist_is_exhaustive_for_admin_only_functions(self):
-        """Allow-listed functions must still be SchoolAdmin only: import is IsAdminUser, aggregates gate on ADMIN."""
+    def test_the_allowlist_is_empty_and_the_admin_only_gates_remain(self):
+        """No function is exempt any more (S3). The import is still IsAdminUser and the aggregates still gate on ADMIN."""
+        self.assertEqual([name for names in self.FILES.values() for name in names], [])
         views = (self.ROOT / "students/views.py").read_text(encoding="utf-8")
         self.assertRegex(views, r"if self\.action == 'import_students':\s+return \[IsAdminUser\(\)\]")
         dash = (self.ROOT / "dashboard/views.py").read_text(encoding="utf-8")
