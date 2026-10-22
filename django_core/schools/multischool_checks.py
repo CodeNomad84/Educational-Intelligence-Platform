@@ -117,7 +117,7 @@ PARITY_PROBLEM_TEXT = {
     'grades_lost': 'grade rows would be hidden from a SchoolAdmin by the membership scope',
     'attendances_lost': 'attendance rows would be hidden from a SchoolAdmin by the membership scope',
     'no_school_admin_while_students_exist': 'students exist but no SchoolAdmin account exists (the comparison would pass vacuously)',
-    'schools_with_students_but_no_school_admin': 'school(s) have students but no valid SchoolAdmin covers them',
+    'schools_with_students_but_no_school_admin': 'school(s) have students, classes or academic years but no valid SchoolAdmin covers them',
     'memberships_invalid': 'active membership(s) of users who no longer qualify',
 }
 
@@ -158,7 +158,8 @@ def school_admin_users():
 
 
 def schools_without_admin_cover(admins=None):
-    """Ids of the Schools that have students but are covered by NO valid SchoolAdmin (S2 review E1).
+    """Ids of the Schools that have students, classes or academic years but are covered by NO valid SchoolAdmin
+    (S2 review E1; R-b, S3: a school with only classes or academic years needs an administrator too).
 
     A school is covered when ``school_ids_for_admin`` of at least one active, non-superuser SchoolAdmin account
     contains it, i.e. through an ACTIVE membership of a user who still qualifies (a dual-role, inactive or
@@ -168,8 +169,12 @@ def schools_without_admin_cover(admins=None):
     covered = set()
     for user in admins:
         covered |= school_ids_for_admin(user)
-    with_students = set(Student.objects.filter(school__isnull=False).values_list('school_id', flat=True).distinct())
-    return sorted(with_students - covered)
+    from .models import AcademicYear, SchoolClass   # lazy: the module header imports only the School model
+
+    with_content = set(Student.objects.filter(school__isnull=False).values_list('school_id', flat=True).distinct())
+    with_content |= set(SchoolClass.objects.values_list('school_id', flat=True).distinct())
+    with_content |= set(AcademicYear.objects.values_list('school_id', flat=True).distinct())
+    return sorted(with_content - covered)
 
 
 def _inconsistent_school_rows():

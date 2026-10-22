@@ -347,8 +347,8 @@ class NotNullAtTheDatabaseTests(MigrationCase):
     def test_reverting_a_backfill_batch_after_0015_is_refused_clearly_and_changes_nothing(self):
         path = self.batch()
         with open(path, 'w', encoding='utf-8') as handle:
-            json.dump({'command': 'backfill_student_school', 'version': batch_log.VERSION, 'school_id': 1,
-                       'assignments': [{'student_id': self.keep, 'school_id': 1}]}, handle)
+            json.dump(batch_log.sign({'command': 'backfill_student_school', 'version': batch_log.VERSION, 'school_id': 1,
+                                      'assignments': [{'student_id': self.keep, 'school_id': 1}]}), handle)
         out = io.StringIO()
         with self.assertRaises(CommandError) as ctx:
             call_command('backfill_student_school', '--revert-batch', path, stdout=out)

@@ -1,19 +1,27 @@
-"""Batch log for reversible management commands (changes/0010 S2).
+"""Batch log for reversible management commands (changes/0010 S2; R-a, S3: signed).
 
 A command that writes data records, in a JSON batch file, exactly the rows it ACTUALLY changed (not the rows it
 planned), and writes the file inside the same transaction, before it commits: if the file cannot be written the
 changes roll back. The file is created exclusively (an existing file is never overwritten) with mode 0600. No default
 location is used: the operator names the file. Ids only, no names and no personal data. A later ``--revert-batch``
 verifies every row it touches against the values recorded here and undoes only those.
+
+R-a (S3): every batch carries an HMAC-SHA256 ``signature`` (key: this installation's ``SECRET_KEY``) over all other
+fields. A hand-edited batch, or one written by another installation, is refused before any row is read, so an edited
+file cannot re-activate or delete rows the batch did not change. The key is not rotated lightly: a batch must be
+reverted while the ``SECRET_KEY`` that signed it is in force.
 """
+import hashlib
+import hmac
 import json
 import os
 import stat
 from datetime import datetime, timezone
 
+from django.conf import settings
 from django.core.management.base import CommandError
 
-VERSION = 2          # 2: rows carry user_id/school_id (membership batches) and are the rows actually updated
+VERSION = 3          # 3: signed (R-a). 2: rows carry user_id/school_id (membership batches), the rows actually updated
 MAX_ID = 2 ** 63 - 1  # largest id the supported databases accept
 
 
@@ -45,9 +53,20 @@ def ensure_new(path):
         raise CommandError('The batch file already exists; it is never overwritten. Choose a new path.')
 
 
+def _digest(data):
+    body = json.dumps({k: v for k, v in data.items() if k != 'signature'}, sort_keys=True, separators=(',', ':'),
+                      ensure_ascii=True)
+    return hmac.new(settings.SECRET_KEY.encode('utf-8'), body.encode('utf-8'), hashlib.sha256).hexdigest()
+
+
+def sign(data):
+    """Return ``data`` with its ``signature`` (used by ``write_batch``; tests use it to build valid hand-made batches)."""
+    return {**data, 'signature': _digest(data)}
+
+
 def write_batch(path, command, payload):
-    data = {'command': command, 'version': VERSION,
-            'created_at': datetime.now(timezone.utc).isoformat(), **payload}
+    data = sign({'command': command, 'version': VERSION,
+                 'created_at': datetime.now(timezone.utc).isoformat(), **payload})
     try:
         fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     except FileExistsError:
@@ -112,6 +131,10 @@ def read_batch(path, command):
         raise CommandError(
             f'Unsupported batch version {found}: this tool reads version {VERSION}. A batch written by an older '
             'version must be reverted with the code version that wrote it.')
+    signature = data.get('signature')
+    if not isinstance(signature, str) or not hmac.compare_digest(signature, _digest(data)):
+        raise CommandError('The batch file signature is missing or does not match: the file was edited or was written '
+                           'by another installation. Nothing was changed.')
     return data
 
 

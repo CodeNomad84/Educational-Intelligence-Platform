@@ -65,6 +65,8 @@ class Base(TestCase):
             if isinstance(payload, str):
                 handle.write(payload)
             else:
+                if isinstance(payload, dict) and payload.get("version") == batch_log.VERSION:
+                    payload = batch_log.sign(payload)      # R-a: a hand-made batch of the current version is signed
                 json.dump(payload, handle)
         return self.path(name)
 
@@ -779,3 +781,75 @@ class RemoveIfSameFileUnitTests(SimpleTestCase):
             current = self.fake_stat(mode, size=0)
             self.assertFalse(self.run_guard(current, current), oct(mode))
             self.assertFalse(self.run_guard(None, current), oct(mode))
+
+
+class SignedBatchTests(Base):
+    """R-a (S3): a batch is signed with an HMAC of the installation's SECRET_KEY; an edited, unsigned or foreign-key batch
+    is refused before any row is read or changed."""
+
+    def make_batch(self):
+        for i in range(2):
+            u = make_user(f"o{i}", ADMIN)
+            SchoolMembership.objects.create(user=u, school=self.school)
+            u.groups.clear()                                    # orphans: the deactivation batch will list both
+        self.run_cmd(CHECK, "--deactivate", "--apply", "--batch-file", self.path("sig.json"))
+        return self.path("sig.json")
+
+    def state(self):
+        return list(SchoolMembership.objects.order_by("pk").values_list("pk", "is_active"))
+
+    def edit(self, path, change):
+        with open(path, encoding="utf-8") as handle:
+            data = json.load(handle)
+        change(data)
+        with open(path, "w", encoding="utf-8") as handle:
+            json.dump(data, handle)
+
+    def assert_refused(self, path):
+        before = self.state()
+        with self.assertRaises(CommandError) as ctx:
+            self.run_cmd(CHECK, "--revert-batch", path)
+        self.assertIn("signature", str(ctx.exception))
+        self.assertEqual(self.state(), before)
+
+    def test_a_real_batch_is_signed_and_reverts(self):
+        path = self.make_batch()
+        with open(path, encoding="utf-8") as handle:
+            self.assertEqual(len(json.load(handle)["signature"]), 64)
+        self.run_cmd(CHECK, "--revert-batch", path)
+        self.assertEqual({active for _pk, active in self.state()}, {True})
+
+    def test_an_edited_row_list_is_refused(self):
+        path = self.make_batch()
+        keep = SchoolMembership.objects.create(user=make_user("keeper", ADMIN), school=self.school)   # not in the batch
+        SchoolMembership.objects.filter(pk=keep.pk).update(is_active=False)
+        self.edit(path, lambda d: d["memberships"].append(
+            {"id": keep.pk, "user_id": keep.user_id, "school_id": keep.school_id}))
+        self.assert_refused(path)
+
+    def test_an_edited_id_or_command_data_is_refused(self):
+        path = self.make_batch()
+        self.edit(path, lambda d: d["memberships"][0].update(id=d["memberships"][0]["id"] + 1))
+        self.assert_refused(path)
+
+    def test_a_missing_or_empty_or_wrong_signature_is_refused(self):
+        for change in (lambda d: d.pop("signature"), lambda d: d.update(signature=""), lambda d: d.update(signature="0" * 64),
+                       lambda d: d.update(signature=None), lambda d: d.update(signature=7)):
+            path = self.make_batch()
+            self.edit(path, change)
+            with self.subTest(change=change):
+                self.assert_refused(path)
+            os.unlink(path)
+            SchoolMembership.objects.all().delete()
+            User.objects.filter(username__startswith="o").delete()
+
+    def test_a_batch_signed_with_another_key_is_refused(self):
+        path = self.make_batch()
+        with self.settings(SECRET_KEY="another-installation-key"):
+            self.assert_refused(path)
+
+    def test_the_signature_covers_every_field(self):
+        path = self.make_batch()
+        self.edit(path, lambda d: d.update(created_at="2000-01-01T00:00:00+00:00"))
+        self.assert_refused(path)
+

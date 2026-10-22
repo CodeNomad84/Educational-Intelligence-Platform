@@ -31,11 +31,11 @@ def make_user(username, *groups, **extra):
 class Base(TestCase):
     def setUp(self):
         self.a = School.objects.order_by("pk").first() or School.objects.create(name="A", code="a")
-        self.year(self.a)  # a school with students needs a current year for the existing gate
-        self.n = 0
+        self.n = 0   # (R-b: a school with an academic year needs a SchoolAdmin, so the year is created with its first student)
 
     def student(self, school, **extra):
         self.n += 1
+        self.year(school)   # a school with students needs a current year for the existing gate
         return Student.objects.create(
             first_name="S", last_name=str(self.n), national_id=f"40000000{self.n:02d}", grade=7, phone_number="1",
             school=school, **extra)
@@ -393,6 +393,22 @@ class SchoolsWithoutAdminCoverTests(Base):
         self.member("admin_a", self.a)
         self.student(self.a)
         School.objects.create(name="B", code="b")
+        self.assertEqual(self.ready()["schools_with_students_but_no_school_admin"], 0)
+
+    def test_r_b_a_school_with_only_a_class_or_only_an_academic_year_needs_an_admin_too(self):
+        """R-b (S3): E1 covers schools that have no students yet but already have classes or academic years."""
+        from .models import SchoolClass
+        self.member("admin_a", self.a)
+        only_class = School.objects.create(name="C", code="c")
+        SchoolClass.objects.create(school=only_class, title="7-A", academic_year="1404-1405", grade=7)
+        only_year = School.objects.create(name="Y", code="y")
+        self.year(only_year)
+        School.objects.create(name="Empty", code="empty")            # nothing at all: needs no admin
+        report = self.ready()
+        self.assertEqual(report["schools_with_students_but_no_school_admin"], 2)
+        self.member("admin_c", only_class)
+        self.assertEqual(self.ready()["schools_with_students_but_no_school_admin"], 1)
+        self.member("admin_y", only_year)
         self.assertEqual(self.ready()["schools_with_students_but_no_school_admin"], 0)
 
     def test_only_a_valid_admin_covers_a_school(self):
