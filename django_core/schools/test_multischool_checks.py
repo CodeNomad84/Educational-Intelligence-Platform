@@ -464,13 +464,13 @@ class SchoolAdminParityTests(Base):
             self.assertGreater(self.parity(fail=True)["students_locked_out"], 0)
 
     def test_an_inactive_superuser_with_another_role_is_leak_checked_too(self):
-        """L2: the same bound applies to an inactive superuser who holds Teacher."""
+        """An inactive superuser who also holds Teacher must see nothing at all (an inactive account holds no role)."""
         from students import access
         make_user("oldroot", ADMIN, "Teacher", is_superuser=True, is_active=False)
         self.member("sa")
         self.data(self.a)
         self.assertEqual(self.parity()["superuser_scope_wrong"], 0)
-        with mock.patch.object(access, "_sees_every_school", lambda user, roles: ADMIN in roles and user.is_superuser):
+        with mock.patch.object(access, "_sees_every_school", lambda user, roles: user.is_superuser):
             self.assertEqual(self.parity(fail=True)["superuser_scope_wrong"], 1)
 
     # --- the temporary superuser branch (until S8) is checked separately -------------------------------------------
@@ -492,7 +492,7 @@ class SchoolAdminParityTests(Base):
             report = self.parity(fail=True)
         self.assertEqual(report["superuser_scope_wrong"], 1)
         User.objects.filter(username="root").update(is_active=False)
-        with mock.patch.object(access, "_sees_every_school", lambda user, roles: ADMIN in roles and user.is_superuser):
+        with mock.patch.object(access, "_sees_every_school", lambda user, roles: user.is_superuser):
             self.assertEqual(self.parity(fail=True)["superuser_scope_wrong"], 1)
         self.assertEqual(self.parity()["superuser_scope_wrong"], 0)
 

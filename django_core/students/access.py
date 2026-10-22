@@ -35,6 +35,8 @@ def roles_for(user):
     """Return the set of recognised roles held by ``user`` (empty for anonymous/unknown)."""
     if user is None or not getattr(user, 'is_authenticated', False):
         return set()
+    if not user.is_active:   # an inactive account holds no role at all (owner decision 2026-10-23); the user object is the unit of trust (H4)
+        return set()
     names = set(user.groups.filter(name__in=ALL_ROLES).values_list('name', flat=True))
     if user.is_superuser:
         names.add(ADMIN)
@@ -146,7 +148,7 @@ def _school_admin_q(user, roles):
 def _full_tier_q(user, roles):
     """Rows where the user holds a full-detail grant: SchoolAdmin (own schools), Parent (own child) or Grade Lead
     (own grade)."""
-    return _any([_school_admin_q(user, roles), Q(parent_user=user) if PARENT in roles else None,
+    return _any([_school_admin_q(user, roles), Q(parent_user=user) if PARENT in roles and user.is_active else None,
                  _grade_lead_q(user, roles)])
 
 

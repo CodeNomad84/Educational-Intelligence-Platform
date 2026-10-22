@@ -47,7 +47,7 @@ def _teacher_assignments(user, roles):
 
 def _full_tier_q(user, roles):
     """Rows where the user holds a full-detail grant: Parent (own child) or Grade Lead (own grade)."""
-    return _any([Q(parent_user=user) if PARENT in roles else None, _grade_lead_q(user, roles)])
+    return _any([Q(parent_user=user) if PARENT in roles and user.is_active else None, _grade_lead_q(user, roles)])
 
 
 def visible_students(user):
