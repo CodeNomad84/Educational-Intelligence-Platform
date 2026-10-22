@@ -834,7 +834,8 @@ class SignedBatchTests(Base):
 
     def test_a_missing_or_empty_or_wrong_signature_is_refused(self):
         for change in (lambda d: d.pop("signature"), lambda d: d.update(signature=""), lambda d: d.update(signature="0" * 64),
-                       lambda d: d.update(signature=None), lambda d: d.update(signature=7)):
+                       lambda d: d.update(signature=None), lambda d: d.update(signature=7),
+                       lambda d: d.update(signature="é" * 64)):
             path = self.make_batch()
             self.edit(path, change)
             with self.subTest(change=change):
@@ -852,4 +853,11 @@ class SignedBatchTests(Base):
         path = self.make_batch()
         self.edit(path, lambda d: d.update(created_at="2000-01-01T00:00:00+00:00"))
         self.assert_refused(path)
+
+    def test_an_unserialisable_payload_is_a_clean_error_and_leaves_no_file(self):
+        import datetime
+        path = self.path("bad.json")
+        with self.assertRaises(CommandError):
+            batch_log.write_batch(path, CHECK, {"memberships": [{"id": datetime.datetime.now()}]})
+        self.assertFalse(os.path.exists(path))
 

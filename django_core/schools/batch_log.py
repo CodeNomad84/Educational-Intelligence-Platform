@@ -56,7 +56,9 @@ def ensure_new(path):
 def _digest(data):
     body = json.dumps({k: v for k, v in data.items() if k != 'signature'}, sort_keys=True, separators=(',', ':'),
                       ensure_ascii=True)
-    return hmac.new(settings.SECRET_KEY.encode('utf-8'), body.encode('utf-8'), hashlib.sha256).hexdigest()
+    # domain separation (review F3): the SECRET_KEY also signs sessions; this key is derived for batch files only
+    key = b'eip.schools.batch_log.v3:' + settings.SECRET_KEY.encode('utf-8')
+    return hmac.new(key, body.encode('utf-8'), hashlib.sha256).hexdigest()
 
 
 def sign(data):
@@ -65,8 +67,11 @@ def sign(data):
 
 
 def write_batch(path, command, payload):
-    data = sign({'command': command, 'version': VERSION,
-                 'created_at': datetime.now(timezone.utc).isoformat(), **payload})
+    try:
+        data = sign({'command': command, 'version': VERSION,
+                     'created_at': datetime.now(timezone.utc).isoformat(), **payload})
+    except (TypeError, ValueError):
+        raise CommandError('The batch content cannot be serialised; nothing was written.')
     try:
         fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     except FileExistsError:
@@ -132,7 +137,7 @@ def read_batch(path, command):
             f'Unsupported batch version {found}: this tool reads version {VERSION}. A batch written by an older '
             'version must be reverted with the code version that wrote it.')
     signature = data.get('signature')
-    if not isinstance(signature, str) or not hmac.compare_digest(signature, _digest(data)):
+    if not isinstance(signature, str) or not hmac.compare_digest(signature.encode('utf-8'), _digest(data).encode('ascii')):
         raise CommandError('The batch file signature is missing or does not match: the file was edited or was written '
                            'by another installation. Nothing was changed.')
     return data
