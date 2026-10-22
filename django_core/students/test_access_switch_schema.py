@@ -57,6 +57,19 @@ class AccessSwitchCountsSchemaTests(TestCase):
         self.assertEqual(set(command.PROBLEM_KEYS) & set(command.INFO_KEYS), set())
         self.assertIs(command.BLOCKERS, command.PROBLEM_KEYS)
 
+    def test_the_tuples_have_exactly_the_expected_literal_contents(self):
+        """K-F3 / review F4: moving a blocker into INFO_KEYS (or adding one) must be a visible, deliberate test change."""
+        self.assertEqual(sorted(command.PROBLEM_KEYS), sorted([
+            'schools_with_students_but_no_current_year', 'students_missing_current_enrollment',
+            'students_class_grade_conflict_would_vanish', 'enrollment_mirror_disagreements',
+            'grade_lead_assignments_with_unresolved_year', 'grade_lead_assignments_year_has_no_academic_year_row',
+            'grade_lead_assignments_year_not_current', 'teacher_assignments_class_without_current_enrollments']))
+        self.assertEqual(sorted(command.INFO_KEYS), sorted([
+            'students', 'info_students_without_class_invisible_to_staff',
+            'info_students_with_stale_or_unresolved_class_year', 'info_continuing_students_without_current_enrollment',
+            'grade_lead_assignments_active', 'info_teacher_assignments_with_blank_or_invalid_subject_grant_nothing',
+            'teacher_assignments_active']))
+
     def test_the_producer_reports_exactly_the_declared_schema(self):
         declared = set(command.PROBLEM_KEYS) | set(command.INFO_KEYS)
         self.assertEqual(set(command.access_switch_counts()), declared)       # empty database
