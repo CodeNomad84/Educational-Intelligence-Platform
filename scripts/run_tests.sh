@@ -19,8 +19,8 @@
 # running it.
 #   PG_IMAGE      PostgreSQL image, default pgvector/pgvector:pg16; must already exist locally
 #   DJANGO_IMAGE  image to run the tests in. Unset: the script BUILDS eip-test-django:local from django_core/Dockerfile and
-#                 requirements.txt only; if that build fails (e.g. the registry is unreachable) an EXISTING local eip-test-django:local
-#                 is used with a warning, and without one it is a hard failure. The source is mounted read-only at run
+#                 requirements.txt only; if that build fails (e.g. the registry is unreachable) it is a hard failure (exit 3, build error shown)
+#                 unless ALLOW_STALE_IMAGE=1 is set AND a local eip-test-django:local exists (then it is used, with a loud warning). The source is mounted read-only at run
 #                 time, so only dependencies can be stale. Set: that image must exist locally.
 # It creates an INTERNAL private network (no route to the outside: the test containers have no internet access) and a
 # throw-away PostgreSQL container (tmpfs data, name suffix from the process id and the time), generates a random
@@ -93,11 +93,13 @@ run_pg() {
     echo ">> building $IMAGE from django_core/Dockerfile and requirements.txt"
     CTX="$(mktemp -d)"
     cp "$APP/Dockerfile" "$APP/requirements.txt" "$CTX/"
-    if ! docker build -q -t "$IMAGE" "$CTX" >/dev/null; then
-      # registry unreachable (or any build failure): an image that already exists locally is used, with a warning
-      # (it may be older than requirements.txt); with no local image this is still a hard failure.
-      docker image inspect "$IMAGE" >/dev/null 2>&1 || fail_prereq "building $IMAGE failed and no local $IMAGE exists"
-      echo ">> WARNING: building $IMAGE failed; using the existing local image (it may not match requirements.txt)" >&2
+    if ! docker build -q -t "$IMAGE" "$CTX" >/dev/null; then       # the build error is printed above (stderr is not hidden)
+      # Registry unreachable or any other build failure. A stale image is used ONLY when the caller asks for it explicitly.
+      if [ "${ALLOW_STALE_IMAGE:-}" = "1" ] && docker image inspect "$IMAGE" >/dev/null 2>&1; then
+        echo ">> WARNING: building $IMAGE FAILED; ALLOW_STALE_IMAGE=1, so the existing local image is used. Its dependencies may NOT match requirements.txt: do not trust this run as a dependency check." >&2
+      else
+        fail_prereq "building $IMAGE failed (see above). To run against an existing local $IMAGE anyway: ALLOW_STALE_IMAGE=1"
+      fi
     fi
     rm -rf -- "$CTX"; CTX=""
   fi

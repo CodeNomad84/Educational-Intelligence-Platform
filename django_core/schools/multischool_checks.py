@@ -6,6 +6,7 @@ decision F6, S3 gate) of what each SchoolAdmin really sees (``visible_students/g
 independently computed expectation from the memberships. Neither changes access.
 """
 from collections import Counter
+from contextlib import contextmanager
 
 from django.contrib.auth import get_user_model
 
@@ -14,7 +15,7 @@ from students.access import ADMIN, GRADE_LEAD, PARENT, PLATFORM_ADMIN, TEACHER, 
 from students.models import Attendance, Enrollment, Grade, Student
 
 from .membership_audit import classify_memberships
-from .models import GradeLeadAssignment, School, SchoolMembership, TeacherAssignment
+from .models import School, SchoolMembership
 
 # DECLARED SCHEMA of ``readiness_counts()`` (S2 review K1): every key it returns is either a PROBLEM (a blocker of
 # ``check_access_switch_ready --multi-school``) or INFORMATIONAL, and it always returns ALL of them (zero-initialised).
@@ -115,7 +116,8 @@ PARITY_PROBLEM_KEYS = (
 PARITY_INFO_KEYS = (
     'users_compared',
     'superusers_compared',
-    'users_with_other_roles_checked_against_upper_bound',   # also Teacher/GradeLead/Parent: leak check against a wider bound
+    'users_with_other_roles_checked_differentially',   # also Teacher/GradeLead/Parent: expectation = admin rows + the other roles' real grants
+    'users_outside_school_admin_checked',              # no SchoolAdmin and no Teacher/GradeLead/Parent role: must see nothing
     'info_other_school_students_hidden',            # rows of schools the admin does not administer, correctly hidden
     'info_other_school_grades_hidden',
     'info_other_school_attendances_hidden',
@@ -242,38 +244,33 @@ def _expected_school_ids(user):
     ).exclude(user__groups__name=PLATFORM_ADMIN).values_list('school_id', flat=True))
 
 
-def _other_grants_bound(user, kinds):
-    """Upper bound of what the Teacher / GradeLead / Parent roles of ``user`` can legitimately add: the schools of the
-    user's active assignments (GradeLead: ``school``; Teacher: the class's school) and the user's own children, each only
-    while the user is in the matching group. Computed from the assignment tables and ``parent_user``, never from
-    ``visible_*``. It is deliberately WIDER than the real rules (it ignores grade, class, subject, year): the leak check
-    for an account with other roles only fails on rows these roles could never grant (e.g. another school's rows)."""
-    schools, children = set(), set()
-    if GRADE_LEAD in kinds:
-        schools |= set(GradeLeadAssignment.objects.filter(user=user, is_active=True).values_list('school_id', flat=True))
-    if TEACHER in kinds:
-        schools |= set(TeacherAssignment.objects.filter(teacher=user).values_list('school_class__school_id', flat=True))
-    if PARENT in kinds:
-        children = set(Student.objects.filter(parent_user=user).values_list('pk', flat=True))
-    return schools, children
+@contextmanager
+def _roles_without_admin():
+    """M-1: evaluate ``access.visible_*`` as if the SchoolAdmin role (and the superuser mapping to it) did not exist. It
+    replaces the module-level ``access.roles_for`` for the duration of the block (no database write, ``access.py`` is not
+    changed), so what the other roles grant can be read from the REAL grant code, independently of the admin branch."""
+    real = access.roles_for
+    access.roles_for = lambda user: real(user) - {ADMIN}
+    try:
+        yield
+    finally:
+        access.roles_for = real
 
 
 def strict_scope_comparison():
-    """F6: for every SchoolAdmin-group account the REAL ``visible_*`` sets against an independent expectation (school of the
-    row in the member schools, computed here from the row maps, not by arithmetic on ``visible_*``). Row outside the
-    expectation = LEAK, expected row missing = LOCKOUT, rows of other schools that are hidden = INFO. An account that
-    also holds Teacher/GradeLead/Parent is checked against the expectation PLUS an upper bound of those roles
-    (``_other_grants_bound``), so a leaking admin branch is caught for it too (M1). Superusers (temporary branch until
-    S8) are checked separately: active = every row, inactive = none (plus the same bound for other roles)."""
+    """F6 / M-1 / L-2: the REAL ``visible_*`` sets against an independent expectation.
+    * every account of group SchoolAdmin: expected = the rows of the schools of its valid memberships (school of the row
+      from the row maps; memberships from ``_expected_school_ids``) UNION what its OTHER roles grant, read from the real
+      grant code with the admin role switched off (``_roles_without_admin``). A row outside it = LEAK, an expected row
+      missing = LOCKOUT, rows of other schools that are hidden = INFO. An admin branch that leaks into a school where the
+      account also holds a Teacher/GradeLead/Parent grant is caught, because the other roles grant only part of it.
+    * superusers (temporary branch until S8): active = every row; inactive = only what their other roles grant.
+    * every other non-superuser account that holds no Teacher/GradeLead/Parent role (PlatformAdmin-only, membership-only,
+      no role at all) must see nothing."""
     row_school = {
         'students': dict(Student.objects.values_list('pk', 'school_id')),
         'grades': dict(Grade.objects.values_list('pk', 'student__school_id')),
         'attendances': dict(Attendance.objects.values_list('pk', 'student__school_id')),
-    }
-    row_student = {
-        'students': {pk: pk for pk in row_school['students']},
-        'grades': dict(Grade.objects.values_list('pk', 'student_id')),
-        'attendances': dict(Attendance.objects.values_list('pk', 'student_id')),
     }
     visible = {'students': access.visible_students, 'grades': access.visible_grades,
                'attendances': access.visible_attendances}
@@ -284,37 +281,43 @@ def strict_scope_comparison():
     def actual(kind, user):
         return set(visible[kind](user).values_list('pk', flat=True))
 
-    def allowed(kind, school_ids, bound):
-        extra_schools, children = bound
-        return {pk for pk, school_id in row_school[kind].items()
-                if school_id in school_ids or school_id in extra_schools or row_student[kind][pk] in children}
+    def other_roles_grant(kind, user):
+        with _roles_without_admin():
+            return actual(kind, user)
+
+    def role_names(user):
+        return set(user.groups.filter(name__in=other_roles).values_list('name', flat=True))
 
     for user in User.objects.filter(groups__name=ADMIN, is_superuser=False).distinct().order_by('pk'):
         school_ids = _expected_school_ids(user)
-        kinds = set(user.groups.filter(name__in=other_roles).values_list('name', flat=True))
-        bound = _other_grants_bound(user, kinds)
         totals['users_compared'] += 1
         totals['school_admins_without_membership'] += 1 if (user.is_active and not school_ids) else 0
-        totals['users_with_other_roles_checked_against_upper_bound'] += 1 if kinds else 0
+        totals['users_with_other_roles_checked_differentially'] += 1 if role_names(user) else 0
         for kind, schools in row_school.items():
             expected = {pk for pk, school_id in schools.items() if school_id in school_ids}
+            granted = other_roles_grant(kind, user)
             seen = actual(kind, user)
-            totals[f'{kind}_locked_out'] += len(expected - seen)
-            totals[f'{kind}_leaked'] += len(seen - allowed(kind, school_ids, bound))
+            totals[f'{kind}_locked_out'] += len((expected | granted) - seen)
+            totals[f'{kind}_leaked'] += len(seen - expected - granted)
             totals[f'info_other_school_{kind}_hidden'] += len(set(schools) - expected - seen)
 
     for user in User.objects.filter(is_superuser=True).order_by('pk'):
         totals['superusers_compared'] += 1
-        kinds = set(user.groups.filter(name__in=other_roles).values_list('name', flat=True))
-        bound = _other_grants_bound(user, kinds)
         wrong = False
         for kind, schools in row_school.items():
             seen = actual(kind, user)
             if user.is_active:
                 wrong = wrong or seen != set(schools)
             else:
-                wrong = wrong or bool(seen - allowed(kind, set(), bound))
+                wrong = wrong or bool(seen - other_roles_grant(kind, user))
         totals['superuser_scope_wrong'] += 1 if wrong else 0
+
+    outside = User.objects.filter(is_superuser=False).exclude(groups__name=ADMIN).exclude(
+        groups__name__in=other_roles).order_by('pk')
+    for user in outside:
+        totals['users_outside_school_admin_checked'] += 1
+        for kind in row_school:
+            totals[f'{kind}_leaked'] += len(actual(kind, user))
     return totals
 
 
@@ -330,7 +333,8 @@ def school_admin_parity():
     result['schools_with_students_but_no_school_admin'] = len(schools_without_admin_cover(admins))
     result['users_compared'] = totals['users_compared']
     result['superusers_compared'] = totals['superusers_compared']
-    result['users_with_other_roles_checked_against_upper_bound'] = totals['users_with_other_roles_checked_against_upper_bound']
+    result['users_with_other_roles_checked_differentially'] = totals['users_with_other_roles_checked_differentially']
+    result['users_outside_school_admin_checked'] = totals['users_outside_school_admin_checked']
     result['students_leaked'] = totals['students_leaked']
     result['grades_leaked'] = totals['grades_leaked']
     result['attendances_leaked'] = totals['attendances_leaked']

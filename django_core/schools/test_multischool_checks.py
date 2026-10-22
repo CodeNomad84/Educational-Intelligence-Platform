@@ -251,8 +251,8 @@ class SchoolAdminParityTests(Base):
             call_command("compare_access_parity", "--multi-school", "--json", *args, stdout=out)
         return json.loads(out.getvalue())
 
-    def data(self, school):
-        s = self.student(school)
+    def data(self, school, **extra):
+        s = self.student(school, **extra)
         Grade.objects.create(student=s, subject="math", exam_type="quiz", score=10, date="2026-01-01")
         Attendance.objects.create(student=s, date="2026-01-02", status="present")
         return s
@@ -304,6 +304,14 @@ class SchoolAdminParityTests(Base):
         self.assertEqual(report["info_other_school_students_hidden"], 0)
 
     # --- F6: a leak and a lockout each fail, per model ---------------------------------------------------------------
+    @staticmethod
+    def leaky(name, model):
+        """A broken ``visible_*`` that returns every row for the admin role only (the other roles keep the real rule), so
+        the gate's 'other roles only' reading stays honest."""
+        from students import access
+        real = getattr(access, name)
+        return lambda user: model.objects.all() if ADMIN in access.roles_for(user) else real(user)
+
     def two_school_state(self):
         other = School.objects.create(name="B", code="b")
         self.member("sa")
@@ -317,7 +325,7 @@ class SchoolAdminParityTests(Base):
 
         from students import access
         self.two_school_state()
-        with mock.patch.object(access, "_school_admin_q", lambda user, roles: Q()):
+        with mock.patch.object(access, "_school_admin_q", lambda user, roles: Q(pk__isnull=False) if ADMIN in roles else None):
             report = self.parity(fail=True)
         self.assertEqual((report["students_leaked"], report["grades_leaked"], report["attendances_leaked"]), (2, 2, 2))
         self.assertEqual(report["students_locked_out"], 0)
@@ -329,7 +337,7 @@ class SchoolAdminParityTests(Base):
         for name, key in (("visible_students", "students_leaked"), ("visible_grades", "grades_leaked"),
                           ("visible_attendances", "attendances_leaked")):
             model = {"visible_students": Student, "visible_grades": Grade, "visible_attendances": Attendance}[name]
-            with self.subTest(name=name), mock.patch.object(access, name, lambda user, model=model: model.objects.all()):
+            with self.subTest(name=name), mock.patch.object(access, name, self.leaky(name, model)):
                 report = self.parity(fail=True)
                 self.assertGreater(report[key], 0)
 
@@ -384,43 +392,70 @@ class SchoolAdminParityTests(Base):
         return json.loads(out.getvalue())
 
     def dual_role_state(self, group):
-        """School A with an admin who also holds ``group`` (a real grant inside A), and school B with its own rows."""
+        """School A with the only admin ``both`` (member of A, also ``group``), whose OTHER role grants one student of school B
+        (M-1: the leak must be caught exactly in a school where the account holds a grant), plus a second, ungranted student
+        of B and rows in A."""
         from .models import GradeLeadAssignment, TeacherAssignment
+        from students.enrollment_sync import ensure_current_enrollment
         other = School.objects.create(name="B", code="b")
         user = self.member("both")
-        user.groups.add(Group.objects.get_or_create(name=group)[0])   # the ONLY admin: nothing else can leak
-        mine = self.data(self.a)
-        self.data(other)
-        klass = SchoolClass.objects.create(school=self.a, title="7-A", academic_year="1404-1405", grade=7)
+        user.groups.add(Group.objects.get_or_create(name=group)[0])
+        self.data(self.a)
+        klass_b = SchoolClass.objects.create(school=other, title="7-B", academic_year="1404-1405", grade=7)
+        granted = self.data(other, school_class=klass_b)
+        self.data(other)                                   # in B, NOT granted by the other role
+        ensure_current_enrollment(granted, source="manual")
         if group == "Teacher":
-            TeacherAssignment.objects.create(teacher=user, school_class=klass, subject="math")
+            TeacherAssignment.objects.create(teacher=user, school_class=klass_b, subject="math")
         elif group == "GradeLead":
-            GradeLeadAssignment.objects.create(user=user, school=self.a, grade=7, academic_year="1404-1405")
+            GradeLeadAssignment.objects.create(user=user, school=other, grade=7, academic_year="1404-1405")
         else:
-            mine.parent_user = user
-            mine.save()
+            granted.parent_user = user
+            granted.save()
         return user
 
     def test_a_leaking_admin_branch_fails_for_an_admin_who_is_also_teacher_gradelead_or_parent(self):
-        """M1 mutation: the admin branch returns every row (a non-empty always-true Q: an empty Q() is dropped by OR); the other role's own grant is inside school A only."""
-        from django.db.models import Q
-
+        """M-1 mutation: the admin branch returns every row, in a school (B) where the other role legitimately grants ONE
+        student. The differential check (expectation = admin rows + what the other role really grants) still flags the
+        ungranted rows of B."""
         from students import access
+        from django.db.models import Q
         for group in ("Teacher", "GradeLead", "Parent"):
             with self.subTest(group=group):
                 with transaction.atomic():
                     self.dual_role_state(group)
                     report = self.parity_allowing_failure()
-                    self.assertClean(report)                    # without the mutation: no leak, no lockout
+                    self.assertClean(report)                    # without the mutation: the real grant is accepted
                     self.assertEqual(report["users_compared"], 1)
-                    self.assertEqual(report["users_with_other_roles_checked_against_upper_bound"], 1)
-                    with mock.patch.object(access, "_school_admin_q", lambda user, roles: Q(pk__isnull=False)):
+                    self.assertEqual(report["users_with_other_roles_checked_differentially"], 1)
+                    with mock.patch.object(access, "_school_admin_q",
+                                           lambda user, roles: Q(pk__isnull=False) if ADMIN in roles else None):
                         report = self.parity_allowing_failure()
                     self.assertGreater(report["students_leaked"], 0)
                     self.assertGreater(report["grades_leaked"], 0)
-                    self.assertGreater(report["attendances_leaked"], 0)
+                    if group != "Teacher":                      # a Teacher is granted no attendance at all
+                        self.assertGreater(report["attendances_leaked"], 0)
                     self.assertEqual(report["verdict"], "FAIL")
                     transaction.set_rollback(True)
+
+    def test_accounts_outside_the_school_admin_group_must_see_nothing(self):
+        """L-2: PlatformAdmin-only, membership-only and role-less accounts are checked to see nothing; a mutation that
+        shows them rows fails (no SchoolAdmin exists in this state, so only these accounts can produce the leak)."""
+        from students import access
+        make_user("platform", PLATFORM_ADMIN)
+        orphan = make_user("orphan")                      # no role at all
+        SchoolMembership.objects.create(user=orphan, school=self.a)   # membership-only
+        make_user("nobody")
+        self.data(self.a)
+        report = self.parity_allowing_failure()
+        self.assertEqual((report["users_outside_school_admin_checked"], report["students_leaked"],
+                          report["grades_leaked"], report["attendances_leaked"]), (3, 0, 0, 0))
+        with mock.patch.object(access, "visible_students", lambda user: Student.objects.all()):
+            self.assertEqual(self.parity_allowing_failure()["students_leaked"], 3)
+        with mock.patch.object(access, "visible_grades", lambda user: Grade.objects.all()):
+            self.assertEqual(self.parity_allowing_failure()["grades_leaked"], 3)
+        with mock.patch.object(access, "visible_attendances", lambda user: Attendance.objects.all()):
+            self.assertEqual(self.parity_allowing_failure()["attendances_leaked"], 3)
 
     def test_a_dual_role_admin_still_gets_the_lockout_check(self):
         from students import access
@@ -435,7 +470,7 @@ class SchoolAdminParityTests(Base):
         self.member("sa")
         self.data(self.a)
         self.assertEqual(self.parity()["superuser_scope_wrong"], 0)
-        with mock.patch.object(access, "_sees_every_school", lambda user, roles: user.is_superuser):
+        with mock.patch.object(access, "_sees_every_school", lambda user, roles: ADMIN in roles and user.is_superuser):
             self.assertEqual(self.parity(fail=True)["superuser_scope_wrong"], 1)
 
     # --- the temporary superuser branch (until S8) is checked separately -------------------------------------------
@@ -457,7 +492,7 @@ class SchoolAdminParityTests(Base):
             report = self.parity(fail=True)
         self.assertEqual(report["superuser_scope_wrong"], 1)
         User.objects.filter(username="root").update(is_active=False)
-        with mock.patch.object(access, "_sees_every_school", lambda user, roles: user.is_superuser):
+        with mock.patch.object(access, "_sees_every_school", lambda user, roles: ADMIN in roles and user.is_superuser):
             self.assertEqual(self.parity(fail=True)["superuser_scope_wrong"], 1)
         self.assertEqual(self.parity()["superuser_scope_wrong"], 0)
 
