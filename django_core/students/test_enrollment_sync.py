@@ -10,7 +10,7 @@ from django.core.management.base import CommandError
 from django.test import TestCase
 from rest_framework.test import APIClient
 
-from schools.models import AcademicYear, GradeLeadAssignment, School, SchoolClass, TeacherAssignment
+from schools.models import AcademicYear, GradeLeadAssignment, School, SchoolClass, SchoolMembership, TeacherAssignment
 from students.access import ADMIN, GRADE_LEAD, TEACHER
 from students.enrollment_sync import ensure_current_enrollment
 from students.models import Enrollment, Student
@@ -88,6 +88,7 @@ class CallSiteTests(Base):
     def test_admin_dashboard_and_api_paths_keep_enrollment_current(self):
         admin_user = User.objects.create_user(username='adm')
         admin_user.groups.add(Group.objects.get_or_create(name=ADMIN)[0])
+        SchoolMembership.objects.create(user=admin_user, school=self.school)  # S2b: writes need a school
         # API create
         client = APIClient()
         client.force_authenticate(admin_user)

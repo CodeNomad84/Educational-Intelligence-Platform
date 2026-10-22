@@ -317,7 +317,7 @@ from .forms import StudentForm
 def student_create_view(request):
     """افزودن دانش‌آموز جدید"""
     if request.method == 'POST':
-        form = StudentForm(request.POST)
+        form = StudentForm(request.POST, user=request.user)
         if form.is_valid():
             student = form.save()
             ensure_current_enrollment(student, source='manual')  # keeps the current-year enrollment in step
@@ -326,6 +326,6 @@ def student_create_view(request):
         else:
             messages.error(request, 'خطا در ثبت اطلاعات. لطفاً دوباره تلاش کنید.')
     else:
-        form = StudentForm()
+        form = StudentForm(user=request.user)
     
     return render(request, 'dashboard/student_form.html', {'form': form})

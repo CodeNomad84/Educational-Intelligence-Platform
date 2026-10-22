@@ -13,7 +13,7 @@ from django.urls import reverse
 from django.db import IntegrityError, transaction
 from django.db.models import ProtectedError
 
-from schools.models import School, SchoolClass
+from schools.models import School, SchoolClass, SchoolMembership
 
 from .access import ADMIN, PARENT, TEACHER, roles_for, visible_students
 from .models import Student
@@ -253,6 +253,7 @@ class StudentApiClassTests(TestCase):
         self.admin = make_user('admin_a', ADMIN)
         self.parent = make_user('parent_a', PARENT)
         self.school = School.objects.create(name='School A', code='school-a')
+        SchoolMembership.objects.create(user=self.admin, school=self.school)  # S2b: writes need a school
         self.klass = SchoolClass.objects.create(school=self.school, title='10-A')
         self.closed = SchoolClass.objects.create(school=self.school, title='9-Z', is_active=False)
         self.student = make_student('0000000201', self.parent)
@@ -275,7 +276,8 @@ class StudentApiClassTests(TestCase):
         resp = self.patch({'class_name': 'hand typed', 'school': other.pk})
         self.assertEqual(resp.status_code, 200)
         self.student.refresh_from_db()
-        self.assertEqual((self.student.class_name, self.student.school_id), ('', None))
+        # the client's ``school`` is ignored; the legacy school-less student gets the admin's only school (S2b)
+        self.assertEqual((self.student.class_name, self.student.school_id), ('', self.school.pk))
 
     def test_inactive_or_unknown_class_is_rejected(self):
         self.client.force_login(self.admin)

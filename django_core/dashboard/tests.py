@@ -11,7 +11,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from config.service_auth import AUDIENCE, ISSUER, service_headers
-from schools.models import School, SchoolClass
+from schools.models import School, SchoolClass, SchoolMembership
 from students.access import ADMIN, PARENT, TEACHER
 from students.models import Student
 from students.tests import make_student, make_user
@@ -201,6 +201,7 @@ class StudentFormClassSelectorTests(TestCase):
     def setUp(self):
         self.admin = make_user('admin_a', ADMIN)
         self.school = School.objects.create(name='School A', code='school-a')
+        SchoolMembership.objects.create(user=self.admin, school=self.school)  # S2b: writes need a school
         self.klass = SchoolClass.objects.create(school=self.school, title='10-A')
         self.closed = SchoolClass.objects.create(school=self.school, title='9-Z', is_active=False)
         self.url = reverse('dashboard:student_add')
@@ -230,7 +231,8 @@ class StudentFormClassSelectorTests(TestCase):
         resp = self.client.post(self.url, {**self.base, 'class_name': 'typed text'})
         self.assertEqual(resp.status_code, 302)
         student = Student.objects.get(national_id='0000000301')
-        self.assertEqual((student.school_class_id, student.school_id, student.class_name), (None, None, ''))
+        self.assertEqual((student.school_class_id, student.school_id, student.class_name),
+                         (None, self.school.pk, ''))  # S2b: the admin's only school is implied
         self.assertEqual(SchoolClass.objects.count(), before)
 
     def test_inactive_or_unknown_class_is_rejected(self):
