@@ -248,7 +248,9 @@ def _expected_school_ids(user):
 def _roles_without_admin():
     """M-1: evaluate ``access.visible_*`` as if the SchoolAdmin role (and the superuser mapping to it) did not exist. It
     replaces the module-level ``access.roles_for`` for the duration of the block (no database write, ``access.py`` is not
-    changed), so what the other roles grant can be read from the REAL grant code, independently of the admin branch."""
+    changed), so what the other roles grant can be read from the REAL grant code, independently of the admin branch.
+
+    SINGLE-THREADED CLI / TEST USE ONLY: the replacement is process-global, so never call this from a request or worker thread."""
     real = access.roles_for
     access.roles_for = lambda user: real(user) - {ADMIN}
     try:
