@@ -38,6 +38,14 @@ Do not dump documents into chat, repeat audits, or create unrequested files/arti
 - **L3 Architectural** (DB redesign, authN/authZ/RBAC, service boundaries, tenancy, storage, AI provider/RAG architecture, breaking API, sensitive data handling): Proposal → ADR → **explicit approval** → implement → tests → security review → report.
 Unsure? Classify upward. Never execute L3 without explicit approval.
 
+## 6a. Autonomy tiers (owner decision 2026-10-22; applies to Phases 2-3; supplements section 6, never overrides section 7)
+**Tier A, act then report briefly:** Low/Info review findings (fix inline only if small and inside the same change, otherwise record in the Change Report; no separate hardening rounds); internal tooling, test and helper code; naming; file layout inside a module; error messages; refactors inside one module; commit ordering within an approved stage; docs format; continuing to the next commit of an already approved plan without stopping. May push to `phase-1/boot-security` (never force) after `scripts/run_tests.sh all` passes.
+**Tier B, decide with a clear default, record it as a decision, continue; must be reversible:** Level 2 choices with an obvious recommended option.
+**Tier C, stop and ask:** anything changing access rules (`visible_*`, roles, service token) or tenancy; irreversible migrations (S6, S7); schema or data model changes; product decisions (D-xx); any Medium-or-higher review finding; anything contradicting an earlier owner decision; the first entry of real data, 2.4, Counselor, and any new L3 stage; any unexpected test or mutation result.
+**Cap:** at most one fix round per commit for review findings; the rest go to the open list. No hardening rounds unless the owner asks.
+**Reports:** one page: what changed, evidence (test counts), Tier B decisions taken, and only the Tier C items that need the owner.
+**Unchanged:** `&&` chain before every commit, both databases, `/security-review`, mutation checks for access changes, no real student data until P3 exit.
+
 ## 7. Hard rules
 - Never read, print, edit or commit `.env` or secrets; never reproduce secret values found in code (cite file:line only). Rotation, not history rewrite.
 - Never run `git push`, force-push, rebase, `reset --hard`, `clean`, or rewrite history or any command that writes to GitHub without the owner's explicit approval in chat for that specific action.. Check `git status` before and `git diff` after work. One focused change per commit; no unrelated edits.
