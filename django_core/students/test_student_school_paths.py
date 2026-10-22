@@ -140,18 +140,6 @@ class ApiUpdateTests(Base):
         self.student_b.refresh_from_db()
         self.assertEqual(self.student_b.first_name, 'S')
 
-    def test_legacy_student_without_school_gets_one_once(self):
-        legacy = Student.objects.create(first_name='L', last_name='G', national_id='9100000003', grade=7,
-                                        phone_number='0')
-        self.assertIsNone(legacy.school_id)
-        self.assertEqual(self.patch(self.admin('two', self.a, self.b), legacy, {'first_name': 'X'}).status_code, 400)
-        resp = self.patch(self.admin('two2', self.a, self.b), legacy, {'target_school': self.b.pk})
-        self.assertEqual(resp.status_code, 200, resp.content)
-        legacy.refresh_from_db()
-        self.assertEqual(legacy.school_id, self.b.pk)
-        self.assertEqual(self.patch(self.admin('two3', self.a, self.b), legacy, {'target_school': self.a.pk})
-                         .status_code, 400)
-
 
 class DashboardFormTests(Base):
     def setUp(self):

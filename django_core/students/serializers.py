@@ -38,7 +38,8 @@ class StudentSerializer(serializers.ModelSerializer):
         try:
             attrs['school_id'] = resolve_student_school(
                 user, school_class=school_class, target_school_id=target,
-                existing_school_id=instance.school_id if instance is not None else None)
+                existing_school_id=instance.school_id if instance is not None else None,
+                is_existing=instance is not None)
         except StudentSchoolError as exc:
             field = 'school_class' if exc.code == 'class_target_mismatch' else 'target_school'
             raise serializers.ValidationError({field: [exc.message]})

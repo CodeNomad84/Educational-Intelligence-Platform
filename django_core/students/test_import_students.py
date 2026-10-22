@@ -83,6 +83,7 @@ class ImportCase(TestCase):
         data = dict(first_name='Old', last_name='Name', national_id=national_id, grade=8, phone_number='111',
                     class_name='legacy text', father_job='old job', mother_job='old job')
         data.update(extra)
+        data.setdefault('school', School.objects.order_by('pk').first())  # S6: an existing student has a school
         return Student.objects.create(**data)
 
 
@@ -615,15 +616,16 @@ class ImportExistingLinkTests(ClassImportCase):
                          [{'row': 2, 'value': '9-A', 'reason': 'no_unique_school'}])
         self.assertEqual(klass.students.count(), 0)
 
-    def test_existing_unlinked_student_without_a_school_gets_the_school_and_the_link(self):
+    def test_existing_student_without_a_school_is_not_adopted_and_not_linked(self):
+        # S6 requirement 1 (retires the S2b adoption): only backfill_student_school gives a legacy row a school
         school = self.one_school()
-        klass = self.klass(school, '9-A')
-        old = self.make_existing(nid(1), grade=9)
-        self.assertIsNone(old.school_id)
+        self.klass(school, '9-A')
+        old = self.make_existing(nid(1), grade=9, school=None)   # S6-2:retire - a NULL school cannot exist after S6-2
         resp = self.post(sheet(line(nid(1), 9, '9-A')))
         old.refresh_from_db()
-        self.assertEqual((old.school_id, old.school_class_id), (school.pk, klass.pk))
-        self.assertEqual((resp.json()['updated'], resp.json()['linked']), (1, 1))
+        self.assertEqual((old.school_id, old.school_class_id, old.grade), (None, None, 9))
+        data = resp.json()
+        self.assertEqual((data['created'], data['updated'], data['linked'], len(data['errors'])), (0, 0, 0, 1))
 
     def test_linked_counts_only_new_class_relationships_not_school_assignment(self):
         school = self.one_school()
@@ -872,11 +874,11 @@ class ImportWriteFailureTests(ClassImportCase):
     def test_failed_update_of_an_unlinked_student_keeps_it_unlinked_unscored_and_uncounted(self):
         school = self.one_school()
         self.klass(school, 'X')
-        old = self.make_existing(nid(1), grade=8)
+        old = self.make_existing(nid(1), grade=8, school=school)
         self.fail_writes(nid(1), 'UPDATE')
         data = self.post(sheet(line(nid(1), 9, 'X'))).json()
         old.refresh_from_db()
-        self.assertEqual((old.grade, old.school_id, old.school_class_id), (8, None, None))   # fully rolled back
+        self.assertEqual((old.grade, old.school_id, old.school_class_id), (8, school.pk, None))   # fully rolled back
         self.assertEqual((data['linked'], data['updated'], len(data['errors'])), (0, 0, 1))
 
     def test_a_link_created_after_planning_is_re_read_and_never_overwritten(self):

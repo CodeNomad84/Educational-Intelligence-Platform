@@ -33,7 +33,7 @@ class Base(TestCase):
     def student(self, klass=None, grade=10):
         self.n += 1
         return Student.objects.create(first_name=f'S{self.n}', last_name='T', national_id=f'{self.n:010d}',
-                                      grade=grade, phone_number='0', school_class=klass)
+                                      grade=grade, phone_number='0', school=self.school, school_class=klass)
 
     def open_rows(self, student):
         return list(Enrollment.objects.filter(student=student, ended_on__isnull=True))
@@ -62,7 +62,10 @@ class EnsureTests(Base):
         self.assertEqual((rows[1].ended_on, rows[1].school_class_id), (None, self.c10b.pk))
 
     def test_skips_are_reported_not_guessed_and_not_raised(self):
-        self.assertEqual(ensure_current_enrollment(self.student(None)), 'no_school')
+        legacy = self.student(None)
+        Student.objects.filter(pk=legacy.pk).update(school=None)  # S6-2:retire - a NULL school cannot exist after S6-2
+        legacy.refresh_from_db()
+        self.assertEqual(ensure_current_enrollment(legacy), 'no_school')
         no_class = self.student(self.c10a)
         Student.objects.filter(pk=no_class.pk).update(school_class=None)
         no_class.refresh_from_db()

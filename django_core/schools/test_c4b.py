@@ -150,7 +150,8 @@ class GradeLeadAssignmentTests(TestCase):
 
     def test_assignment_grants_no_student_access(self):
         """Guard: nothing reads GradeLeadAssignment before C5a."""
-        Student.objects.create(first_name="S", last_name="T", national_id="0000000002", grade=10, phone_number="1")
+        Student.objects.create(first_name="S", last_name="T", national_id="0000000002", grade=10, phone_number="1",
+                               school=School.objects.order_by('pk').first())
         self.make().save()
         self.assertEqual(visible_students(self.lead).count(), 0)
 

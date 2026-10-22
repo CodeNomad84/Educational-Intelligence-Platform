@@ -159,7 +159,8 @@ class CheckClassLinksCommandTests(TestCase):
 
     def student(self, n, class_name, grade, **extra):
         return Student.objects.create(first_name=f'Fn{n}', last_name=f'Ln{n}', national_id=f'80000{n:05d}',
-                                      grade=grade, phone_number='0', class_name=class_name, **extra)
+                                      grade=grade, phone_number='0', class_name=class_name,
+                                      **{'school': School.objects.order_by('pk').first(), **extra})
 
     def run_report(self, *args):
         out = io.StringIO()

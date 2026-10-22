@@ -32,7 +32,8 @@ class StudentForm(forms.ModelForm):
             school_id = resolve_student_school(
                 self.user, school_class=cleaned.get('school_class'),
                 target_school_id=target.pk if target is not None else None,
-                existing_school_id=self.instance.school_id if self.instance.pk else None)
+                existing_school_id=self.instance.school_id if self.instance.pk else None,
+                is_existing=bool(self.instance.pk))
         except StudentSchoolError as exc:
             field = 'school_class' if exc.code == 'class_target_mismatch' else 'target_school'
             self.add_error(field, exc.message)

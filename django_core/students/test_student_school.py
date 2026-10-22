@@ -6,7 +6,7 @@ from django.test import TestCase
 from schools.models import School, SchoolClass, SchoolMembership
 
 from .student_school import (
-    CLASS_TARGET_MISMATCH, NO_SCHOOL_ACCESS, SCHOOL_CHANGE, SCHOOL_NOT_ALLOWED, TARGET_REQUIRED,
+    CLASS_TARGET_MISMATCH, NO_SCHOOL_ACCESS, SCHOOL_CHANGE, SCHOOL_NOT_ALLOWED, STUDENT_WITHOUT_SCHOOL, TARGET_REQUIRED,
     StudentSchoolError, allowed_school_ids, resolve_student_school)
 
 User = get_user_model()
@@ -147,6 +147,21 @@ class ResolveStudentSchoolTests(TestCase):
     def test_existing_student_without_school_needs_the_normal_rule(self):
         self.assertCode(TARGET_REQUIRED, self.admin('two', self.a, self.b), existing_school_id=None)
         self.assertEqual(resolve_student_school(self.admin('one', self.a), existing_school_id=None), self.a.pk)
+
+    # --- S6: an existing student without a school is never adopted ----------------------------------------------
+    def test_existing_student_without_school_is_rejected_for_every_kind_of_user(self):
+        root = User.objects.create_superuser('root', password='x')
+        for user in (self.admin('one', self.a), self.admin('two', self.a, self.b), root):
+            for kwargs in ({}, {'school_class': self.class_a}, {'target_school_id': self.a.pk}):
+                with self.subTest(user=user.username, kwargs=list(kwargs)):
+                    self.assertCode(STUDENT_WITHOUT_SCHOOL, user, is_existing=True, **kwargs)
+
+    def test_a_user_without_access_still_gets_the_access_error_first(self):
+        self.assertCode(NO_SCHOOL_ACCESS, self.admin('none'), is_existing=True)
+
+    def test_existing_student_with_a_school_is_unaffected_by_the_flag(self):
+        self.assertEqual(resolve_student_school(self.admin('two', self.a, self.b), existing_school_id=self.b.pk,
+                                                is_existing=True), self.b.pk)
 
     # --- messages never reveal the other school ------------------------------------------------------------------
     def test_not_allowed_message_is_identical_for_existing_and_missing_schools(self):

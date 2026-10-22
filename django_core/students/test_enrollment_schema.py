@@ -37,7 +37,7 @@ class Base(TestCase):
         self.n += 1
         return Student.objects.create(
             first_name=f"S{self.n}", last_name="T", national_id=f"{self.n:010d}", grade=grade,
-            phone_number="0", school_class=klass, **kw)
+            phone_number="0", school=self.school, school_class=klass, **kw)
 
 
 class EnrollmentSchemaTests(Base):
@@ -151,6 +151,7 @@ class CheckEnrollmentBackfillTests(Base):
 
     def test_student_without_school_is_never_guessed(self):
         s = self.student(None)
+        Student.objects.filter(pk=s.pk).update(school=None)  # S6-2:retire - a NULL school cannot exist after S6-2
         Grade.objects.create(student=s, subject="math", exam_type="quiz", score=10, date=date(2026, 1, 1))
         self.assertEqual(self.report()['grades']['student_without_school_unlinked'], 1)
 

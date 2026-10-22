@@ -163,7 +163,7 @@ class BackfillSchoolMembershipsTests(ToolCase):
     def test_tool_changes_nobodys_visibility(self):
         parent = make_user("parent", PARENT)
         Student.objects.create(first_name="A", last_name="B", national_id="2000000001", grade=7, phone_number="1",
-                               parent_user=parent)
+                               parent_user=parent, school=School.objects.order_by('pk').first())
 
         def snapshot():
             return {u.username: sorted(visible_students(u).values_list("pk", flat=True))
@@ -323,7 +323,7 @@ class CheckSchoolMembershipsTests(ToolCase):
     def test_tool_changes_nobodys_visibility(self):
         parent = make_user("parent", PARENT)
         Student.objects.create(first_name="A", last_name="B", national_id="2000000002", grade=7, phone_number="1",
-                               parent_user=parent)
+                               parent_user=parent, school=School.objects.order_by('pk').first())
         self.member("dual", setup="platform")
 
         def snapshot():

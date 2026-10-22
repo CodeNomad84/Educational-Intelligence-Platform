@@ -146,7 +146,7 @@ class NoVisibilityChangeTests(TestCase):
         teacher = make_user("teacher_a", TEACHER)
         TeacherAssignment.objects.create(teacher=teacher, school_class=klass)
         Student.objects.create(first_name="S", last_name="One", national_id="0000000001", grade=10,
-                               class_name="10-A", phone_number="0")
+                               class_name="10-A", phone_number="0", school=School.objects.order_by('pk').first())
         self.assertEqual(visible_students(teacher).count(), 0)
 
 

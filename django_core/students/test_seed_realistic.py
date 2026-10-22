@@ -66,10 +66,10 @@ class SeedTests(TestCase):
 class SeedSchoolAssignmentTests(TestCase):
     """S2b: the synthetic seeds give every student a school (the one exception is documented in the seed)."""
 
-    def test_temporal_synthetic_has_exactly_one_deliberately_school_less_student(self):
+    def test_temporal_synthetic_gives_every_student_a_school(self):
         call_command('seed_temporal_synthetic', '--i-know-this-is-synthetic', stdout=StringIO())
-        self.assertEqual(list(Student.objects.filter(school__isnull=True).values_list('first_name', flat=True)),
-                         ['NoClass0'])
+        self.assertTrue(Student.objects.exists())
+        self.assertFalse(Student.objects.filter(school__isnull=True).exists())
 
     def test_temporal_realistic_gives_every_student_a_school(self):
         seed()

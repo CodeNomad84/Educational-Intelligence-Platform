@@ -75,10 +75,14 @@ class RosterTests(Base):
             self.run_cmd('roster', '1402-1403', bad)
 
     def test_rejections_are_reported_not_guessed(self):
+        elsewhere = Student.objects.create(
+            first_name='OtherSchool0', last_name='Synthetic', national_id='9900009999', grade=10, phone_number='0',
+            school=School.objects.create(name='Other synthetic school', code='other-synthetic'))
+        self.nid['OtherSchool0'] = elsewhere.national_id
         path = self.write(self.HEADER, [
             ['9999999999', '8', 'promoted', '8-A'],                 # unknown student
             ['12ab', '8', 'promoted', '8-A'],                       # invalid national id
-            [self.nid['NoClass0'], '8', 'promoted', '8-A'],         # student has no school
+            [self.nid['OtherSchool0'], '8', 'promoted', '8-A'],     # student of another school
             [self.nid['BadYear0'], '8', 'promoted', 'zzz'],         # class not in that year
             [self.nid['NoYearRow0'], '5', 'promoted', '8-A'],       # grade invalid
             [self.nid['StaleLink0'], '8', 'unknown', '8-A'],        # status invalid

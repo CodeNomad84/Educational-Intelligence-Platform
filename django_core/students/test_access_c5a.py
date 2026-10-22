@@ -74,7 +74,7 @@ class Base(TestCase):
         self.n += 1
         return Student.objects.create(
             first_name=first, last_name="Test", national_id=f"{self.n:010d}", grade=grade,
-            phone_number=f"0912{self.n:07d}", father_job="job", school_class=klass, **kw)
+            phone_number=f"0912{self.n:07d}", father_job="job", school=self.school, school_class=klass, **kw)
 
     def lead(self, username="lead", grade=10, year="1404", school=None, **kw):
         user = make_user(username, GRADE_LEAD)

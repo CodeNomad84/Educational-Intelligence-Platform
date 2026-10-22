@@ -36,7 +36,7 @@ class Base(TestCase):
     def student(self, grade, klass, enroll=True):
         self.n += 1
         s = Student.objects.create(first_name=f'S{self.n}', last_name='T', national_id=f'{self.n:010d}', grade=grade,
-                                   phone_number='0', school_class=klass)
+                                   phone_number='0', school=self.school, school_class=klass)
         if enroll:
             Enrollment.objects.create(student=s, academic_year=self.cur, school_class=klass, grade=grade, source='manual')
         return s

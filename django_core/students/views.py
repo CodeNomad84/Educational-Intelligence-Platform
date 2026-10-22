@@ -171,8 +171,10 @@ def _write_import_row(row, plan):
         # student's link state at write time, so a link created meanwhile is never overwritten.
         current = (Student.objects.select_for_update().filter(national_id=row.national_id)
                    .values('school_id', 'school_class_id').first())
-        if current is not None and current['school_id'] not in (None, plan.school_id):
-            raise ImportSchoolConflict()   # never overwrite or move a student of another school
+        if current is not None and current['school_id'] != plan.school_id:
+            # another school's student, or a legacy student WITHOUT a school: never overwritten, moved or adopted here
+            # (S6: only ``backfill_student_school`` gives an existing student a school)
+            raise ImportSchoolConflict()
         defaults = dict(row.data)
         class_pk = plan.decisions.get(row.index)
         link = False

@@ -434,7 +434,7 @@ class NoSideEffectTests(TestCase):
         linked = Student.objects.create(first_name='L', last_name='K', national_id='5000000001', grade=9,
                                         phone_number='1', school_class=active)
         Student.objects.create(first_name='U', last_name='K', national_id='5000000002', grade=10,
-                               phone_number='1', class_name='free text')
+                               phone_number='1', class_name='free text', school=school)
         before = self.snapshot()
 
         candidates = [ClassCandidate.from_model(c) for c in SchoolClass.objects.all()]

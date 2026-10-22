@@ -38,8 +38,8 @@ class Base(TestCase):
         self.n += 1
         student = Student.objects.create(
             first_name="S", last_name=str(self.n), national_id=f"40000000{self.n:02d}", grade=7, phone_number="1",
-            **extra)
-        Student.objects.filter(pk=student.pk).update(school=school)
+            school=self.a, **extra)
+        Student.objects.filter(pk=student.pk).update(school=school)  # school=None: a legacy NULL row (S6-2:retire the NULL case)
         return Student.objects.get(pk=student.pk)
 
     def year(self, school, code="1404-1405", current=True):

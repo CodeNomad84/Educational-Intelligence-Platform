@@ -5,6 +5,10 @@ from schools.vocabulary import GRADE_CHOICES, SUBJECT_CHOICES
 
 User = get_user_model()
 
+class SchoolAssignmentRefused(Exception):
+    """``Student.save()`` was asked to give an existing school-less student a school (S6 requirement 1)."""
+
+
 class Student(models.Model):
     GRADE_CHOICES = GRADE_CHOICES  # shared vocabulary, defined in schools/vocabulary.py
     first_name = models.CharField(max_length=100)
@@ -68,14 +72,38 @@ class Student(models.Model):
     def __str__(self):
         return f"{self.first_name} {self.last_name} - {self.get_grade_display()}"
 
+    @classmethod
+    def from_db(cls, db, field_names, values):
+        instance = super().from_db(db, field_names, values)
+        instance._remember_loaded_school()
+        return instance
+
+    def refresh_from_db(self, *args, **kwargs):
+        super().refresh_from_db(*args, **kwargs)
+        self._remember_loaded_school()
+
+    def _remember_loaded_school(self):
+        # S6: the school this row had when it was read; absent (deferred field) = unknown = not guarded.
+        if 'school_id' in self.__dict__:
+            self._loaded_school_id = self.__dict__['school_id']
+        else:
+            self.__dict__.pop('_loaded_school_id', None)
+
     def save(self, *args, **kwargs):
         """Keep ``school`` and the ``class_name`` mirror consistent with ``school_class``.
+
+        S6: an EXISTING student that was read without a school is never given one here, neither by a class link nor by
+        assigning ``school``: only ``backfill_student_school`` (queryset update) may populate a legacy row.
 
         With a class: ``school`` = class.school and ``class_name`` = class.title, always overwritten.
         Without a class: nothing is derived; ``class_name`` keeps its legacy free text.
         ``update_fields`` is extended so a partial save of ``school_class`` still persists both.
         Bulk operations (``bulk_create``/``bulk_update``/``update``) bypass this method.
         """
+        if (not self._state.adding and self.__dict__.get('_loaded_school_id', 0) is None
+                and (self.school_id is not None or self.school_class_id is not None)):
+            raise SchoolAssignmentRefused(
+                'An existing student without a school cannot be given one by save(); use backfill_student_school.')
         if self.school_class_id is not None:
             klass = self.school_class
             self.school_id = klass.school_id

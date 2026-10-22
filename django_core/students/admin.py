@@ -51,7 +51,7 @@ class StudentAdminForm(forms.ModelForm):
             school_id = resolve_student_school(
                 self.bound_user, school_class=cleaned.get('school_class'),
                 target_school_id=target.pk if target is not None else None,
-                existing_school_id=self.bound_existing_school_id)
+                existing_school_id=self.bound_existing_school_id, is_existing=bool(self.instance.pk))
         except StudentSchoolError as exc:
             self.add_error('school_class' if exc.code == 'class_target_mismatch' else 'target_school', exc.message)
             return cleaned

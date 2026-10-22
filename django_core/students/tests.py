@@ -30,10 +30,10 @@ def make_user(username, group=None, **extra):
     return user
 
 
-def make_student(national_id, parent=None, first='Student'):
+def make_student(national_id, parent=None, first='Student', school=None):
     return Student.objects.create(
         first_name=first, last_name=national_id, national_id=national_id,
-        grade=8, phone_number='0', parent_user=parent,
+        grade=8, phone_number='0', parent_user=parent, school=school or School.objects.order_by('pk').first(),
     )
 
 
@@ -165,14 +165,14 @@ class StudentClassLinkTests(TestCase):
         self.klass = SchoolClass.objects.create(school=self.school, title='10-A', academic_year='1404')
         self.klass2 = SchoolClass.objects.create(school=self.school, title='10-B', academic_year='1404')
         self.foreign = SchoolClass.objects.create(school=self.other_school, title='X-1')
-        self.student = make_student('0000000101')
+        self.student = make_student('0000000101', school=self.school)
 
     def test_unlinked_student_keeps_legacy_free_text(self):
         self.student.class_name = 'legacy text'
         self.student.save()
         self.student.refresh_from_db()
         self.assertEqual((self.student.class_name, self.student.school_id, self.student.school_class_id),
-                         ('legacy text', None, None))
+                         ('legacy text', self.school.pk, None))
 
     def test_linking_derives_school_and_mirrors_title(self):
         self.student.school_class = self.klass
@@ -256,7 +256,7 @@ class StudentApiClassTests(TestCase):
         SchoolMembership.objects.create(user=self.admin, school=self.school)  # S2b: writes need a school
         self.klass = SchoolClass.objects.create(school=self.school, title='10-A')
         self.closed = SchoolClass.objects.create(school=self.school, title='9-Z', is_active=False)
-        self.student = make_student('0000000201', self.parent)
+        self.student = make_student('0000000201', self.parent, school=self.school)
 
     def url(self):
         return f'/api/students/{self.student.pk}/'
@@ -276,7 +276,7 @@ class StudentApiClassTests(TestCase):
         resp = self.patch({'class_name': 'hand typed', 'school': other.pk})
         self.assertEqual(resp.status_code, 200)
         self.student.refresh_from_db()
-        # the client's ``school`` is ignored; the legacy school-less student gets the admin's only school (S2b)
+        # the client's ``school`` is ignored; the student keeps its school
         self.assertEqual((self.student.class_name, self.student.school_id), ('', self.school.pk))
 
     def test_inactive_or_unknown_class_is_rejected(self):

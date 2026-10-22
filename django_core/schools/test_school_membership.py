@@ -247,7 +247,8 @@ class StageS1ChangesNoAccessTests(TestCase):
         self.sa_b = Student.objects.create(
             first_name="Bita", last_name="B", national_id="1000000002", grade=7, phone_number="2", school_class=class_b)
         self.loose = Student.objects.create(
-            first_name="Cyrus", last_name="C", national_id="1000000003", grade=8, phone_number="3")
+            first_name="Cyrus", last_name="C", national_id="1000000003", grade=8, phone_number="3",
+            school=self.a)
         for student in (self.sa_a, self.sa_b, self.loose):
             Grade.objects.create(student=student, subject="math", exam_type="quiz", score=15, date="2026-01-01")
             Attendance.objects.create(student=student, date="2026-01-02", status="present")

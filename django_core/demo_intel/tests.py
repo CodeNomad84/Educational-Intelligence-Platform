@@ -28,9 +28,15 @@ def _school_days(today, n=100):
     return [today - timedelta(days=d) for d in range(n) if (today - timedelta(days=d)).weekday() not in (3, 4)]
 
 
+def _demo_school():
+    from schools.models import School
+    return School.objects.order_by("pk").first()
+
+
 def make_student(n=1):
     return Student.objects.create(first_name="تست", last_name=f"نمونه{n}", national_id=f"900000{n:04d}",
-                                  grade=10, class_name="۱۰-الف", phone_number="0900000000")
+                                  grade=10, class_name="۱۰-الف", phone_number="0900000000",
+                                  school=_demo_school())
 
 
 class EngineTests(TestCase):
@@ -301,7 +307,7 @@ class HardeningViewAndAssistantTests(TestCase):
         call_command("seed_demo", "--password", "Test-pass-123", verbosity=0)
         for first in ("ژاله", "ژیلا"):
             Student.objects.create(first_name=first, last_name="تکراری", national_id="9100" + str(ord(first[1]))[:6],
-                                   grade=9, class_name="۹-الف", phone_number="0")
+                                   grade=9, class_name="۹-الف", phone_number="0", school=_demo_school())
 
     def test_ambiguous_name(self):
         out = assistant.answer("چرا تکراری در معرض خطر است؟")

@@ -57,11 +57,11 @@ class Command(BaseCommand):
                 classes[(code, g)] = klass(code, g, 'A')
         counter = {'n': 0}
 
-        def student(first, grade, cls, in_school=True):
+        def student(first, grade, cls):
             counter['n'] += 1
             return Student.objects.create(
                 first_name=first, last_name='Synthetic', national_id=f"99{counter['n']:08d}", grade=grade,
-                phone_number='0000000000', school=school if in_school else None, school_class=cls)
+                phone_number='0000000000', school=school, school_class=cls)
 
         def enroll(st, code, grade, cls, status, source='import'):
             return Enrollment.objects.create(
@@ -99,10 +99,9 @@ class Command(BaseCommand):
         activity(student('Transfer0', 9, classes[('1404-1405', 9)]), '1404-1405', 9)
 
         # --- deliberate noise (everything below must be skipped, never guessed) ---
-        # NoClass0 is the ONE deliberately school-less synthetic student (a legacy dirty row for the roster/enrollment
-        # tests, 'student has no school'); every other student gets the synthetic school. It must go when S6 makes
-        # Student.school NOT NULL (changes/0010).
-        activity(student('NoClass0', 10, None, in_school=False), '1404-1405', 11)  # no class, no school
+        # NoClass0 has a school but no class (S6: every student has a school; the former school-less variant of this
+        # row could not exist once Student.school is NOT NULL, changes/0010).
+        activity(student('NoClass0', 10, None), '1404-1405', 11)  # no class
         bad = SchoolClass.objects.create(school=school, title='X-bad', academic_year='404', grade=10, is_active=True)
         activity(student('BadYear0', 10, bad), '1404-1405', 11)                         # unresolved year text
         unknown = SchoolClass.objects.create(school=school, title='X-1401', academic_year='1401', grade=10, is_active=True)

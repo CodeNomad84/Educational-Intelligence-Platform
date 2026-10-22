@@ -148,7 +148,7 @@ class HostileBatchTests(Base):
         user = make_user("sa", ADMIN)
         SchoolMembership.objects.create(user=user, school=self.school)
         student = Student.objects.create(
-            first_name="S", last_name="1", national_id="5000000001", grade=7, phone_number="1")
+            first_name="S", last_name="1", national_id="5000000001", grade=7, phone_number="1", school=self.school)
         Student.objects.filter(pk=student.pk).update(school=self.school)
         before = (list(SchoolMembership.objects.values_list("pk", "user_id", "school_id", "is_active")),
                   list(Student.objects.values_list("pk", "school_id")))
@@ -238,9 +238,9 @@ class ActuallyUpdatedTests(Base):
         self.assertEqual(report["would_deactivate"], 1)
 
     def test_student_batch_excludes_a_row_that_got_a_school_after_planning(self):
-        s1 = Student.objects.create(first_name="S", last_name="1", national_id="5100000001", grade=7, phone_number="1")
-        s2 = Student.objects.create(first_name="S", last_name="2", national_id="5100000002", grade=7, phone_number="1")
-        Student.objects.update(school=None)
+        s1 = Student.objects.create(first_name="S", last_name="1", national_id="5100000001", grade=7, phone_number="1", school=self.school)
+        s2 = Student.objects.create(first_name="S", last_name="2", national_id="5100000002", grade=7, phone_number="1", school=self.school)
+        Student.objects.update(school=None)  # S6-2:retire (legacy NULL row)
         real_ensure_new = batch_log.ensure_new
 
         def school_s2_then_check(path):
@@ -489,8 +489,8 @@ class RowLockTests(Base):
         orphan = make_user("orphan", ADMIN)
         SchoolMembership.objects.create(user=orphan, school=self.school)
         orphan.groups.clear()
-        Student.objects.create(first_name="S", last_name="1", national_id="6100000001", grade=7, phone_number="1")
-        Student.objects.update(school=None)
+        Student.objects.create(first_name="S", last_name="1", national_id="6100000001", grade=7, phone_number="1", school=self.school)
+        Student.objects.update(school=None)  # S6-2:retire (legacy NULL row)
         with patch:
             self.run_cmd(CHECK, "--deactivate", "--apply", "--batch-file", self.path("a.json"))
             self.run_cmd(CHECK, "--revert-batch", self.path("a.json"))
@@ -531,7 +531,7 @@ class MachineReadableGateKeyTests(Base):
 
     def test_key_is_present_even_when_the_command_fails(self):
         make_user("sa", ADMIN)  # a SchoolAdmin without membership: both gate commands fail
-        Student.objects.create(first_name="S", last_name="1", national_id="6200000001", grade=7, phone_number="1")
+        Student.objects.create(first_name="S", last_name="1", national_id="6200000001", grade=7, phone_number="1", school=self.school)
         Student.objects.update(school=self.school)
         for command in ("check_access_switch_ready", "compare_access_parity"):
             out = StringIO()
@@ -562,8 +562,8 @@ class LockQuerySqlTests(Base):
         for u in users:
             SchoolMembership.objects.create(user=u, school=self.school)
             u.groups.clear()
-        Student.objects.create(first_name="S", last_name="1", national_id="6300000001", grade=7, phone_number="1")
-        Student.objects.update(school=None)
+        Student.objects.create(first_name="S", last_name="1", national_id="6300000001", grade=7, phone_number="1", school=self.school)
+        Student.objects.update(school=None)  # S6-2:retire (legacy NULL row)
         with CaptureQueriesContext(connection) as ctx:
             self.run_cmd(CHECK, "--deactivate", "--apply", "--batch-file", self.path("a.json"))
             self.run_cmd(CHECK, "--revert-batch", self.path("a.json"))
@@ -686,8 +686,7 @@ class GatePassedKeyTests(Base):
         user = make_user("sa", ADMIN)
         SchoolMembership.objects.create(user=user, school=self.school)
         student = Student.objects.create(first_name="S", last_name="1", national_id="7000000001", grade=7,
-                                         phone_number="1")
-        Student.objects.filter(pk=student.pk).update(school=self.school)
+                                         phone_number="1", school=self.school)
 
     def test_not_passed_without_the_flag_in_both_commands(self):
         self.clean_state()

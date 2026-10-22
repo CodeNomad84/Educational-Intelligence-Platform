@@ -53,7 +53,7 @@ class BackfillStudentSchoolTests(TestCase):
         self.n += 1
         student = Student.objects.create(
             first_name="S", last_name=str(self.n), national_id=f"30000000{self.n:02d}", grade=7, phone_number="1",
-            **extra)
+            **{'school': School.objects.order_by('pk').first(), **extra})  # S6-2:retire - NULL is forced below
         if school == "keep":
             pass  # save() derived the school from the class
         elif school == "none":
