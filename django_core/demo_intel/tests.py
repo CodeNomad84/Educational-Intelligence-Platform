@@ -386,3 +386,29 @@ class HardeningViewAndAssistantTests(TestCase):
         c.logout()
         for url in ("/demo/counselor/", "/demo/assistant/", "/dashboard/"):
             self.assertEqual(c.get(url).status_code, 302, url)
+
+
+@override_settings(DATABASES={"default": {**copy.deepcopy(settings.DATABASES["default"]), "NAME": "/x/demo_db.sqlite3"}})
+class SeedDemoSchoolTests(TestCase):
+    """S2b: every demo student gets an explicit school; no hidden default when several Schools exist."""
+
+    def test_the_only_school_is_used_and_every_student_has_it(self):
+        from schools.models import School
+        only = School.objects.get()
+        call_command("seed_demo", "--password", "Test-pass-123", verbosity=0)
+        self.assertEqual(set(Student.objects.values_list("school_id", flat=True)), {only.pk})
+
+    def test_several_schools_need_the_school_option(self):
+        from schools.models import School
+        School.objects.create(name="Second", code="second")
+        with self.assertRaises(CommandError):
+            call_command("seed_demo", "--password", "Test-pass-123", verbosity=0)
+        self.assertEqual(Student.objects.count(), 0)
+
+    def test_the_school_option_picks_the_school_and_unknown_codes_fail(self):
+        from schools.models import School
+        School.objects.create(name="Second", code="second")
+        with self.assertRaises(CommandError):
+            call_command("seed_demo", "--school", "nope", "--password", "Test-pass-123", verbosity=0)
+        call_command("seed_demo", "--school", "second", "--password", "Test-pass-123", verbosity=0)
+        self.assertEqual(set(Student.objects.values_list("school__code", flat=True)), {"second"})

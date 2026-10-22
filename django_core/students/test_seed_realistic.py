@@ -61,3 +61,16 @@ class SeedTests(TestCase):
             call_command('compare_access_parity', '--json', stdout=out)
         self.assertGreater(json.loads(out.getvalue())['unexplained'], 0)
         self.assertEqual(list(Student.objects.order_by('pk').values()), students)  # no tool changed a student
+
+
+class SeedSchoolAssignmentTests(TestCase):
+    """S2b: the synthetic seeds give every student a school (the one exception is documented in the seed)."""
+
+    def test_temporal_synthetic_has_exactly_one_deliberately_school_less_student(self):
+        call_command('seed_temporal_synthetic', '--i-know-this-is-synthetic', stdout=StringIO())
+        self.assertEqual(list(Student.objects.filter(school__isnull=True).values_list('first_name', flat=True)),
+                         ['NoClass0'])
+
+    def test_temporal_realistic_gives_every_student_a_school(self):
+        seed()
+        self.assertFalse(Student.objects.filter(school__isnull=True).exists())

@@ -133,7 +133,7 @@ class Command(BaseCommand):
             s['mirror_class'] = klass
             rows.append(Student(
                 first_name=f"Syn{s['idx']:03d}", last_name='Student', national_id=f"98{s['idx']:08d}", grade=grade,
-                phone_number=f"090000{s['idx']:05d}", school=klass.school if klass else None,
+                phone_number=f"090000{s['idx']:05d}", school=klass.school if klass else school,
                 school_class=klass, class_name=klass.title if klass else ''))
         Student.objects.bulk_create(rows)
         by_idx = {int(st.national_id[2:]): st for st in Student.objects.all()}

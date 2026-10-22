@@ -96,6 +96,8 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument("--reset", action="store_true", help="Delete existing demo data first.")
         parser.add_argument("--password", default=None, help="Password for the demo users (default: random).")
+        parser.add_argument("--school", default=None, help="Code of the School the demo students belong to "
+                            "(required when more than one School exists; with exactly one it is used).")
 
     # ---------------------------------------------------------------------------------------------
     def handle(self, *args, **opts):
@@ -113,13 +115,14 @@ class Command(BaseCommand):
         elif Student.objects.exists():
             raise CommandError("Demo DB already has students. Use --reset to rebuild it.")
 
+        school = self._school(opts["school"])
         with transaction.atomic():
             profiles = self._build_profiles()
             students = []
             for idx, p in enumerate(profiles, start=1):
                 s = Student.objects.create(
                     first_name=p["first"], last_name=p["last"], national_id=f"9000{idx:06d}",
-                    grade=p["grade"], class_name=p["cls"], phone_number=f"0900000{idx:04d}")
+                    grade=p["grade"], class_name=p["cls"], phone_number=f"0900000{idx:04d}", school=school)
                 students.append((s, p))
                 self._attendance(s, p)
                 self._grades(s, p)
@@ -147,6 +150,20 @@ class Command(BaseCommand):
         self.stdout.write(self.style.WARNING(f"Password: {password}"))
 
     # ---------------------------------------------------------------------------------------------
+    @staticmethod
+    def _school(code):
+        """S2b: every demo student gets an explicit school; no hidden default when several Schools exist."""
+        from schools.models import School
+        if code:
+            try:
+                return School.objects.get(code=code)
+            except School.DoesNotExist:
+                raise CommandError(f"No School with code '{code}'.")
+        schools = list(School.objects.all()[:2])
+        if len(schools) == 1:
+            return schools[0]
+        raise CommandError("Pass --school <code>: " + ("no School exists." if not schools else "several Schools exist."))
+
     def _guard(self):
         if not getattr(settings, "DEMO_MODE", False):
             raise CommandError("DEMO_MODE is off. Run with DJANGO_SETTINGS_MODULE=config.settings.demo.")
