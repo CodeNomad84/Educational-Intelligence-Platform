@@ -9,7 +9,8 @@ Evidence-only, like ``backfill_enrollments``: with EXACTLY ONE School every acti
 With zero or several Schools nothing is guessed: the command prints the eligible user ids and ``--apply`` is
 refused. Existing rows (active or inactive) are never modified: an inactive row is not re-activated. Created rows
 have no ``created_by``. A revert deletes only batch rows that are still active and unchanged in school and user.
-The command grants nothing by itself: no visibility rule reads memberships before stage S3.
+Since S3 the SchoolAdmin read scope IS the set of active memberships: creating a row turns that admin's read access ON for that school
+(admins without a row see nothing). Run it, then the gate, before serving S3 code.
 """
 import json
 

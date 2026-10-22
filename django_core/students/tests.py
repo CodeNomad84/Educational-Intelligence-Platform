@@ -71,7 +71,10 @@ class AccessPolicyTests(TestCase):
         self.assertEqual(visible_students(make_user('nogroup')).count(), 0)
         # Teacher student access is disabled until a verified assignment model exists (S-04).
         self.assertEqual(visible_students(make_user('t', TEACHER)).count(), 0)
-        self.assertEqual(visible_students(make_user('a', ADMIN)).count(), 2)
+        self.assertEqual(visible_students(make_user('a', ADMIN)).count(), 0)   # S3: a SchoolAdmin needs a membership
+        member = make_user('member', ADMIN)
+        SchoolMembership.objects.create(user=member, school=School.objects.order_by('pk').first())
+        self.assertEqual(visible_students(member).count(), 2)
 
 
 class StudentApiAuthzTests(TestCase):
@@ -149,8 +152,13 @@ class StudentApiAuthzTests(TestCase):
         self.assertEqual(resp.status_code, 401)
 
     def test_admin_can_manage(self):
+        SchoolMembership.objects.create(user=self.admin, school=self.child_b.school)
         self.client.force_login(self.admin)
         self.assertEqual(self.client.get(self.detail(self.child_b)).status_code, 200)
+
+    def test_admin_without_membership_gets_404(self):
+        self.client.force_login(self.admin)
+        self.assertEqual(self.client.get(self.detail(self.child_b)).status_code, 404)
 
 
 class StudentClassLinkTests(TestCase):

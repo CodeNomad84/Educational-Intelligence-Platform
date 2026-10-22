@@ -15,7 +15,7 @@ from django.test import TestCase
 from django.urls import reverse
 from rest_framework.test import APIClient
 
-from schools.models import AcademicYear, GradeLeadAssignment, School, SchoolClass, TeacherAssignment
+from schools.models import AcademicYear, GradeLeadAssignment, School, SchoolClass, SchoolMembership, TeacherAssignment
 from students.access import (
     ADMIN, GRADE_LEAD, PARENT, TEACHER, visible_attendances, visible_grades, visible_students,
 )
@@ -213,12 +213,17 @@ class UnionTests(Base):
         self.assertEqual(set(rows), {self.s10a.pk, self.s10b.pk, child.pk})
         self.assertTrue(all(rows.values()))
 
-    def test_admin_plus_any_sees_all_full(self):
+    def test_admin_plus_lead_sees_the_union_of_the_own_school_and_the_lead_grants_all_full(self):
         user = self.lead()
         user.groups.add(Group.objects.get_or_create(name=ADMIN)[0])
+        lead_only = self.ids(user)                      # no membership yet: only the Grade Lead grant
+        SchoolMembership.objects.create(user=user, school=self.school)
         rows = list(visible_students(user))
-        self.assertEqual(len(rows), Student.objects.count())
+        own_school = set(Student.objects.filter(school=self.school).values_list("pk", flat=True))
+        self.assertEqual({s.pk for s in rows}, own_school | lead_only)
         self.assertTrue(all(s.full_tier for s in rows))
+        self.assertTrue(Student.objects.exclude(school=self.school).exists())      # the other school stays hidden
+        self.assertFalse({s.pk for s in rows} & set(Student.objects.exclude(school=self.school).values_list("pk", flat=True)) - lead_only)
 
     def test_no_role_sees_nothing(self):
         user = make_user("nobody")

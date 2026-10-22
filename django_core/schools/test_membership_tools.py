@@ -160,10 +160,13 @@ class BackfillSchoolMembershipsTests(ToolCase):
         with self.assertRaises(CommandError):
             self.run_cmd("backfill_school_memberships", "--revert-batch", self.path("missing.json"))
 
-    def test_tool_changes_nobodys_visibility(self):
+    def test_tool_gives_school_admins_their_school_and_changes_nobody_elses_visibility(self):
+        # S3: a SchoolAdmin sees exactly the schools of the active memberships, so this tool is what turns the read
+        # access of the eligible admins ON; every other account is unaffected.
         parent = make_user("parent", PARENT)
-        Student.objects.create(first_name="A", last_name="B", national_id="2000000001", grade=7, phone_number="1",
-                               parent_user=parent, school=School.objects.order_by('pk').first())
+        student = Student.objects.create(
+            first_name="A", last_name="B", national_id="2000000001", grade=7, phone_number="1",
+            parent_user=parent, school=School.objects.order_by('pk').first())
 
         def snapshot():
             return {u.username: sorted(visible_students(u).values_list("pk", flat=True))
@@ -171,7 +174,12 @@ class BackfillSchoolMembershipsTests(ToolCase):
 
         before = snapshot()
         self.run_cmd("backfill_school_memberships", "--apply", "--batch-file", self.path())
-        self.assertEqual(snapshot(), before)
+        after = snapshot()
+        admins = {self.sa1.username, self.sa2.username}
+        self.assertTrue(all(before[name] == [] for name in admins))
+        self.assertTrue(all(after[name] == [student.pk] for name in admins))
+        self.assertEqual({k: v for k, v in after.items() if k not in admins},
+                         {k: v for k, v in before.items() if k not in admins})
 
 
 class CheckSchoolMembershipsTests(ToolCase):
@@ -324,7 +332,7 @@ class CheckSchoolMembershipsTests(ToolCase):
         parent = make_user("parent", PARENT)
         Student.objects.create(first_name="A", last_name="B", national_id="2000000002", grade=7, phone_number="1",
                                parent_user=parent, school=School.objects.order_by('pk').first())
-        self.member("dual", setup="platform")
+        self.member("dual", setup="platform")   # an invalid membership already grants nothing (S3), so deactivating it changes nothing
 
         def snapshot():
             return {u.username: sorted(visible_students(u).values_list("pk", flat=True))

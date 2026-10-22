@@ -205,8 +205,9 @@ class SchoolMembership(models.Model):
 
     Many-to-many between users and schools through this model. The row grants nothing unless the user also
     holds the ``SchoolAdmin`` group, is active and is not a superuser; ``students.access.school_ids_for_admin``
-    re-checks all of that at query time. **Stage S1 only stores the entity: nothing reads it for visibility
-    yet** (the SchoolAdmin branch of ``visible_*`` is switched in S3), so creating a row changes no access.
+    re-checks all of that at query time. **Since S3 the SchoolAdmin branch of ``visible_*`` reads it**: a SchoolAdmin
+    sees exactly the schools of its active memberships (none without a row); a superuser keeps a temporary global read
+    until S8.
     """
 
     user = models.ForeignKey(

@@ -234,8 +234,9 @@ class SchoolIdsForAdminTests(TestCase):
         self.assertEqual(school_ids_for_admin(self.user), set())
 
 
-class StageS1ChangesNoAccessTests(TestCase):
-    """S1 stores the entity and the helper only: no visibility rule, role or token reads them."""
+class MembershipScopeTests(TestCase):
+    """S3: the SchoolAdmin read scope is the set of schools of the user's active memberships (``school_ids_for_admin``);
+    a SchoolAdmin without a valid membership sees nothing. Roles and the token are unchanged."""
 
     def setUp(self):
         self.a = School.objects.create(name="A", code="a")
@@ -268,20 +269,26 @@ class StageS1ChangesNoAccessTests(TestCase):
             for name, user in users.items()
         }
 
-    def test_creating_memberships_changes_nothing_anyone_sees(self):
+    def test_a_membership_of_a_non_admin_changes_nothing_anyone_sees(self):
         before = self.snapshot()
-        SchoolMembership.objects.create(user=self.admin_user, school=self.a)
-        SchoolMembership.objects.create(user=self.parent, school=self.b)  # bypasses clean(): still no effect
+        SchoolMembership.objects.create(user=self.parent, school=self.b)  # bypasses clean(): grants nothing
         self.assertEqual(self.snapshot(), before)
 
-    def test_school_admin_without_membership_still_sees_everything(self):
-        self.assertEqual(visible_students(self.admin_user).count(), 3)
-        self.assertEqual(visible_grades(self.admin_user).count(), 3)
-        self.assertEqual(visible_attendances(self.admin_user).count(), 3)
+    def test_school_admin_without_membership_sees_nothing(self):
+        self.assertEqual(visible_students(self.admin_user).count(), 0)
+        self.assertEqual(visible_grades(self.admin_user).count(), 0)
+        self.assertEqual(visible_attendances(self.admin_user).count(), 0)
 
-    def test_school_admin_with_a_membership_still_sees_every_school(self):
+    def test_school_admin_with_a_membership_sees_that_school_only(self):
         SchoolMembership.objects.create(user=self.admin_user, school=self.a)
-        self.assertEqual(visible_students(self.admin_user).count(), 3)
+        self.assertEqual(set(visible_students(self.admin_user)), {self.sa_a, self.loose})
+        self.assertEqual({g.student_id for g in visible_grades(self.admin_user)}, {self.sa_a.pk, self.loose.pk})
+        self.assertEqual({a.student_id for a in visible_attendances(self.admin_user)}, {self.sa_a.pk, self.loose.pk})
+        self.assertEqual(set(visible_students(self.admin_user).values_list("full_tier", flat=True)), {True})
+
+    def test_an_inactive_membership_grants_nothing(self):
+        SchoolMembership.objects.create(user=self.admin_user, school=self.a, is_active=False)
+        self.assertEqual(visible_students(self.admin_user).count(), 0)
 
     def test_a_platform_admin_group_member_has_no_role_and_sees_nothing(self):
         platform = make_user("platform", PLATFORM_ADMIN)
@@ -293,11 +300,43 @@ class StageS1ChangesNoAccessTests(TestCase):
     def test_platform_admin_is_not_a_recognised_role(self):
         self.assertNotIn(PLATFORM_ADMIN, ALL_ROLES)
 
-    def test_no_visibility_rule_reads_the_new_entity(self):
-        for func in (visible_students, visible_grades, visible_attendances, roles_for):
-            source = inspect.getsource(func)
-            self.assertNotIn("school_ids_for_admin", source, func.__name__)
-            self.assertNotIn("SchoolMembership", source, func.__name__)
+    def test_school_ids_for_admin_is_the_only_reader_of_memberships_outside_schools(self):
+        """S1 review H1, pinned repo-wide (S3): outside ``schools/`` (and tests/migrations) the only code that touches
+        ``SchoolMembership`` or the ``school_memberships`` / ``memberships`` relations is ``school_ids_for_admin``."""
+        import ast
+        from pathlib import Path
+
+        root = Path(__file__).resolve().parents[1]
+        writers = {"students/management/commands/seed_demo.py"}   # demo seed WRITES memberships for its synthetic admins
+        offenders = []
+        for path in sorted(root.rglob("*.py")):
+            rel = path.relative_to(root).as_posix()
+            if (rel in writers or rel.startswith(("schools/", ".venv/", "staticfiles/", "media/")) or "/migrations/" in rel
+                    or "/tests/" in rel or path.name.startswith("test") or path.name == "tests.py"):
+                continue
+            source = path.read_text(encoding="utf-8")
+            if "embership" not in source:
+                continue
+            tree = ast.parse(source)
+            allowed = set()
+            if rel == "students/access.py":
+                for node in ast.walk(tree):
+                    if isinstance(node, ast.FunctionDef) and node.name == "school_ids_for_admin":
+                        allowed.update(range(node.lineno, node.end_lineno + 1))
+            for node in ast.walk(tree):
+                names = []
+                if isinstance(node, ast.Name):
+                    names = [node.id]
+                elif isinstance(node, ast.Attribute):
+                    names = [node.attr]
+                elif isinstance(node, ast.ImportFrom):
+                    names = [a.name for a in node.names]
+                elif isinstance(node, ast.Constant) and isinstance(node.value, str) and len(node.value) < 60:
+                    names = [node.value]            # string lookups such as "school_memberships__school"
+                if any(n == "SchoolMembership" or n.startswith(("school_memberships", "memberships")) for n in names) \
+                        and getattr(node, "lineno", 0) not in allowed:
+                    offenders.append(f"{rel}:{node.lineno}")
+        self.assertEqual(offenders, [])
 
     def test_no_view_serializer_permission_or_token_code_reads_the_new_entity(self):
         import config.service_auth as service_auth

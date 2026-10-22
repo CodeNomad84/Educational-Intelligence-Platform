@@ -125,22 +125,43 @@ def _teacher_assignments(user, roles):
     ).values_list('school_class__school_id', 'school_class_id', 'subject'))
 
 
+def _sees_every_school(user, roles):
+    """S3 / D2: the TEMPORARY global read of a superuser (until S8 removes "superuser => SchoolAdmin", ADR-0012 /
+    changes/0010). It is an explicit branch, not a side effect of ``roles_for``: ``school_ids_for_admin`` is empty for a
+    superuser, so without this branch a superuser would be locked out. Account state is the per-request user object's
+    (H4): callers pass the freshly loaded ``request.user``; an inactive account sees nothing."""
+    return bool(ADMIN in roles and user.is_superuser and user.is_active)
+
+
+def _school_admin_q(user, roles):
+    """Q on ``Student``: the students of the schools this SchoolAdmin administers (``school_ids_for_admin``: active
+    membership, re-checked at query time). An EMPTY school set grants NOTHING (None), never "no filter" (S1 review F3).
+    A superuser is handled by ``_sees_every_school`` before this is reached."""
+    if ADMIN not in roles:
+        return None
+    school_ids = school_ids_for_admin(user)
+    return Q(school_id__in=school_ids) if school_ids else None
+
+
 def _full_tier_q(user, roles):
-    """Rows where the user holds a full-detail grant: Parent (own child) or Grade Lead (own grade)."""
-    return _any([Q(parent_user=user) if PARENT in roles else None, _grade_lead_q(user, roles)])
+    """Rows where the user holds a full-detail grant: SchoolAdmin (own schools), Parent (own child) or Grade Lead
+    (own grade)."""
+    return _any([_school_admin_q(user, roles), Q(parent_user=user) if PARENT in roles else None,
+                 _grade_lead_q(user, roles)])
 
 
 def visible_students(user):
     """Students the user may read: the union of the user's grants. Deny by default.
 
-    SchoolAdmin: all. Parent: own children. Grade Lead: students of the assigned school whose current enrollment
+    SchoolAdmin: the students of the schools of the user's active memberships (S3; none without a membership);
+    a superuser: all (explicit temporary branch until S8). Parent: own children. Grade Lead: students of the assigned school whose current enrollment
     has the assigned grade, in the current year the assignment names. Subject Teacher: students whose current
     enrollment is in a class with an active assignment. Each row is annotated ``full_tier``: True where a full-detail grant covers it
     (SchoolAdmin, Parent, Grade Lead), False where only a Subject Teacher grant does. Field policy, search
     and attendance follow ``full_tier``, never the user's role names (non-widening, ADR-0005 §5).
     """
     roles = roles_for(user)
-    if ADMIN in roles:
+    if _sees_every_school(user, roles):
         return Student.objects.annotate(full_tier=Value(True, output_field=BooleanField()))
     full = _full_tier_q(user, roles)
     teacher = _any(
@@ -161,7 +182,7 @@ def visible_grades(user):
     """Grade rows the user may read: through a full-detail grant (all subjects) or through a Subject Teacher
     assignment (own subject, assigned class only)."""
     roles = roles_for(user)
-    if ADMIN in roles:
+    if _sees_every_school(user, roles):
         return Grade.objects.all()
     full = _full_tier_q(user, roles)
     parts = [Q(student__in=Student.objects.filter(full)) if full is not None else None]
@@ -174,10 +195,10 @@ def visible_grades(user):
 
 
 def visible_attendances(user):
-    """Attendance rows: SchoolAdmin all; Parent and Grade Lead for their full-detail students; a Subject
+    """Attendance rows: SchoolAdmin the own schools (superuser: all, until S8); Parent and Grade Lead for their full-detail students; a Subject
     Teacher sees none (owner D7)."""
     roles = roles_for(user)
-    if ADMIN in roles:
+    if _sees_every_school(user, roles):
         return Attendance.objects.all()
     full = _full_tier_q(user, roles)
     if full is None:

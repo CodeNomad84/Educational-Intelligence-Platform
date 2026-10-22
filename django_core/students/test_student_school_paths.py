@@ -136,7 +136,8 @@ class ApiUpdateTests(Base):
         self.assertEqual((self.student_a.school_id, self.student_a.school_class_id), (self.a.pk, None))
 
     def test_admin_of_one_school_cannot_edit_a_student_of_another(self):
-        self.assertEqual(self.patch(self.admin('one', self.a), self.student_b, {'first_name': 'X'}).status_code, 400)
+        # S3: the other school's student is not even visible (404), so there is nothing to edit
+        self.assertEqual(self.patch(self.admin('one', self.a), self.student_b, {'first_name': 'X'}).status_code, 404)
         self.student_b.refresh_from_db()
         self.assertEqual(self.student_b.first_name, 'S')
 

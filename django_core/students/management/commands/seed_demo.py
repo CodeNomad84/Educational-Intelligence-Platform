@@ -138,7 +138,7 @@ class Command(BaseCommand):
                         student=s, date=self.today - timedelta(days=days_ago),
                         counselor_name="مشاور نمایشی", summary=summary)
             password = opts["password"] or secrets.token_urlsafe(9)
-            self._users(password, students)
+            self._users(password, students, school)
 
         results = analyze_students(Student.objects.all(), self.today)
         dist = {"HIGH": 0, "MEDIUM": 0, "LOW": 0}
@@ -257,8 +257,9 @@ class Command(BaseCommand):
                                   exam_type="midterm" if EXAM_OFFSETS.index(offset) % 3 == 0 else "quiz"))
         Grade.objects.bulk_create(rows)
 
-    def _users(self, password, students):
+    def _users(self, password, students, school):
         User = get_user_model()
+        from schools.models import SchoolMembership
         admin_g, _ = Group.objects.get_or_create(name=ADMIN)
         parent_g, _ = Group.objects.get_or_create(name="Parent")
         for username, first, last, group in [
@@ -270,6 +271,8 @@ class Command(BaseCommand):
             user.set_password(password)
             user.save()
             user.groups.set([group])
+            if group is admin_g:   # S3: a SchoolAdmin reads exactly the schools of its memberships
+                SchoolMembership.objects.update_or_create(user=user, school=school, defaults={"is_active": True})
             if username == "demo_parent":
                 child = next(s for s, p in students if p.get("key") == "improving_after_intervention")
                 child.parent_user = user
