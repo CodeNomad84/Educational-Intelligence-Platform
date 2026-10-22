@@ -43,6 +43,17 @@ class StudentSchoolError(Exception):
         super().__init__(self.message)
 
 
+def school_column_is_nullable():
+    """The REAL nullability of students_student.school_id, read from the database (not from the model: after
+    ``migrate students 0015 --fake`` the model says NOT NULL while the column may still be nullable)."""
+    from django.db import connection
+    from .models import Student
+    with connection.cursor() as cursor:
+        columns = {c.name: c.null_ok for c in connection.introspection.get_table_description(
+            cursor, Student._meta.db_table)}
+    return bool(columns[Student._meta.get_field('school').column])
+
+
 def _as_pk(value):
     """A school id from an int or a numeric string; None for None/''; ``False`` for anything else."""
     if value is None or value == '':

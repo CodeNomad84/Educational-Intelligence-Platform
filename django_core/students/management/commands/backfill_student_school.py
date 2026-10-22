@@ -26,6 +26,7 @@ from schools import batch_log
 from schools.models import School
 from students.enrollment_sync import CURRENT_STATUSES
 from students.models import Enrollment, Student
+from students.student_school import school_column_is_nullable
 
 COMMAND = 'backfill_student_school'
 CHUNK = 500
@@ -134,6 +135,9 @@ class Command(BaseCommand):
     def _revert(self, opts):
         data = batch_log.read_batch(opts['revert_batch'], COMMAND)
         items = batch_log.id_rows(data, 'assignments', ('student_id', 'school_id'))
+        if items and not school_column_is_nullable():
+            raise CommandError('Cannot revert: students.school is NOT NULL since students.0015 (S6). Nothing was changed. '
+                               'Reverse the migration first ("manage.py migrate students 0014") if this revert is really wanted.')
         grouped = defaultdict(list)
         for i in items:
             grouped[i['school_id']].append(i['student_id'])

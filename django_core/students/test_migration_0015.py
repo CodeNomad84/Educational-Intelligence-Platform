@@ -19,6 +19,7 @@ from contextlib import redirect_stdout
 from unittest import mock
 
 from django.core.management import call_command
+from schools import batch_log
 from django.core.management.base import CommandError
 from django.db import IntegrityError, connection, transaction
 from django.db.migrations.executor import MigrationExecutor
@@ -243,6 +244,37 @@ class ToolsTests(MigrationCase):
         self.assertEqual(self.Student.objects.get(pk=s.pk).school_id, other.pk)
         self.assertIsNotNone(only.pk)
 
+    def test_a_row_that_got_a_school_after_planning_is_not_in_the_batch_and_not_reverted(self):
+        from schools import batch_log
+        only = self.school()
+        s1, s2 = self.student(None), self.student(None)
+        real = batch_log.ensure_new
+
+        def school_s2_then_check(path):
+            self.Student.objects.filter(pk=s2.pk).update(school=only)
+            return real(path)
+
+        path = self.batch()
+        with mock.patch.object(batch_log, 'ensure_new', school_s2_then_check):
+            self.run_cmd('backfill_student_school', '--apply', '--batch-file', path)
+        with open(path, encoding='utf-8') as handle:
+            self.assertEqual([a['student_id'] for a in json.load(handle)['assignments']], [s1.pk])
+        self.run_cmd('backfill_student_school', '--revert-batch', path)
+        self.assertEqual(self.Student.objects.get(pk=s2.pk).school_id, only.pk)
+
+    def test_the_multi_school_gate_counts_a_real_school_less_row(self):
+        from schools.multischool_checks import readiness_counts
+        self.school()
+        self.student(None)
+        self.assertEqual(readiness_counts()['students_without_school'], 1)
+
+    def test_the_readiness_report_reads_the_real_column_nullability(self):
+        import json as _json
+        self.school()
+        self.student(None)
+        self.assertTrue(_json.loads(self.run_cmd('check_student_school_ready', '--json').split('\nCommandError')[0])
+                        ['school_column_is_nullable'])
+
     def test_the_student_lock_of_the_backfill_names_the_student_table_only(self):
         self.school()
         self.student(None)
@@ -306,6 +338,22 @@ class NotNullAtTheDatabaseTests(MigrationCase):
             with connection.cursor() as cursor:
                 cursor.execute('UPDATE students_student SET school_id = NULL WHERE id = %s', [self.keep])
         self.fails(raw)
+
+    def test_the_readiness_report_says_the_column_is_not_nullable(self):
+        out = io.StringIO()
+        call_command('check_student_school_ready', '--json', stdout=out)
+        self.assertFalse(json.loads(out.getvalue())['school_column_is_nullable'])
+
+    def test_reverting_a_backfill_batch_after_0015_is_refused_clearly_and_changes_nothing(self):
+        path = self.batch()
+        with open(path, 'w', encoding='utf-8') as handle:
+            json.dump({'command': 'backfill_student_school', 'version': batch_log.VERSION, 'school_id': 1,
+                       'assignments': [{'student_id': self.keep, 'school_id': 1}]}, handle)
+        out = io.StringIO()
+        with self.assertRaises(CommandError) as ctx:
+            call_command('backfill_student_school', '--revert-batch', path, stdout=out)
+        self.assertIn('NOT NULL since students.0015', str(ctx.exception))
+        self.assertIsNotNone(self.Real.objects.get(pk=self.keep).school_id)
 
     def test_save_still_works_for_a_student_with_a_school(self):
         student = self.Real.objects.get(pk=self.keep)

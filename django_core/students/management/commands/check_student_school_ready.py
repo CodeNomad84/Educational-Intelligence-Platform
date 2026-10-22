@@ -15,6 +15,7 @@ from django.core.management.base import BaseCommand, CommandError
 from schools.models import School
 from students.management.commands.backfill_student_school import plan_assignments
 from students.models import Student
+from students.student_school import school_column_is_nullable
 
 
 def readiness_report():
@@ -32,6 +33,8 @@ def readiness_report():
         'backfill_would_assign': len(assignments),
         'backfill_would_leave_unresolved': unresolved,
         'students_whose_school_differs_from_their_class_school': inconsistent,
+        # read from the database: False only when students.0015 really ran (never use --fake for it)
+        'school_column_is_nullable': school_column_is_nullable(),
     }
     report['ready'] = report['students_without_school'] == 0 and inconsistent == 0
     return report
