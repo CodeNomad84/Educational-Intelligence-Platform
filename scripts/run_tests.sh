@@ -29,6 +29,9 @@
 # container (bind-mounted /dev/null over db.sqlite3, demo_db.sqlite3, data.xlsx, data.ods and every .env*, an empty tmpfs over
 # .venv); only files that exist on the host are overlaid. The image BUILD (the only step that may need the network, for
 # uncached layers) runs before the internal network exists, on Docker's default network.
+# KNOWN LIMIT: "internal" removes every route to the outside, but the network's gateway address is on-link, so a service
+# the host binds to ALL interfaces is reachable from the test container (observed: the host's Ollama on *:11434). The
+# container-only test records what answers; EIP_TEST_STRICT_GATEWAY=1 (set on the host) makes it fail if anything does.
 #
 # Exit codes: 0 all passed, 1 a check or test failed, 2 usage error, 3 PostgreSQL mode prerequisites missing.
 set -euo pipefail
@@ -123,7 +126,7 @@ run_pg() {
     # django_core and scripts/ only (read-only), laid out like the repository so that the tooling tests find both;
     # the repository root (.env, data/, ...) is never mounted
     docker run --rm --network "$NET" -v "$APP:/repo/django_core:ro" -v "$ROOT/scripts:/repo/scripts:ro" \
-      ${hide[@]+"${hide[@]}"} -w /repo/django_core -e EIP_TEST_CONTAINER=1 \
+      ${hide[@]+"${hide[@]}"} -w /repo/django_core -e EIP_TEST_CONTAINER=1 -e EIP_TEST_STRICT_GATEWAY \
       -e DJANGO_SETTINGS_MODULE=config.settings.test_postgres \
       -e TEST_PG_HOST="$PGC" -e TEST_PG_NAME=eip_test -e TEST_PG_USER=eip_test -e TEST_PG_PASSWORD \
       "$IMAGE" python -B manage.py "$@"

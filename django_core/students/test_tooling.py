@@ -1,13 +1,16 @@
 """Tests of the test tooling itself: config.settings.test_postgres and scripts/run_tests.sh (modes, hard failures,
 cleanup, no secret on a command line). The script is only run with a FAKE ``docker`` (a shell script that logs its
 arguments) and a restricted PATH: no real container, image or network is touched."""
+import errno
 import importlib
+import ipaddress
 import os
 import re
 import shutil
 import signal
 import socket
 import stat
+import struct
 import subprocess
 import sys
 import tempfile
@@ -267,6 +270,7 @@ exit 0
                 if not (APP_DIR / name).exists():
                     self.assertNotIn(f"/repo/django_core/{name}", step)
             self.assertIn("-e EIP_TEST_CONTAINER=1", step)
+            self.assertIn("-e EIP_TEST_STRICT_GATEWAY", step)
         pg_start = next(c for c in self.calls() if c.startswith("run -d "))
         self.assertNotIn("EIP_TEST_CONTAINER", pg_start)
         self.assertNotIn("/repo/", pg_start)  # the database container mounts nothing from the repository
@@ -324,16 +328,147 @@ exit 0
         self.assertIn("trap 'exit 143' TERM", text)
 
 
+# ---- parsers for /proc/net/route and /proc/net/ipv6_route (sample-tested on the host, used inside the container)
+def ipv4_routes(text):
+    """[(network, prefix_len, gateway, iface)] from /proc/net/route (little-endian hex fields)."""
+    routes = []
+    for line in text.strip().splitlines()[1:]:
+        fields = line.split()
+        if len(fields) < 8:
+            continue
+        iface, dest, gateway, mask = fields[0], fields[1], fields[2], fields[7]
+        net = ipaddress.ip_address(socket.inet_ntoa(struct.pack("<L", int(dest, 16))))
+        prefix = bin(int(mask, 16)).count("1")
+        routes.append((ipaddress.ip_network(f"{net}/{prefix}", strict=False), prefix,
+                       socket.inet_ntoa(struct.pack("<L", int(gateway, 16))), iface))
+    return routes
+
+
+def has_ipv4_default_route(text):
+    return any(prefix == 0 for _net, prefix, _gw, _iface in ipv4_routes(text))
+
+
+def has_ipv6_default_route(text):
+    """A default route through a real device; the kernel's 'reject' placeholder routes on lo are not routes."""
+    for line in text.strip().splitlines():
+        fields = line.split()
+        if len(fields) < 10:
+            continue
+        dest, prefix, flags, iface = fields[0], int(fields[1], 16), int(fields[8], 16), fields[9]
+        if dest == "0" * 32 and prefix == 0 and iface != "lo" and not flags & 0x0200:
+            return True
+    return False
+
+
+# observed with Docker 29.9.0, 2026-10-22: an INTERNAL network (172.22.0.0/16, gateway field 172.22.0.1) and a normal one
+ROUTE_INTERNAL = """Iface\tDestination\tGateway \tFlags\tRefCnt\tUse\tMetric\tMask\t\tMTU\tWindow\tIRTT
+eth0\t000016AC\t00000000\t0001\t0\t0\t0\t0000FFFF\t0\t0\t0
+"""
+ROUTE_NORMAL = """Iface\tDestination\tGateway \tFlags\tRefCnt\tUse\tMetric\tMask\t\tMTU\tWindow\tIRTT
+eth0\t00000000\t010017AC\t0003\t0\t0\t0\t00000000\t0\t0\t0
+eth0\t000017AC\t00000000\t0001\t0\t0\t0\t0000FFFF\t0\t0\t0
+"""
+IPV6_PLACEHOLDERS = """00000000000000000000000000000000 00 00000000000000000000000000000000 00 00000000000000000000000000000000 ffffffff 00000001 00000000 00200200       lo
+00000000000000000000000000000001 80 00000000000000000000000000000000 00 00000000000000000000000000000000 00000000 00000004 00000000 80200001       lo
+"""
+IPV6_REAL_DEFAULT = IPV6_PLACEHOLDERS + "00000000000000000000000000000000 00 fe800000000000000000000000000001 00 00000000000000000000000000000000 00000400 00000001 00000000 00000003     eth0\n"
+
+
+class RouteParserTests(SimpleTestCase):
+    """The parsers behind the container-only network test, on real /proc/net samples: the test cannot pass vacuously."""
+
+    def test_internal_network_has_no_default_route_and_one_on_link_subnet(self):
+        routes = ipv4_routes(ROUTE_INTERNAL)
+        self.assertFalse(has_ipv4_default_route(ROUTE_INTERNAL))
+        self.assertEqual([(str(net), iface) for net, _p, _g, iface in routes], [("172.22.0.0/16", "eth0")])
+
+    def test_a_normal_network_has_a_default_route(self):
+        self.assertTrue(has_ipv4_default_route(ROUTE_NORMAL))
+        self.assertEqual(sorted(str(net) for net, *_ in ipv4_routes(ROUTE_NORMAL)), ["0.0.0.0/0", "172.23.0.0/16"])
+
+    def test_ipv6_placeholder_routes_on_lo_are_not_a_default_route_but_a_real_one_is(self):
+        self.assertFalse(has_ipv6_default_route(IPV6_PLACEHOLDERS))
+        self.assertTrue(has_ipv6_default_route(IPV6_REAL_DEFAULT))
+
+    def test_empty_or_garbage_tables_have_no_default_route(self):
+        for text in ("", "Iface\tDestination\n", "garbage\nmore garbage\n"):
+            self.assertFalse(has_ipv4_default_route(text))
+            self.assertFalse(has_ipv6_default_route(text))
+
+
 @unittest.skipUnless(os.environ.get("EIP_TEST_CONTAINER") == "1", "runs only inside the PostgreSQL test container")
 class InsideTheTestContainerTests(SimpleTestCase):
     """Executed by `scripts/run_tests.sh pg` INSIDE the container: the isolation really holds."""
 
-    def test_there_is_no_route_to_the_outside(self):
-        for host, port in (("1.1.1.1", 53), ("8.8.8.8", 53)):
-            with self.subTest(host=host), self.assertRaises(OSError):
-                socket.create_connection((host, port), timeout=3).close()
-        with self.assertRaises(OSError):
+    UNREACHABLE = (errno.ENETUNREACH, errno.EHOSTUNREACH)
+    OFF_LINK_PROBES = (("1.1.1.1", 53), ("8.8.8.8", 53), ("169.254.169.254", 80), ("172.17.0.1", 22),
+                       ("10.0.0.1", 53), ("192.168.1.1", 53), ("172.16.0.1", 53))
+    GATEWAY_PORTS = (22, 80, 443, 5432, 6379, 8000, 8001, 9000, 11434)
+
+    def own_networks(self):
+        return [net for net, prefix, _gw, _iface in ipv4_routes(Path("/proc/net/route").read_text()) if prefix > 0]
+
+    def test_there_is_no_default_route(self):
+        """U1: the strongest, version-independent proof of --internal: nothing routes beyond the own subnet."""
+        self.assertFalse(has_ipv4_default_route(Path("/proc/net/route").read_text()), "IPv4 default route present")
+        self.assertFalse(has_ipv6_default_route(Path("/proc/net/ipv6_route").read_text()), "IPv6 default route present")
+        self.assertEqual(len(self.own_networks()), 1, "expected exactly one connected subnet")
+
+    def test_off_link_addresses_are_unreachable_not_merely_unanswered(self):
+        """U1: only ENETUNREACH / EHOSTUNREACH count. A timeout or a refusal would also happen on an offline machine."""
+        own = self.own_networks()
+        probed = 0
+        for host, port in self.OFF_LINK_PROBES:
+            if any(ipaddress.ip_address(host) in net for net in own):
+                continue  # an address on the own subnet is on-link, covered by the gateway test
+            probed += 1
+            with self.subTest(host=host):
+                try:
+                    socket.create_connection((host, port), timeout=3).close()
+                except OSError as exc:
+                    self.assertIn(exc.errno, self.UNREACHABLE, f"{host}:{port} -> {exc!r}")
+                else:
+                    self.fail(f"{host}:{port} is reachable")
+        self.assertGreaterEqual(probed, 5)
+
+    def test_dns_resolves_the_database_container_and_nothing_else(self):
+        """U1 positive control: name resolution works for the test network, and an external name fails to resolve."""
+        host = os.environ["TEST_PG_HOST"]
+        infos = socket.getaddrinfo(host, 5432, type=socket.SOCK_STREAM)
+        self.assertTrue(infos, "the database container name must resolve")
+        address = ipaddress.ip_address(infos[0][4][0])
+        self.assertTrue(any(address in net for net in self.own_networks()), "the database is on the own subnet")
+        with self.assertRaises(socket.gaierror) as ctx:
             socket.getaddrinfo("example.org", 80)
+        self.assertIn(ctx.exception.errno, (socket.EAI_AGAIN, socket.EAI_NONAME), repr(ctx.exception))
+
+    def test_the_database_container_is_reachable_over_tcp(self):
+        """U1 positive control: --internal does not break container-to-container traffic."""
+        socket.create_connection((os.environ["TEST_PG_HOST"], 5432), timeout=10).close()
+
+    def test_gateway_observation_is_recorded_and_strict_mode_can_forbid_any_host_service(self):
+        """U2. The gateway address of an internal network is ON-LINK: a connection to it is answered (REFUSED or
+        CONNECTED), not "unreachable". So a service the host binds to all interfaces is reachable from the test
+        container even on an --internal network. OBSERVED with Docker 29.9.0 on the development machine (2026-10-22):
+        172.22.0.1 answers; ports 22, 80, 443, 5432, 6379, 8000, 8001, 9000 are REFUSED; 11434 (the host's Ollama,
+        listening on *:11434) CONNECTS. No workaround is built (see Change Report 0012). This test records the outcome in
+        its output and fails only when EIP_TEST_STRICT_GATEWAY=1 is set on the host (passed through by the script) and a
+        host service answers."""
+        gateways = {net.network_address + 1 for net in self.own_networks()}
+        self.assertTrue(gateways)
+        connected, refused, other = [], [], []
+        for gateway in sorted(gateways):
+            for port in self.GATEWAY_PORTS:
+                try:
+                    socket.create_connection((str(gateway), port), timeout=3).close()
+                    connected.append(f"{gateway}:{port}")
+                except OSError as exc:
+                    (refused if exc.errno == errno.ECONNREFUSED else other).append(
+                        f"{gateway}:{port}={errno.errorcode.get(exc.errno, type(exc).__name__)}")
+        sys.stderr.write(f"\nGATEWAY OBSERVATION (U2): connected={connected} refused={len(refused)} other={other}\n")
+        self.assertEqual(len(connected) + len(refused) + len(other), len(gateways) * len(self.GATEWAY_PORTS))
+        if os.environ.get("EIP_TEST_STRICT_GATEWAY") == "1":
+            self.assertEqual(connected, [], "a host service answers on the network gateway from inside the test container")
 
     def test_local_only_files_are_not_visible(self):
         app = Path("/repo/django_core")
