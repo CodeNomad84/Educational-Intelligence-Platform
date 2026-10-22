@@ -64,7 +64,7 @@ class AccessPolicyTests(TestCase):
     def test_roles(self):
         self.assertEqual(roles_for(self.parent_a), {PARENT})
         self.assertEqual(roles_for(make_user('nogroup')), set())
-        self.assertEqual(roles_for(make_user('root', is_superuser=True)), {ADMIN})
+        self.assertEqual(roles_for(make_user('root', is_superuser=True)), set())   # Slice 0: platform account
 
     def test_visible_students_deny_by_default(self):
         self.assertEqual(list(visible_students(self.parent_a)), [self.child_a])

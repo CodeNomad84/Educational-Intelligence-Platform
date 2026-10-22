@@ -81,6 +81,32 @@ class StudentAdmin(admin.ModelAdmin):
             'bound_user': request.user,
             'bound_existing_school_id': obj.school_id if obj is not None else None})
 
+    # Slice 0: the Django admin shows school data only to accounts that hold a school role; the superuser (platform
+    # account) sees no student here. Rows are limited to what the access layer lets the user read.
+    @staticmethod
+    def _school_user(request):
+        from .access import roles_for
+        return bool(roles_for(request.user))
+
+    def has_module_permission(self, request):
+        return self._school_user(request) and super().has_module_permission(request)
+
+    def has_view_permission(self, request, obj=None):
+        return self._school_user(request) and super().has_view_permission(request, obj)
+
+    def has_add_permission(self, request):
+        return self._school_user(request) and super().has_add_permission(request)
+
+    def has_change_permission(self, request, obj=None):
+        return self._school_user(request) and super().has_change_permission(request, obj)
+
+    def has_delete_permission(self, request, obj=None):
+        return self._school_user(request) and super().has_delete_permission(request, obj)
+
+    def get_queryset(self, request):
+        from .access import visible_students
+        return super().get_queryset(request).filter(pk__in=visible_students(request.user).values('pk'))
+
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         from .student_school import class_choices, parent_choices
         student = getattr(request, '_student_being_edited', None)

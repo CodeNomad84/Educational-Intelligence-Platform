@@ -463,38 +463,18 @@ class SchoolAdminParityTests(Base):
         with mock.patch.object(access, "visible_students", lambda u: Student.objects.none()):
             self.assertGreater(self.parity(fail=True)["students_locked_out"], 0)
 
-    def test_an_inactive_superuser_with_another_role_is_leak_checked_too(self):
-        """An inactive superuser who also holds Teacher must see nothing at all (an inactive account holds no role)."""
+    def test_the_superuser_platform_account_must_see_no_school_data(self):
+        """Slice 0: active, inactive, or holding another role - a superuser must see nothing; a leak fails the gate."""
         from students import access
-        make_user("oldroot", ADMIN, "Teacher", is_superuser=True, is_active=False)
-        self.member("sa")
-        self.data(self.a)
-        self.assertEqual(self.parity()["superuser_scope_wrong"], 0)
-        with mock.patch.object(access, "_sees_every_school", lambda user, roles: user.is_superuser):
-            self.assertEqual(self.parity(fail=True)["superuser_scope_wrong"], 1)
-
-    # --- the temporary superuser branch (until S8) is checked separately -------------------------------------------
-    def test_superuser_active_sees_all_and_inactive_sees_none(self):
-        make_user("root", ADMIN, is_superuser=True)
-        make_user("oldroot", ADMIN, is_superuser=True, is_active=False)
+        make_user("root", is_superuser=True)
+        make_user("oldroot", "Teacher", is_superuser=True, is_active=False)
         self.member("sa")
         self.data(self.a)
         report = self.parity()
         self.assertEqual((report["superusers_compared"], report["superuser_scope_wrong"]), (2, 0))
-
-    def test_a_wrong_superuser_scope_fails_the_gate(self):
-        """Mutation: the explicit superuser branch removed (the superuser is locked out), or kept for an inactive one."""
-        from students import access
-        make_user("root", ADMIN, is_superuser=True)
-        self.member("sa")
-        self.data(self.a)
-        with mock.patch.object(access, "_sees_every_school", lambda user, roles: False):
+        with mock.patch.object(access, "visible_students", lambda user: Student.objects.all()):
             report = self.parity(fail=True)
-        self.assertEqual(report["superuser_scope_wrong"], 1)
-        User.objects.filter(username="root").update(is_active=False)
-        with mock.patch.object(access, "_sees_every_school", lambda user, roles: user.is_superuser):
-            self.assertEqual(self.parity(fail=True)["superuser_scope_wrong"], 1)
-        self.assertEqual(self.parity()["superuser_scope_wrong"], 0)
+        self.assertEqual(report["superuser_scope_wrong"], 2)
 
     def test_superuser_inactive_and_dual_role_handling(self):
         make_user("root", ADMIN, is_superuser=True)

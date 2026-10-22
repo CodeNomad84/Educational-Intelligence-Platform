@@ -266,7 +266,7 @@ def strict_scope_comparison():
       grant code with the admin role switched off (``_roles_without_admin``). A row outside it = LEAK, an expected row
       missing = LOCKOUT, rows of other schools that are hidden = INFO. An admin branch that leaks into a school where the
       account also holds a Teacher/GradeLead/Parent grant is caught, because the other roles grant only part of it.
-    * superusers (temporary branch until S8): active = every row; inactive = nothing (an inactive account holds no role).
+    * superusers (platform account, Slice 0): must see nothing.
     * every other non-superuser account that holds no Teacher/GradeLead/Parent role (PlatformAdmin-only, membership-only,
       no role at all) must see nothing."""
     row_school = {
@@ -304,14 +304,9 @@ def strict_scope_comparison():
             totals[f'info_other_school_{kind}_hidden'] += len(set(schools) - expected - seen)
 
     for user in User.objects.filter(is_superuser=True).order_by('pk'):
+        # Slice 0: the superuser is the platform account; whatever its state, it must see no school data at all.
         totals['superusers_compared'] += 1
-        wrong = False
-        for kind, schools in row_school.items():
-            seen = actual(kind, user)
-            if user.is_active:
-                wrong = wrong or seen != set(schools)
-            else:
-                wrong = wrong or bool(seen)   # an inactive account holds no role at all (roles_for): it must see nothing
+        wrong = any(actual(kind, user) for kind in row_school)
         totals['superuser_scope_wrong'] += 1 if wrong else 0
 
     outside = User.objects.filter(is_superuser=False).exclude(groups__name=ADMIN).exclude(

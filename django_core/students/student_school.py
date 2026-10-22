@@ -8,9 +8,9 @@ private interpretation and there is NO hidden "the only School" default:
   3. else an existing student keeps the school it has;
   4. else a non-superuser with exactly ONE active membership -> that school (implied);
   5. else the write is rejected (zero memberships; several memberships without a target; a superuser without a
-     target: a superuser may name any school explicitly but is never defaulted).
+     target: a superuser is the platform account and has no school: rejected).
 
-The result must belong to the user's schools (``school_ids_for_admin``; a superuser: any existing school), and an
+The result must belong to the user's schools (``school_ids_for_admin``), and an
 existing student's school never changes. Errors are ``StudentSchoolError`` with a stable ``code`` and a message that
 does not reveal whether a school the user may not use exists. This module only decides; the callers turn the error
 into a form / API error. It changes no visibility rule.
@@ -65,12 +65,10 @@ def _as_pk(value):
 
 
 def allowed_school_ids(user):
-    """``None`` is never returned: a set of school ids the user may create/edit students in. Superuser: every school
-    that exists now; others: ``school_ids_for_admin`` (empty for anonymous, inactive, platform and unassigned)."""
+    """``None`` is never returned: a set of school ids the user may create/edit students in: ``school_ids_for_admin``
+    (empty for anonymous, inactive, superuser/platform and unassigned accounts)."""
     if user is None or not getattr(user, 'is_authenticated', False) or not user.is_active:
         return set()
-    if user.is_superuser:
-        return set(School.objects.values_list('pk', flat=True))
     return school_ids_for_admin(user)
 
 

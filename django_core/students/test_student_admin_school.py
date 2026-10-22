@@ -71,11 +71,10 @@ class StudentAdminSchoolTests(TestCase):
         self.assertEqual(self.add(self.staff('none')).status_code, 200)
         self.assertEqual(Student.objects.count(), 0)
 
-    def test_superuser_must_name_a_school(self):
+    def test_superuser_cannot_add_students(self):
         root = User.objects.create_superuser('root', password='x')
-        self.assertEqual(self.add(root).status_code, 200)
-        self.assertEqual(self.add(root, target_school=self.b.pk).status_code, 302)
-        self.assertEqual(Student.objects.get().school_id, self.b.pk)
+        self.assertEqual(self.add(root).status_code, 403)   # Slice 0: the Django admin hides students from the platform account
+        self.assertFalse(Student.objects.exists())
 
     def test_a_class_decides_the_school(self):
         self.assertEqual(self.add(self.staff('two', self.a, self.b), school_class=self.class_b.pk).status_code, 302)

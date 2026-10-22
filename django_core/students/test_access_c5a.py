@@ -178,9 +178,9 @@ class QueryTimeHardeningTests(Base):
         user.save()
         self.assertEqual(self.ids(user), {child.pk})
 
-    def test_superuser_maps_to_school_admin_not_scoped(self):
-        root = make_user("root", GRADE_LEAD, is_superuser=True)
-        self.assertEqual(len(visible_students(root)), Student.objects.count())
+    def test_superuser_holds_no_school_role_and_sees_nothing(self):
+        root = make_user("root", is_superuser=True)
+        self.assertEqual(len(visible_students(root)), 0)
 
 
 class UnionTests(Base):

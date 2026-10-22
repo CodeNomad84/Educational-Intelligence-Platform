@@ -125,10 +125,10 @@ class DashboardAuthzTests(TestCase):
         self.client.force_login(self.admin)
         self.assertEqual(self.client.get(self.url('student_add')).status_code, 200)
 
-    def test_superuser_counts_as_admin(self):
+    def test_superuser_is_the_platform_account_and_cannot_add_students(self):
         root = make_user('root', is_superuser=True)
         self.client.force_login(root)
-        self.assertEqual(self.client.get(self.url('student_add')).status_code, 200)
+        self.assertEqual(self.client.get(self.url('student_add')).status_code, 403)
 
     def test_logout_redirects_to_login(self):
         self.client.force_login(self.parent_a)

@@ -92,26 +92,12 @@ class ResolveStudentSchoolTests(TestCase):
         from django.contrib.auth.models import AnonymousUser
         self.assertCode(NO_SCHOOL_ACCESS, AnonymousUser())
 
-    # --- superuser: explicit, never defaulted ---------------------------------------------------------------
-    def test_superuser_needs_a_target_even_with_one_school_only(self):
+    # --- superuser: the platform account has no school (Slice 0) ---------------------------------------------
+    def test_superuser_is_rejected_in_every_combination(self):
         root = User.objects.create_superuser('root', password='x')
-        self.assertCode(TARGET_REQUIRED, root)
-
-    def test_superuser_may_name_any_school_or_use_a_class(self):
-        root = User.objects.create_superuser('root', password='x')
-        self.assertEqual(resolve_student_school(root, target_school_id=self.b.pk), self.b.pk)
-        self.assertEqual(resolve_student_school(root, school_class=self.class_a), self.a.pk)
-
-    def test_superuser_naming_a_missing_school_is_rejected_generically(self):
-        root = User.objects.create_superuser('root', password='x')
-        self.assertCode(SCHOOL_NOT_ALLOWED, root, target_school_id=999999)
-
-    def test_superuser_with_a_single_school_is_still_not_defaulted(self):
-        SchoolClass.objects.all().delete()
-        School.objects.exclude(pk=self.a.pk).delete()
-        root = User.objects.create_superuser('root', password='x')
-        self.assertEqual(list(School.objects.values_list('pk', flat=True)), [self.a.pk])
-        self.assertCode(TARGET_REQUIRED, root)
+        self.assertCode(NO_SCHOOL_ACCESS, root)
+        self.assertCode(NO_SCHOOL_ACCESS, root, target_school_id=self.b.pk)
+        self.assertCode(NO_SCHOOL_ACCESS, root, school_class=self.class_a)
 
     # --- class and target -------------------------------------------------------------------------------------
     def test_class_and_target_that_disagree_are_rejected(self):
@@ -160,5 +146,4 @@ class ResolveStudentSchoolTests(TestCase):
 
     def test_allowed_school_ids(self):
         self.assertEqual(allowed_school_ids(self.admin('two', self.a, self.b)), {self.a.pk, self.b.pk})
-        self.assertEqual(allowed_school_ids(User.objects.create_superuser('root', password='x')),
-                         set(School.objects.values_list('pk', flat=True)))
+        self.assertEqual(allowed_school_ids(User.objects.create_superuser('root', password='x')), set())

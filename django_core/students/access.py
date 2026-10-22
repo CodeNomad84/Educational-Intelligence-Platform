@@ -37,10 +37,9 @@ def roles_for(user):
         return set()
     if not user.is_active:   # an inactive account holds no role at all (owner decision 2026-10-23); the user object is the unit of trust (H4)
         return set()
-    names = set(user.groups.filter(name__in=ALL_ROLES).values_list('name', flat=True))
-    if user.is_superuser:
-        names.add(ADMIN)
-    return names
+    # Slice 0: a superuser is the PLATFORM account (schools, subscriptions, school-admin accounts in the Django admin). It
+    # holds no school role by itself and therefore sees no student, grade or attendance data in the application.
+    return set(user.groups.filter(name__in=ALL_ROLES).values_list('name', flat=True))
 
 
 def has_any_role(user, *roles):
@@ -127,18 +126,10 @@ def _teacher_assignments(user, roles):
     ).values_list('school_class__school_id', 'school_class_id', 'subject'))
 
 
-def _sees_every_school(user, roles):
-    """S3 / D2: the TEMPORARY global read of a superuser (until S8 removes "superuser => SchoolAdmin", ADR-0012 /
-    changes/0010). It is an explicit branch, not a side effect of ``roles_for``: ``school_ids_for_admin`` is empty for a
-    superuser, so without this branch a superuser would be locked out. Account state is the per-request user object's
-    (H4): callers pass the freshly loaded ``request.user``; an inactive account sees nothing."""
-    return bool(ADMIN in roles and user.is_superuser and user.is_active)
-
-
 def _school_admin_q(user, roles):
     """Q on ``Student``: the students of the schools this SchoolAdmin administers (``school_ids_for_admin``: active
     membership, re-checked at query time). An EMPTY school set grants NOTHING (None), never "no filter" (S1 review F3).
-    A superuser is handled by ``_sees_every_school`` before this is reached."""
+    A superuser holds no school role (Slice 0)."""
     if ADMIN not in roles:
         return None
     school_ids = school_ids_for_admin(user)
@@ -163,8 +154,6 @@ def visible_students(user):
     and attendance follow ``full_tier``, never the user's role names (non-widening, ADR-0005 §5).
     """
     roles = roles_for(user)
-    if _sees_every_school(user, roles):
-        return Student.objects.annotate(full_tier=Value(True, output_field=BooleanField()))
     full = _full_tier_q(user, roles)
     teacher = _any(
         _current_enrollment(school_id, school_class_id=class_id)
@@ -184,8 +173,6 @@ def visible_grades(user):
     """Grade rows the user may read: through a full-detail grant (all subjects) or through a Subject Teacher
     assignment (own subject, assigned class only)."""
     roles = roles_for(user)
-    if _sees_every_school(user, roles):
-        return Grade.objects.all()
     full = _full_tier_q(user, roles)
     parts = [Q(student__in=Student.objects.filter(full)) if full is not None else None]
     parts += [
@@ -200,8 +187,6 @@ def visible_attendances(user):
     """Attendance rows: SchoolAdmin the own schools (superuser: all, until S8); Parent and Grade Lead for their full-detail students; a Subject
     Teacher sees none (owner D7)."""
     roles = roles_for(user)
-    if _sees_every_school(user, roles):
-        return Attendance.objects.all()
     full = _full_tier_q(user, roles)
     if full is None:
         return Attendance.objects.none()

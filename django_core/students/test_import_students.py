@@ -93,15 +93,13 @@ class ImportPermissionTests(ImportCase):
     def body(self):
         return csv_upload(f'{HEADER}\nAli,Rezai,1234567890,9,9-A,9120000001,Dr,Nurse\n')
 
-    def test_admin_and_superuser_may_import(self):
+    def test_admin_may_import_and_the_superuser_may_not(self):
         self.assertEqual(self.post(self.body()).status_code, 200)
         root = make_user('import_root', is_superuser=True)
         self.client.force_login(root)
         upload = csv_upload(f'{HEADER}\nSara,Karimi,1234567891,9,9-A,9120000002,Dr,Nurse\n')
-        self.assertEqual(self.post(upload).status_code, 400)   # S2b: a superuser must name the school
-        upload = csv_upload(f'{HEADER}\nSara,Karimi,1234567891,9,9-A,9120000002,Dr,Nurse\n')
         self.assertEqual(self.client.post(URL, {'file': upload, 'target_school': School.objects.get().pk}
-                                          ).status_code, 200)
+                                          ).status_code, 403)   # Slice 0: the platform account has no school data
 
     def test_bearer_token_authentication_is_enforced_the_same_way(self):
         """JWT is the first configured authenticator; the endpoint must honor it and the same permission."""

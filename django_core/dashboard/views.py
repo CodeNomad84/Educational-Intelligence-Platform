@@ -44,6 +44,8 @@ def logout_view(request):
 @login_required
 def dashboard_view(request):
     roles = roles_for(request.user)
+    if request.user.is_superuser and request.user.is_active:
+        return redirect('/admin/')   # Slice 0: the superuser is the platform account; it has no school data here
     if ADMIN not in roles:  # school-wide aggregates: SchoolAdmin only
         if roles & {PARENT, GRADE_LEAD, TEACHER}:
             # Aggregates are SchoolAdmin only; every other role lands on its own student list.
@@ -56,7 +58,7 @@ def dashboard_view(request):
         return school_dashboard(request)
     # DEMO SCOPE end
     # access: SchoolAdmin only (ADMIN in roles was checked above); S3: the aggregates cover the schools of the
-    # user's memberships only (a superuser: every school, until S8), through the same access layer as the lists
+    # user's memberships only, through the same access layer as the lists
     visible_grade_rows = visible_grades(request.user)
     total_students = visible_students(request.user).count()
     total_grades = visible_grade_rows.count()

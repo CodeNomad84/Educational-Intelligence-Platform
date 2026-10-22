@@ -85,12 +85,10 @@ class ApiCreateTests(Base):
         self.assertEqual(resp.status_code, 201, resp.content)
         self.assertEqual(Student.objects.get(pk=resp.json()['id']).school_id, self.b.pk)
 
-    def test_superuser_must_name_a_school(self):
+    def test_superuser_cannot_create_students(self):
         root = User.objects.create_superuser('root', password='x')
-        self.assertEqual(self.post(root).status_code, 400)
-        resp = self.post(root, target_school=self.b.pk)
-        self.assertEqual(resp.status_code, 201, resp.content)
-        self.assertEqual(Student.objects.get(pk=resp.json()['id']).school_id, self.b.pk)
+        self.assertEqual(self.post(root, target_school=self.b.pk).status_code, 403)   # Slice 0: platform account
+        self.assertFalse(Student.objects.filter(school=self.b).exists())
 
     def test_garbage_targets_are_validation_errors_not_server_errors(self):
         user = self.admin('two', self.a, self.b)

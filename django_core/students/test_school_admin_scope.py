@@ -88,14 +88,12 @@ class EmptySchoolSetTests(Base):
 
 
 class SuperuserBranchTests(Base):
-    """D2: until S8 a superuser keeps the global read through an EXPLICIT branch (``_sees_every_school``). The
-    tests below FAIL if that branch is removed (the helper itself returns the empty set for a superuser)."""
+    """Slice 0: the superuser is the PLATFORM account. It reads no student, grade or attendance, whatever its state."""
 
-    def test_superuser_without_membership_reads_every_school(self):
+    def test_superuser_sees_no_school_data(self):
         root = self.admin('root', superuser=True)
-        self.assertEqual(school_ids_for_admin(root), set())          # why the explicit branch is needed
-        self.assertEqual(self.sees(root), ({'a1', 'a2', 'b1'},) * 3)
-        self.assertEqual({s.full_tier for s in visible_students(root)}, {True})
+        self.assertEqual(self.sees(root), (set(), set(), set()))
+        self.assertFalse(visible_students(root).exists())
 
     def test_an_inactive_superuser_sees_nothing(self):
         root = self.admin('root', superuser=True)
@@ -103,10 +101,15 @@ class SuperuserBranchTests(Base):
         root.refresh_from_db()
         self.assertEqual(self.sees(root), (set(), set(), set()))
 
-    def test_the_branch_is_documented_as_temporary(self):
-        import inspect
-        from . import access
-        self.assertIn('S8', inspect.getsource(access._sees_every_school))
+    def test_the_superuser_is_redirected_to_the_django_admin_and_denied_the_api_data(self):
+        root = self.admin('root', superuser=True)
+        self.client.force_login(root)
+        self.assertEqual(self.client.get('/dashboard/').status_code, 302)
+        self.assertEqual(self.client.get('/dashboard/')['Location'], '/admin/')
+        body = self.client.get('/api/students/').json()
+        self.assertEqual(body['results'] if isinstance(body, dict) else body, [])
+        page = self.client.get('/students/')
+        self.assertTrue(page.status_code == 403 or not any(n in page.content.decode() for n in ('a1', 'a2', 'b1')))
 
 
 class StaleUserTests(Base):
@@ -114,12 +117,12 @@ class StaleUserTests(Base):
     held across a change in the database keeps the flags it was loaded with unless it is refreshed."""
 
     def test_a_stale_object_keeps_its_old_flags_until_refreshed(self):
-        root = self.admin('root', superuser=True)
-        stale = User.objects.get(pk=root.pk)
-        User.objects.filter(pk=root.pk).update(is_superuser=False)
-        self.assertEqual(self.sees(stale)[0], {'a1', 'a2', 'b1'})                 # documented: stale object
+        user = self.admin('one', self.a)
+        stale = User.objects.get(pk=user.pk)
+        User.objects.filter(pk=user.pk).update(is_active=False)
+        self.assertEqual(self.sees(stale)[0], {'a1', 'a2'})                       # documented: stale object
         stale.refresh_from_db(fields=['is_active', 'is_superuser'])
-        self.assertEqual(self.sees(stale), (set(), set(), set()))                 # refreshed: no membership, no read
+        self.assertEqual(self.sees(stale), (set(), set(), set()))                 # refreshed: nothing
 
     def test_a_stale_object_of_a_deactivated_admin_is_refused_once_refreshed(self):
         user = self.admin('one', self.a)
@@ -135,14 +138,6 @@ class StaleUserTests(Base):
         self.assertEqual(self.client.get('/api/students/').status_code, 200)
         User.objects.filter(pk=user.pk).update(is_active=False)
         self.assertIn(self.client.get('/api/students/').status_code, (401, 403))   # deactivated: refused at once
-        User.objects.filter(pk=user.pk).update(is_active=True)
-        root = self.admin('root', superuser=True)
-        self.client.force_login(root)
-        names = {r['first_name'] for r in self.client.get('/api/students/').json()['results']}
-        self.assertEqual(names, {'a1', 'a2', 'b1'})
-        User.objects.filter(pk=root.pk).update(is_superuser=False)                 # demoted in the database
-        body = self.client.get('/api/students/').json()
-        self.assertEqual(body['results'] if isinstance(body, dict) else body, [])  # next request: nothing
 
 
 class ApiAndDashboardScopeTests(Base):
@@ -178,5 +173,6 @@ class DashboardAggregateScopeTests(Base):
         self.assertEqual(self.counts(self.admin('none')), (0, 0, 0, 0))
         self.assertEqual(self.counts(self.admin('off', self.a, active=False)), (0, 0, 0, 0))
 
-    def test_the_superuser_branch_still_sees_every_school(self):
-        self.assertEqual(self.counts(self.admin('root', superuser=True)), (3, 3, 3, 15))
+    def test_the_superuser_gets_no_aggregates_and_is_sent_to_the_django_admin(self):
+        self.client.force_login(self.admin('root', superuser=True))
+        self.assertEqual(self.client.get('/dashboard/')['Location'], '/admin/')

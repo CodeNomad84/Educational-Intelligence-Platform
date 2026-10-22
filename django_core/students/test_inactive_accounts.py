@@ -17,7 +17,7 @@ from students.models import Attendance, Grade, Student
 from students.views import StudentViewSet
 
 User = get_user_model()
-ROLES = ('Parent', 'GradeLead', 'Teacher', 'SchoolAdmin', 'superuser')
+ROLES = ('Parent', 'GradeLead', 'Teacher', 'SchoolAdmin')   # the platform superuser is covered by its own test
 
 
 def make_user(username, role, active):
@@ -81,6 +81,12 @@ class InactiveAccountTests(TestCase):
         self.assertIsNone(access._full_tier_q(inactive, {'Parent'}))
         self.assertIsNotNone(access_legacy._full_tier_q(active, {'Parent'}))
         self.assertIsNone(access_legacy._full_tier_q(inactive, {'Parent'}))
+
+    def test_the_superuser_platform_account_sees_nothing_active_or_not(self):
+        for active in (True, False):
+            root = make_user(f'root-{active}', 'superuser', active)
+            self.assertEqual(access.roles_for(root), set())
+            self.assertEqual(list(access.visible_students(root)), [])
 
     def test_the_service_token_of_an_inactive_account_carries_no_role(self):
         import jwt
