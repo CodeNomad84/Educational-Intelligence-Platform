@@ -123,6 +123,11 @@ class ImportStoreScopeTests(TestCase):
             else:
                 self.assertEqual(args[0], 'school_id', name)
         self.assertEqual(set(import_store.CROSS_SCHOOL_BY_NECESSITY) - set(functions), set())
+        # review F6: the exemption list is pinned and every scoped function really filters on the school
+        self.assertEqual(import_store.CROSS_SCHOOL_BY_NECESSITY, ('locked_state', 'write_row'))
+        for name in functions:
+            if name not in import_store.CROSS_SCHOOL_BY_NECESSITY:
+                self.assertIn('school_id=school_id', inspect.getsource(getattr(import_store, name)), name)
 
     def test_views_no_longer_reach_the_student_manager(self):
         self.assertNotIn('Student.objects', inspect.getsource(views))
