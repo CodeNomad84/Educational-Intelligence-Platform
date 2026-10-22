@@ -276,8 +276,17 @@ exit 0
         self.assertNotIn("/repo/", pg_start)  # the database container mounts nothing from the repository
 
     # ---- traps: the temporary build context, INT and TERM
-    def test_a_failed_build_exits_3_and_removes_the_build_context(self):
+    def test_a_failed_build_with_an_existing_local_image_warns_and_continues(self):
+        """Registry unreachable: the existing eip-test-django:local is used (with a warning), the context is removed."""
         self.fake_docker(build=True)
+        result = self.run_script("pg")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("WARNING: building eip-test-django:local failed", result.stderr)
+        self.assertEqual(list(self.tmpdir.iterdir()), [])
+        self.assertTrue([c for c in self.calls() if c.startswith("run")])
+
+    def test_a_failed_build_without_a_local_image_exits_3_and_removes_the_build_context(self):
+        self.fake_docker(build=True, inspect_django=True)
         result = self.run_script("pg")
         self.assertEqual(result.returncode, 3)
         self.assertIn("building", result.stderr)

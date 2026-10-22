@@ -9,7 +9,9 @@ the 4c switch) and prints COUNTS only
 the switch, not a regression); a difference that fits none is UNEXPLAINED. Exit code 1 on any unexplained
 difference (owner D-4-6). Nothing here changes access. SchoolAdmin and superuser accounts are NOT compared here (the legacy
 rule gave them everything, which S3 changed on purpose); they are counted as ``school_admin_accounts_not_compared`` and
-checked by ``--multi-school``.
+checked by ``--multi-school``. A SchoolAdmin/superuser who ALSO holds GradeLead, Teacher or Parent cannot be compared (the legacy
+rule has no admin-free view of such an account), so a non-zero ``school_admin_accounts_not_compared`` makes the run FAIL (exit 1)
+until the owner decides how those accounts are verified (S3 follow-up M2).
 
 Without `--multi-school` the output ends with "multi-school checks: NOT RUN". The multi-school gate (changes/0010, S3) is
 a separate opt-in run: it requires THIS command and `check_access_switch_ready` to be run WITH `--multi-school` and to
@@ -168,8 +170,14 @@ class Command(BaseCommand):
                     self.stdout.write(f'{key}: {value}')
             self.stdout.write('multi-school checks: NOT RUN')
             self.stdout.write('multi-school passed: false')
+        problems = []
         if report['unexplained']:
-            raise CommandError(f"{report['unexplained']} unexplained difference(s).")
+            problems.append(f"{report['unexplained']} unexplained difference(s)")
+        if admin_accounts_skipped:
+            problems.append(f"{admin_accounts_skipped} account(s) hold SchoolAdmin/superuser together with another role and "
+                            "cannot be compared with the legacy rule")
+        if problems:
+            raise CommandError('; '.join(problems) + '.')
 
     def _multi_school(self, opts):
         from schools.multischool_checks import (

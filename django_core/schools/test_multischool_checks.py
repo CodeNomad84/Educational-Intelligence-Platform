@@ -9,6 +9,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.core.management import call_command
 from django.core.management.base import CommandError
+from django.db import transaction
 from django.test import TestCase
 
 from students.models import Attendance, Enrollment, Grade, Student
@@ -382,17 +383,60 @@ class SchoolAdminParityTests(Base):
             pass
         return json.loads(out.getvalue())
 
-    def test_another_role_skips_only_the_leak_check(self):
-        """An admin who is also a Teacher legitimately sees more; the lockout check still runs for them."""
-        from students import access
+    def dual_role_state(self, group):
+        """School A with an admin who also holds ``group`` (a real grant inside A), and school B with its own rows."""
+        from .models import GradeLeadAssignment, TeacherAssignment
+        other = School.objects.create(name="B", code="b")
         user = self.member("both")
-        user.groups.add(Group.objects.get_or_create(name="Teacher")[0])
-        self.data(self.a)
-        report = self.parity()
-        self.assertClean(report)
-        self.assertEqual(report["users_with_other_grants_leak_check_skipped"], 1)
+        user.groups.add(Group.objects.get_or_create(name=group)[0])   # the ONLY admin: nothing else can leak
+        mine = self.data(self.a)
+        self.data(other)
+        klass = SchoolClass.objects.create(school=self.a, title="7-A", academic_year="1404-1405", grade=7)
+        if group == "Teacher":
+            TeacherAssignment.objects.create(teacher=user, school_class=klass, subject="math")
+        elif group == "GradeLead":
+            GradeLeadAssignment.objects.create(user=user, school=self.a, grade=7, academic_year="1404-1405")
+        else:
+            mine.parent_user = user
+            mine.save()
+        return user
+
+    def test_a_leaking_admin_branch_fails_for_an_admin_who_is_also_teacher_gradelead_or_parent(self):
+        """M1 mutation: the admin branch returns every row (a non-empty always-true Q: an empty Q() is dropped by OR); the other role's own grant is inside school A only."""
+        from django.db.models import Q
+
+        from students import access
+        for group in ("Teacher", "GradeLead", "Parent"):
+            with self.subTest(group=group):
+                with transaction.atomic():
+                    self.dual_role_state(group)
+                    report = self.parity_allowing_failure()
+                    self.assertClean(report)                    # without the mutation: no leak, no lockout
+                    self.assertEqual(report["users_compared"], 1)
+                    self.assertEqual(report["users_with_other_roles_checked_against_upper_bound"], 1)
+                    with mock.patch.object(access, "_school_admin_q", lambda user, roles: Q(pk__isnull=False)):
+                        report = self.parity_allowing_failure()
+                    self.assertGreater(report["students_leaked"], 0)
+                    self.assertGreater(report["grades_leaked"], 0)
+                    self.assertGreater(report["attendances_leaked"], 0)
+                    self.assertEqual(report["verdict"], "FAIL")
+                    transaction.set_rollback(True)
+
+    def test_a_dual_role_admin_still_gets_the_lockout_check(self):
+        from students import access
+        self.dual_role_state("Teacher")
         with mock.patch.object(access, "visible_students", lambda u: Student.objects.none()):
             self.assertGreater(self.parity(fail=True)["students_locked_out"], 0)
+
+    def test_an_inactive_superuser_with_another_role_is_leak_checked_too(self):
+        """L2: the same bound applies to an inactive superuser who holds Teacher."""
+        from students import access
+        make_user("oldroot", ADMIN, "Teacher", is_superuser=True, is_active=False)
+        self.member("sa")
+        self.data(self.a)
+        self.assertEqual(self.parity()["superuser_scope_wrong"], 0)
+        with mock.patch.object(access, "_sees_every_school", lambda user, roles: user.is_superuser):
+            self.assertEqual(self.parity(fail=True)["superuser_scope_wrong"], 1)
 
     # --- the temporary superuser branch (until S8) is checked separately -------------------------------------------
     def test_superuser_active_sees_all_and_inactive_sees_none(self):
@@ -428,18 +472,25 @@ class SchoolAdminParityTests(Base):
         dual.groups.add(Group.objects.get_or_create(name=PLATFORM_ADMIN)[0])
         self.assertEqual(self.parity(fail=True)["users_compared"], 2)
 
-    def test_default_mode_does_not_compare_admin_accounts_with_the_legacy_rule(self):
-        """F6: SchoolAdmin / superuser accounts are labelled as not compared (their legacy 'everything' is gone on purpose)."""
+    def test_default_mode_blocks_on_dual_role_admin_accounts_it_cannot_compare(self):
+        """M2: SchoolAdmin/superuser accounts that also hold another role cannot be compared with the legacy rule, so the
+        run fails until the owner decides; a plain Teacher is still compared; a pure SchoolAdmin is not an issue."""
+        make_user("plain", "Teacher")
+        self.member("pure")
+        self.data(self.a)
+        out = StringIO()
+        call_command("compare_access_parity", "--json", stdout=out)       # nothing to block on
+        self.assertEqual(json.loads(out.getvalue())["school_admin_accounts_not_compared"], 0)
         user = self.member("both")
         user.groups.add(Group.objects.get_or_create(name="Teacher")[0])
         make_user("root", "Teacher", is_superuser=True)
-        make_user("plain", "Teacher")
-        self.data(self.a)
         out = StringIO()
-        call_command("compare_access_parity", "--json", stdout=out)
+        with self.assertRaises(CommandError) as err:
+            call_command("compare_access_parity", "--json", stdout=out)
         report = json.loads(out.getvalue())
         self.assertEqual((report["school_admin_accounts_not_compared"], report["users_compared"], report["unexplained"]),
                          (2, 1, 0))
+        self.assertIn("2 account(s) hold SchoolAdmin/superuser together with another role", str(err.exception))
 
     def test_no_school_admin_while_students_exist_fails(self):
         """S2 review D1."""

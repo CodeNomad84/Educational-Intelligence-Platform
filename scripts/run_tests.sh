@@ -19,6 +19,8 @@
 # running it.
 #   PG_IMAGE      PostgreSQL image, default pgvector/pgvector:pg16; must already exist locally
 #   DJANGO_IMAGE  image to run the tests in. Unset: the script BUILDS eip-test-django:local from django_core/Dockerfile and
+#                 requirements.txt only; if that build fails (e.g. the registry is unreachable) an EXISTING local eip-test-django:local
+#                 is used with a warning, and without one it is a hard failure. The build uses
 #                 requirements.txt only (the source is mounted read-only at run time). Set: that image must exist locally.
 # It creates an INTERNAL private network (no route to the outside: the test containers have no internet access) and a
 # throw-away PostgreSQL container (tmpfs data, name suffix from the process id and the time), generates a random
@@ -91,7 +93,12 @@ run_pg() {
     echo ">> building $IMAGE from django_core/Dockerfile and requirements.txt"
     CTX="$(mktemp -d)"
     cp "$APP/Dockerfile" "$APP/requirements.txt" "$CTX/"
-    docker build -q -t "$IMAGE" "$CTX" >/dev/null || fail_prereq "building $IMAGE failed"
+    if ! docker build -q -t "$IMAGE" "$CTX" >/dev/null; then
+      # registry unreachable (or any build failure): an image that already exists locally is used, with a warning
+      # (it may be older than requirements.txt); with no local image this is still a hard failure.
+      docker image inspect "$IMAGE" >/dev/null 2>&1 || fail_prereq "building $IMAGE failed and no local $IMAGE exists"
+      echo ">> WARNING: building $IMAGE failed; using the existing local image (it may not match requirements.txt)" >&2
+    fi
     rm -rf -- "$CTX"; CTX=""
   fi
 
