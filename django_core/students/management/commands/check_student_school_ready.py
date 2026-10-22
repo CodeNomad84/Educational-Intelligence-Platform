@@ -32,7 +32,6 @@ def readiness_report():
         'backfill_would_assign': len(assignments),
         'backfill_would_leave_unresolved': unresolved,
         'students_whose_school_differs_from_their_class_school': inconsistent,
-        'school_column_is_nullable': bool(Student._meta.get_field('school').null),
     }
     report['ready'] = report['students_without_school'] == 0 and inconsistent == 0
     return report

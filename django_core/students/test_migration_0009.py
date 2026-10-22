@@ -58,6 +58,7 @@ class MigrationCase(TransactionTestCase):
         self.n = 0
 
     def tearDown(self):
+        self.Student.objects.all().delete()   # S6-2: rows without a school would make students.0015 refuse
         with redirect_stdout(io.StringIO()):  # re-applies 0009 on leftover test data; keep the log quiet
             call_command('migrate', verbosity=0)  # back to the latest schema for the next test
 

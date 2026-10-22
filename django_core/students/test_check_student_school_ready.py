@@ -35,23 +35,6 @@ class CheckStudentSchoolReadyTests(TestCase):
         self.assertEqual((report['ready'], failed, report['students_without_school']), (True, False, 0))
         self.assertEqual(report['students'], 1)
 
-    def test_not_ready_counts_school_less_students_and_exits_nonzero(self):
-        school = School.objects.order_by('pk').first()
-        self.student(1, school)
-        s2 = self.student(2, school)
-        Student.objects.filter(pk=s2.pk).update(school=None)  # S6-2:retire - a legacy NULL row
-        report, failed = run()
-        self.assertEqual((report['ready'], failed, report['students_without_school']), (False, True, 1))
-        self.assertEqual(report['backfill_would_assign'], 1)        # exactly one School: the backfill rule resolves it
-        self.assertEqual(report['backfill_would_leave_unresolved'], 0)
-
-    def test_with_several_schools_the_report_says_what_stays_unresolved(self):
-        School.objects.create(name='B', code='b')
-        s = self.student(1, School.objects.order_by('pk').first())
-        Student.objects.filter(pk=s.pk).update(school=None)
-        report, _failed = run()
-        self.assertEqual((report['schools'], report['backfill_would_assign'], report['backfill_would_leave_unresolved']),
-                         (2, 0, 1))
 
     def test_a_student_whose_school_differs_from_its_class_school_is_not_ready(self):
         a = School.objects.order_by('pk').first()
@@ -65,8 +48,7 @@ class CheckStudentSchoolReadyTests(TestCase):
 
     def test_the_report_has_counts_only_and_the_command_writes_nothing(self):
         school = School.objects.order_by('pk').first()
-        s = self.student(1, school)
-        Student.objects.filter(pk=s.pk).update(school=None)
+        self.student(1, school)
         before = list(Student.objects.order_by('pk').values())
         with CaptureQueriesContext(connection) as ctx:
             report, _failed = run()

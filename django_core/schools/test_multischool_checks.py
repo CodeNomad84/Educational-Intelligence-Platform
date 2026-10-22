@@ -34,13 +34,11 @@ class Base(TestCase):
         self.year(self.a)  # a school with students needs a current year for the existing gate
         self.n = 0
 
-    def student(self, school=None, **extra):
+    def student(self, school, **extra):
         self.n += 1
-        student = Student.objects.create(
+        return Student.objects.create(
             first_name="S", last_name=str(self.n), national_id=f"40000000{self.n:02d}", grade=7, phone_number="1",
-            school=self.a, **extra)
-        Student.objects.filter(pk=student.pk).update(school=school)  # school=None: a legacy NULL row (S6-2:retire the NULL case)
-        return Student.objects.get(pk=student.pk)
+            school=school, **extra)
 
     def year(self, school, code="1404-1405", current=True):
         year, _ = AcademicYear.objects.get_or_create(
@@ -82,12 +80,11 @@ class ReadinessTests(Base):
 
     def test_default_output_is_unchanged_without_the_flag(self):
         make_user("sa", ADMIN)  # a SchoolAdmin without membership
-        self.student(None)  # a student without school
         report = self.ready()
         for key in ("school_admins_without_membership", "students_without_school", "school_inconsistent_rows",
                     "active_memberships_of_platform_admin_users", "memberships_invalid", "info_schools_count"):
             self.assertNotIn(key, report)
-        self.assertEqual(report["info_students_without_school"], 1)  # the existing diagnostic
+        self.assertEqual(report.get("info_students_without_school", 0), 0)  # the existing diagnostic (always 0 since S6)
 
     def test_school_admin_without_membership_is_a_blocker(self):
         make_user("sa", ADMIN)
@@ -112,11 +109,6 @@ class ReadinessTests(Base):
         user = self.member("sa")
         SchoolMembership.objects.filter(user=user).update(is_active=False)
         self.assertEqual(self.ready("--multi-school", fail=True)["school_admins_without_membership"], 1)
-
-    def test_students_without_school_is_a_blocker_only_with_the_flag(self):
-        self.student(None)
-        self.assertEqual(self.ready("--multi-school", fail=True)["students_without_school"], 1)
-        self.assertEqual(self.ready(fail=False)["verdict"], "READY")  # unchanged default gate
 
     def test_students_without_school_zero_case(self):
         self.member("sa")
@@ -244,7 +236,7 @@ class ReadinessTests(Base):
         self.member("sa2")
         make_user("root", ADMIN, is_superuser=True)  # info only
         self.assertEqual(self.ready("--multi-school")["verdict"], "READY")
-        self.student(None)  # blocker
+        make_user("noone", ADMIN)  # blocker: a SchoolAdmin without membership
         self.assertEqual(self.ready("--multi-school", fail=True)["verdict"], "NOT READY")
 
 
@@ -278,13 +270,6 @@ class SchoolAdminParityTests(Base):
         report = self.parity(fail=True)
         self.assertEqual((report["students_lost"], report["grades_lost"], report["attendances_lost"]), (1, 1, 1))
         self.assertEqual(report["explained_by_no_valid_membership"], 1)
-
-    def test_student_without_school_is_lost_and_explained(self):
-        self.member("sa")
-        self.data(None)
-        report = self.parity(fail=True)
-        self.assertEqual(report["students_lost"], 1)
-        self.assertEqual(report["explained_by_student_without_school"], 1)
 
     def test_other_school_rows_are_lost_for_a_single_school_member(self):
         other = School.objects.create(name="B", code="b")
@@ -410,13 +395,6 @@ class SchoolsWithoutAdminCoverTests(Base):
         School.objects.create(name="B", code="b")
         self.assertEqual(self.ready()["schools_with_students_but_no_school_admin"], 0)
 
-    def test_students_without_a_school_are_not_counted_here(self):
-        self.member("admin_a", self.a)
-        self.student(None)
-        report = self.ready()
-        self.assertEqual(report["schools_with_students_but_no_school_admin"], 0)
-        self.assertEqual(report["students_without_school"], 1)
-
     def test_only_a_valid_admin_covers_a_school(self):
         self.two_schools()
         for name, kwargs in (("off", {"is_active": False}), ("root", {"is_superuser": True})):
@@ -507,7 +485,6 @@ class ParityCoverageTests(Base):
         self.student(self.a)
         self.assertEqual(set(school_admin_parity()), declared)
         make_user("noone", ADMIN)  # admin without membership: the explained_by_* branches
-        self.student(None)
         self.assertEqual(set(school_admin_parity()), declared)
 
     def test_a_declared_counter_that_is_no_longer_reported_fails_the_gate_closed(self):
@@ -652,7 +629,6 @@ class ReadinessCoverageTests(Base):
         self.clean()
         self.assertEqual(set(readiness_counts()), declared)
         make_user("noone", ADMIN)
-        self.student(None)
         self.assertEqual(set(readiness_counts()), declared)
 
     def test_clean_state_passes_and_reports_no_unclassified_or_missing_counters(self):

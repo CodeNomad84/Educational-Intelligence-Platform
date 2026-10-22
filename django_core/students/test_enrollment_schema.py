@@ -149,12 +149,6 @@ class CheckEnrollmentBackfillTests(Base):
         self.assertEqual(r['grades']['already_linked'], 1)
         self.assertEqual(r['grades']['would_link'], 1)
 
-    def test_student_without_school_is_never_guessed(self):
-        s = self.student(None)
-        Student.objects.filter(pk=s.pk).update(school=None)  # S6-2:retire - a NULL school cannot exist after S6-2
-        Grade.objects.create(student=s, subject="math", exam_type="quiz", score=10, date=date(2026, 1, 1))
-        self.assertEqual(self.report()['grades']['student_without_school_unlinked'], 1)
-
     def test_empty_database_and_text_output(self):
         Student.objects.all().delete()
         out = StringIO()

@@ -237,27 +237,6 @@ class ActuallyUpdatedTests(Base):
         self.assertEqual([m["id"] for m in data["memberships"]], [ra.pk])
         self.assertEqual(report["would_deactivate"], 1)
 
-    def test_student_batch_excludes_a_row_that_got_a_school_after_planning(self):
-        s1 = Student.objects.create(first_name="S", last_name="1", national_id="5100000001", grade=7, phone_number="1", school=self.school)
-        s2 = Student.objects.create(first_name="S", last_name="2", national_id="5100000002", grade=7, phone_number="1", school=self.school)
-        Student.objects.update(school=None)  # S6-2:retire (legacy NULL row)
-        real_ensure_new = batch_log.ensure_new
-
-        def school_s2_then_check(path):
-            Student.objects.filter(pk=s2.pk).update(school=self.school)
-            return real_ensure_new(path)
-
-        with mock.patch.object(batch_log, "ensure_new", school_s2_then_check):
-            report = self.run_json(BACKFILL_S, "--apply", "--batch-file", self.path())
-        with open(self.path(), encoding="utf-8") as handle:
-            data = json.load(handle)
-        self.assertEqual([a["student_id"] for a in data["assignments"]], [s1.pk])
-        self.assertEqual((report["planned"], report["writes"]), (2, "set 1; batch file written"))
-        # reverting must not null s2: it was never written by this run
-        self.run_cmd(BACKFILL_S, "--revert-batch", self.path())
-        s2.refresh_from_db()
-        self.assertEqual(s2.school_id, self.school.pk)
-
     def test_membership_backfill_refuses_when_the_database_returns_no_ids(self):
         make_user("sa", ADMIN)
         with mock.patch.object(SchoolMembership.objects, "bulk_create",
@@ -483,14 +462,12 @@ class RowLockTests(Base):
 
         return calls, mock.patch.object(QuerySet, "select_for_update", wrapper)
 
-    def test_every_lock_in_the_three_commands_names_self_only(self):
+    def test_every_lock_in_the_membership_commands_names_self_only(self):
         calls, patch = self.record()
         user = make_user("sa", ADMIN)
         orphan = make_user("orphan", ADMIN)
         SchoolMembership.objects.create(user=orphan, school=self.school)
         orphan.groups.clear()
-        Student.objects.create(first_name="S", last_name="1", national_id="6100000001", grade=7, phone_number="1", school=self.school)
-        Student.objects.update(school=None)  # S6-2:retire (legacy NULL row)
         with patch:
             self.run_cmd(CHECK, "--deactivate", "--apply", "--batch-file", self.path("a.json"))
             self.run_cmd(CHECK, "--revert-batch", self.path("a.json"))
@@ -499,7 +476,7 @@ class RowLockTests(Base):
             self.run_cmd(BACKFILL_S, "--apply", "--batch-file", self.path("c.json"))
         self.assertTrue(calls)
         self.assertEqual({(model, of) for model, of, _args in calls},
-                         {("SchoolMembership", ("self",)), ("Student", ("self",))})
+                         {("SchoolMembership", ("self",))})   # the Student lock of the backfill: test_migration_0015
         self.assertIsNotNone(user.pk)
 
     def test_locked_rows_come_back_in_primary_key_order(self):
@@ -562,8 +539,6 @@ class LockQuerySqlTests(Base):
         for u in users:
             SchoolMembership.objects.create(user=u, school=self.school)
             u.groups.clear()
-        Student.objects.create(first_name="S", last_name="1", national_id="6300000001", grade=7, phone_number="1", school=self.school)
-        Student.objects.update(school=None)  # S6-2:retire (legacy NULL row)
         with CaptureQueriesContext(connection) as ctx:
             self.run_cmd(CHECK, "--deactivate", "--apply", "--batch-file", self.path("a.json"))
             self.run_cmd(CHECK, "--revert-batch", self.path("a.json"))

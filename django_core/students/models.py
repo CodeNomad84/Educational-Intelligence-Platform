@@ -37,12 +37,10 @@ class Student(models.Model):
 
     # School structure (ADR-0004). ``school_class`` is the source of truth for class membership;
     # ``school`` is derived from it in save() and ``class_name`` is its deprecated, read-only mirror.
-    # Both are nullable: existing rows stay unlinked until the C3 data migration.
+    # ``school`` is NOT NULL since S6 (students.0015); ``school_class`` stays nullable (a student may have no class).
     school = models.ForeignKey(
         'schools.School',
         on_delete=models.PROTECT,
-        null=True,
-        blank=True,
         editable=False,
         related_name='students',
         verbose_name="مدرسه",

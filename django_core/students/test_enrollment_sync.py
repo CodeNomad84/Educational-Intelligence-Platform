@@ -62,10 +62,6 @@ class EnsureTests(Base):
         self.assertEqual((rows[1].ended_on, rows[1].school_class_id), (None, self.c10b.pk))
 
     def test_skips_are_reported_not_guessed_and_not_raised(self):
-        legacy = self.student(None)
-        Student.objects.filter(pk=legacy.pk).update(school=None)  # S6-2:retire - a NULL school cannot exist after S6-2
-        legacy.refresh_from_db()
-        self.assertEqual(ensure_current_enrollment(legacy), 'no_school')
         no_class = self.student(self.c10a)
         Student.objects.filter(pk=no_class.pk).update(school_class=None)
         no_class.refresh_from_db()

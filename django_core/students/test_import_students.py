@@ -616,17 +616,6 @@ class ImportExistingLinkTests(ClassImportCase):
                          [{'row': 2, 'value': '9-A', 'reason': 'no_unique_school'}])
         self.assertEqual(klass.students.count(), 0)
 
-    def test_existing_student_without_a_school_is_not_adopted_and_not_linked(self):
-        # S6 requirement 1 (retires the S2b adoption): only backfill_student_school gives a legacy row a school
-        school = self.one_school()
-        self.klass(school, '9-A')
-        old = self.make_existing(nid(1), grade=9, school=None)   # S6-2:retire - a NULL school cannot exist after S6-2
-        resp = self.post(sheet(line(nid(1), 9, '9-A')))
-        old.refresh_from_db()
-        self.assertEqual((old.school_id, old.school_class_id, old.grade), (None, None, 9))
-        data = resp.json()
-        self.assertEqual((data['created'], data['updated'], data['linked'], len(data['errors'])), (0, 0, 0, 1))
-
     def test_linked_counts_only_new_class_relationships_not_school_assignment(self):
         school = self.one_school()
         self.klass(school, '9-A')
