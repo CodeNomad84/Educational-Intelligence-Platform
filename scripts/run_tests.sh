@@ -20,8 +20,8 @@
 #   PG_IMAGE      PostgreSQL image, default pgvector/pgvector:pg16; must already exist locally
 #   DJANGO_IMAGE  image to run the tests in. Unset: the script BUILDS eip-test-django:local from django_core/Dockerfile and
 #                 requirements.txt only; if that build fails (e.g. the registry is unreachable) an EXISTING local eip-test-django:local
-#                 is used with a warning, and without one it is a hard failure. The build uses
-#                 requirements.txt only (the source is mounted read-only at run time). Set: that image must exist locally.
+#                 is used with a warning, and without one it is a hard failure. The source is mounted read-only at run
+#                 time, so only dependencies can be stale. Set: that image must exist locally.
 # It creates an INTERNAL private network (no route to the outside: the test containers have no internet access) and a
 # throw-away PostgreSQL container (tmpfs data, name suffix from the process id and the time), generates a random
 # password per run (passed to the containers through the environment, never written to disk or to the command line),
