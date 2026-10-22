@@ -20,10 +20,15 @@
 #   PG_IMAGE      PostgreSQL image, default pgvector/pgvector:pg16; must already exist locally
 #   DJANGO_IMAGE  image to run the tests in. Unset: the script BUILDS eip-test-django:local from django_core/Dockerfile and
 #                 requirements.txt only (the source is mounted read-only at run time). Set: that image must exist locally.
-# It creates a private network and a throw-away PostgreSQL container (tmpfs data, random name suffix), generates a random
+# It creates an INTERNAL private network (no route to the outside: the test containers have no internet access) and a
+# throw-away PostgreSQL container (tmpfs data, name suffix from the process id and the time), generates a random
 # password per run (passed to the containers through the environment, never written to disk or to the command line),
-# runs steps 1-3 with config.settings.test_postgres, and removes the container and the network on exit (also on error or
-# Ctrl-C). The real database, data/postgres, .env and docker-compose are never touched.
+# runs steps 1-3 with config.settings.test_postgres, and removes the container, the network and the temporary build
+# context on exit (also on error, Ctrl-C or SIGTERM: INT exits 130, TERM exits 143). The real database, data/postgres, .env
+# and docker-compose are never touched. django_core is mounted read-only, with the local-only files hidden from the
+# container (bind-mounted /dev/null over db.sqlite3, demo_db.sqlite3, data.xlsx, data.ods and every .env*, an empty tmpfs over
+# .venv); only files that exist on the host are overlaid. The image BUILD (the only step that may need the network, for
+# uncached layers) runs before the internal network exists, on Docker's default network.
 #
 # Exit codes: 0 all passed, 1 a check or test failed, 2 usage error, 3 PostgreSQL mode prerequisites missing.
 set -euo pipefail
@@ -35,6 +40,7 @@ MODE="${1:-sqlite}"
 # inside a function (a bash-version-dependent behaviour for "local" variables, which left resources behind).
 PGC=""
 NET=""
+CTX=""
 
 usage() { echo "usage: scripts/run_tests.sh [sqlite|pg|all]" >&2; exit 2; }
 [ "$#" -le 1 ] || usage
@@ -61,6 +67,8 @@ run_sqlite() {
 cleanup_pg() {
   [ -z "${PGC:-}" ] || docker rm -f "$PGC" >/dev/null 2>&1 || true
   [ -z "${NET:-}" ] || docker network rm "$NET" >/dev/null 2>&1 || true
+  if [ -n "${CTX:-}" ] && [ -d "$CTX" ]; then rm -rf -- "$CTX"; fi
+  CTX=""
 }
 
 run_pg() {
@@ -70,15 +78,18 @@ run_pg() {
   docker image inspect "$PG_IMAGE" >/dev/null 2>&1 \
     || fail_prereq "image $PG_IMAGE is not available locally (docker pull $PG_IMAGE); the script never pulls on its own"
   local IMAGE="${DJANGO_IMAGE:-}"
+  trap cleanup_pg EXIT           # armed before anything is created, so the temporary build context is always removed
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
   if [ -n "$IMAGE" ]; then
     docker image inspect "$IMAGE" >/dev/null 2>&1 || fail_prereq "DJANGO_IMAGE $IMAGE does not exist locally"
   else
     IMAGE="eip-test-django:local"
     echo ">> building $IMAGE from django_core/Dockerfile and requirements.txt"
-    local ctx; ctx="$(mktemp -d)"
-    cp "$APP/Dockerfile" "$APP/requirements.txt" "$ctx/"
-    docker build -q -t "$IMAGE" "$ctx" >/dev/null || { rm -rf "$ctx"; fail_prereq "building $IMAGE failed"; }
-    rm -rf "$ctx"
+    CTX="$(mktemp -d)"
+    cp "$APP/Dockerfile" "$APP/requirements.txt" "$CTX/"
+    docker build -q -t "$IMAGE" "$CTX" >/dev/null || fail_prereq "building $IMAGE failed"
+    rm -rf -- "$CTX"; CTX=""
   fi
 
   local suffix; suffix="$$-$(date +%s)"
@@ -86,9 +97,8 @@ run_pg() {
   PGC="eip-test-pg-$suffix"
   local pw; pw="$(head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \n')"
   export POSTGRES_PASSWORD="$pw" TEST_PG_PASSWORD="$pw"   # values reach the containers via the environment only
-  trap cleanup_pg EXIT INT TERM
 
-  docker network create "$NET" >/dev/null
+  docker network create --internal "$NET" >/dev/null
   docker run -d --rm --name "$PGC" --network "$NET" --tmpfs /var/lib/postgresql/data \
     -e POSTGRES_DB=eip_test -e POSTGRES_USER=eip_test -e POSTGRES_PASSWORD "$PG_IMAGE" >/dev/null
   local ready=0 i
@@ -98,10 +108,22 @@ run_pg() {
   done
   [ "$ready" = 1 ] || { echo "PostgreSQL container did not become ready in 60 s" >&2; exit 1; }
 
+  # Local-only files of django_core are HIDDEN from the container (only those that exist on the host are overlaid):
+  # /dev/null bind-mounted over files, an empty tmpfs over .venv.
+  local hide=() f
+  for f in db.sqlite3 demo_db.sqlite3 data.xlsx data.ods; do
+    if [ -e "$APP/$f" ]; then hide+=(-v "/dev/null:/repo/django_core/$f:ro"); fi
+  done
+  for f in "$APP"/.env*; do
+    if [ -e "$f" ]; then hide+=(-v "/dev/null:/repo/django_core/${f##*/}:ro"); fi
+  done
+  if [ -d "$APP/.venv" ]; then hide+=(--tmpfs "/repo/django_core/.venv:ro,size=64k"); fi
+
   dj() {
     # django_core and scripts/ only (read-only), laid out like the repository so that the tooling tests find both;
     # the repository root (.env, data/, ...) is never mounted
-    docker run --rm --network "$NET" -v "$APP:/repo/django_core:ro" -v "$ROOT/scripts:/repo/scripts:ro" -w /repo/django_core \
+    docker run --rm --network "$NET" -v "$APP:/repo/django_core:ro" -v "$ROOT/scripts:/repo/scripts:ro" \
+      ${hide[@]+"${hide[@]}"} -w /repo/django_core -e EIP_TEST_CONTAINER=1 \
       -e DJANGO_SETTINGS_MODULE=config.settings.test_postgres \
       -e TEST_PG_HOST="$PGC" -e TEST_PG_NAME=eip_test -e TEST_PG_USER=eip_test -e TEST_PG_PASSWORD \
       "$IMAGE" python -B manage.py "$@"

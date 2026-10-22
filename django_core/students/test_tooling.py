@@ -5,10 +5,14 @@ import importlib
 import os
 import re
 import shutil
+import signal
+import socket
 import stat
 import subprocess
 import sys
 import tempfile
+import time
+import unittest
 from pathlib import Path
 from unittest import mock
 
@@ -19,6 +23,16 @@ ROOT = Path(__file__).resolve().parents[2]   # the repository root on the host, 
 SCRIPT = ROOT / "scripts" / "run_tests.sh"
 SETTINGS_MODULE = "config.settings.test_postgres"
 TOOLS = ("dirname", "date", "head", "od", "tr", "mktemp", "cp", "rm", "seq", "sleep", "cat", "mkdir")
+# local-only files of django_core that the script hides from the test container (bind-mounted /dev/null / empty tmpfs)
+HIDDEN_FILES = ("db.sqlite3", "demo_db.sqlite3", "data.xlsx", "data.ods")
+APP_DIR = ROOT / "django_core"
+
+
+def hidden_files_present():
+    """The files the script should overlay, computed the same way from what exists on THIS side."""
+    names = [n for n in HIDDEN_FILES if (APP_DIR / n).exists()]
+    names += sorted(p.name for p in APP_DIR.glob(".env*") if p.exists())
+    return names
 
 
 def load_settings(env):
@@ -91,7 +105,8 @@ case "$1 $2" in
      esac ;;
 esac
 if [ "$1" = "exec" ]; then exit 0; fi
-if [ "$1" = "run" ] && [[ " $* " == *" test "* ]]; then exit {1 if fail.get('run_test') else 0}; fi
+if [ "$1" = "build" ]; then {'sleep 30; ' if fail.get('sleep_build') else ''}exit {1 if fail.get('build') else 0}; fi
+if [ "$1" = "run" ] && [[ " $* " == *" test "* ]]; then {'sleep 30; ' if fail.get('sleep_test') else ''}exit {1 if fail.get('run_test') else 0}; fi
 exit 0
 """
         path = self.bin / "docker"
@@ -99,7 +114,9 @@ exit 0
         path.chmod(path.stat().st_mode | stat.S_IEXEC)
 
     def run_script(self, *args, extra_env=None):
-        env = {"PATH": str(self.bin), "HOME": self.tmp.name}
+        self.tmpdir = Path(self.tmp.name) / "tmpdir"
+        self.tmpdir.mkdir(exist_ok=True)
+        env = {"PATH": str(self.bin), "HOME": self.tmp.name, "TMPDIR": str(self.tmpdir)}
         env.update(extra_env or {})
         return subprocess.run(["/bin/bash", str(SCRIPT), *args], env=env, capture_output=True, text=True, timeout=120)
 
@@ -163,7 +180,9 @@ exit 0
         calls = self.calls()
         joined = "\n".join(calls)
         self.assertTrue(any(c.startswith("build -q -t eip-test-django:local") for c in calls), calls)
-        self.assertTrue(any(c.startswith("network create eip-test-net-") for c in calls))
+        self.assertTrue(any(c.startswith("network create --internal eip-test-net-") for c in calls),
+                        "the test network must be --internal (no route to the outside)")
+        self.assertEqual(list(self.tmpdir.iterdir()), [], "the temporary build context must be removed")
         self.assertTrue(any(c.startswith("run -d --rm --name eip-test-pg-") for c in calls))
         self.assertIn("--tmpfs /var/lib/postgresql/data", joined)
         self.assertTrue(any(c.startswith("rm -f eip-test-pg-") for c in calls), "container not removed")
@@ -173,10 +192,11 @@ exit 0
         self.assertEqual(len(steps), 3, steps)
         self.assertTrue(all("config.settings.test_postgres" in c and "/repo/django_core:ro" in c and "/repo/scripts:ro" in c
                             for c in steps))
-        for step in steps:  # exactly two read-only mounts, laid out like the repository; never the repository root
-            self.assertEqual(sorted(re.findall(r":(/repo/[^:\s]+):ro", step)), ["/repo/django_core", "/repo/scripts"], step)
+        expected = sorted(["/repo/django_core", "/repo/scripts"] + [f"/repo/django_core/{n}" for n in hidden_files_present()])
+        for step in steps:  # two read-only source mounts + the /dev/null overlays; never the repository root
+            self.assertEqual(sorted(re.findall(r":(/repo/[^:\s]+):ro(?:\s|$)", step)), expected, step)
         self.assertTrue(any("manage.py test students dashboard schools" in c for c in steps))
-        self.assertFalse(any("demo" in c for c in steps))
+        self.assertFalse(any("demo_intel" in c or "config.settings.demo" in c for c in steps))
         # the password reaches docker through the environment: only the variable NAME is on the command line
         self.assertNotRegex(joined, r"[0-9a-f]{32}")
         self.assertIn("-e POSTGRES_PASSWORD ", joined + " ")
@@ -208,7 +228,7 @@ exit 0
         self.assertRegex(text, r'(?m)^PGC=""$')
         self.assertRegex(text, r'(?m)^NET=""$')
         self.assertRegex(text, r"(?m)^cleanup_pg\(\) \{")
-        self.assertIn("trap cleanup_pg EXIT INT TERM", text)
+        self.assertIn("trap cleanup_pg EXIT", text)
 
     def test_each_run_uses_fresh_names(self):
         self.fake_docker()
@@ -220,3 +240,119 @@ exit 0
         self.assertEqual((first.returncode, second.returncode), (0, 0))
         self.assertTrue(names_one and names_two)
         self.assertFalse(names_one & names_two)
+
+    # ---- isolation: internal network, hidden local files, build outside the internal network
+    def test_the_network_is_internal_and_the_image_build_runs_before_it_exists(self):
+        self.fake_docker()
+        self.assertEqual(self.run_script("pg").returncode, 0)
+        calls = self.calls()
+        build = next(i for i, c in enumerate(calls) if c.startswith("build "))
+        network = next(i for i, c in enumerate(calls) if c.startswith("network create"))
+        self.assertLess(build, network)
+        self.assertNotIn("--network", calls[build])
+        self.assertIn("--internal", calls[network])
+
+    def test_local_only_files_are_hidden_from_the_test_container(self):
+        self.fake_docker()
+        self.assertEqual(self.run_script("pg").returncode, 0)
+        steps = [c for c in self.calls() if "python -B manage.py" in c]
+        names = hidden_files_present()
+        for step in steps:
+            for name in names:
+                self.assertIn(f"-v /dev/null:/repo/django_core/{name}:ro", step)
+            if (APP_DIR / ".venv").is_dir():
+                self.assertIn("--tmpfs /repo/django_core/.venv:ro,size=64k", step)
+            # only existing files are overlaid (a missing mount point cannot be created in a read-only mount)
+            for name in HIDDEN_FILES:
+                if not (APP_DIR / name).exists():
+                    self.assertNotIn(f"/repo/django_core/{name}", step)
+            self.assertIn("-e EIP_TEST_CONTAINER=1", step)
+        pg_start = next(c for c in self.calls() if c.startswith("run -d "))
+        self.assertNotIn("EIP_TEST_CONTAINER", pg_start)
+        self.assertNotIn("/repo/", pg_start)  # the database container mounts nothing from the repository
+
+    # ---- traps: the temporary build context, INT and TERM
+    def test_a_failed_build_exits_3_and_removes_the_build_context(self):
+        self.fake_docker(build=True)
+        result = self.run_script("pg")
+        self.assertEqual(result.returncode, 3)
+        self.assertIn("building", result.stderr)
+        self.assertEqual(list(self.tmpdir.iterdir()), [])
+        self.assertFalse([c for c in self.calls() if c.startswith(("network", "run"))])
+
+    def run_and_signal(self, sig, wait_for):
+        proc = subprocess.Popen(
+            ["/bin/bash", str(SCRIPT), "pg"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+            env={"PATH": str(self.bin), "HOME": self.tmp.name, "TMPDIR": str(self.tmpdir)}, start_new_session=True)
+        deadline = time.time() + 30
+        while time.time() < deadline and not any(c.startswith(wait_for) or wait_for in c for c in self.calls()):
+            time.sleep(0.05)
+        self.assertTrue(any(wait_for in c for c in self.calls()), "the awaited docker call never happened")
+        time.sleep(0.2)
+        os.killpg(proc.pid, sig)
+        try:
+            proc.communicate(timeout=30)
+        finally:
+            if proc.poll() is None:
+                os.killpg(proc.pid, signal.SIGKILL)
+        return proc.returncode
+
+    def test_sigint_during_the_build_exits_130_and_removes_the_build_context(self):
+        self.tmpdir = Path(self.tmp.name) / "tmpdir"
+        self.tmpdir.mkdir(exist_ok=True)
+        self.fake_docker(sleep_build=True)
+        self.assertEqual(self.run_and_signal(signal.SIGINT, "build "), 130)
+        self.assertEqual(list(self.tmpdir.iterdir()), [])
+        self.assertFalse([c for c in self.calls() if c.startswith("network")])
+
+    def test_sigterm_during_the_test_run_exits_143_and_removes_container_and_network(self):
+        self.tmpdir = Path(self.tmp.name) / "tmpdir"
+        self.tmpdir.mkdir(exist_ok=True)
+        self.fake_docker(sleep_test=True)
+        self.assertEqual(self.run_and_signal(signal.SIGTERM, "manage.py test"), 143)
+        calls = self.calls()
+        self.assertTrue(any(c.startswith("rm -f eip-test-pg-") for c in calls))
+        self.assertTrue(any(c.startswith("network rm eip-test-net-") for c in calls))
+        self.assertEqual(list(self.tmpdir.iterdir()), [])
+
+    def test_the_cleanup_removes_the_build_context_variable_only_when_it_is_a_directory(self):
+        text = SCRIPT.read_text(encoding="utf-8")
+        self.assertRegex(text, r'(?m)^CTX=""$')
+        self.assertIn('if [ -n "${CTX:-}" ] && [ -d "$CTX" ]; then rm -rf -- "$CTX"; fi', text)
+        self.assertIn("trap cleanup_pg EXIT", text)
+        self.assertIn("trap 'exit 130' INT", text)
+        self.assertIn("trap 'exit 143' TERM", text)
+
+
+@unittest.skipUnless(os.environ.get("EIP_TEST_CONTAINER") == "1", "runs only inside the PostgreSQL test container")
+class InsideTheTestContainerTests(SimpleTestCase):
+    """Executed by `scripts/run_tests.sh pg` INSIDE the container: the isolation really holds."""
+
+    def test_there_is_no_route_to_the_outside(self):
+        for host, port in (("1.1.1.1", 53), ("8.8.8.8", 53)):
+            with self.subTest(host=host), self.assertRaises(OSError):
+                socket.create_connection((host, port), timeout=3).close()
+        with self.assertRaises(OSError):
+            socket.getaddrinfo("example.org", 80)
+
+    def test_local_only_files_are_not_visible(self):
+        app = Path("/repo/django_core")
+        for name in HIDDEN_FILES:
+            path = app / name
+            if path.exists():
+                self.assertEqual(path.stat().st_size, 0, f"{name} is visible")
+                self.assertEqual(path.read_bytes(), b"")
+        for path in app.glob(".env*"):
+            self.assertEqual(path.stat().st_size, 0, f"{path.name} is visible")
+        venv = app / ".venv"
+        if venv.exists():
+            self.assertEqual(list(venv.iterdir()), [], ".venv is visible")
+
+    def test_the_repository_root_is_not_mounted(self):
+        for name in (".env", ".env.fastapi", "data", "docs", ".git"):
+            self.assertFalse(Path("/repo", name).exists(), name)
+        self.assertEqual(sorted(p.name for p in Path("/repo").iterdir()), ["django_core", "scripts"])
+
+    def test_the_source_is_read_only(self):
+        with self.assertRaises(OSError):
+            (Path("/repo/django_core") / "_write_probe").write_text("x")
