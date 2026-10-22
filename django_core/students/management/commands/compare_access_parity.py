@@ -7,12 +7,17 @@ legacy rule (``access_legacy``) and with the production rule (``access.visible_s
 the 4c switch) and prints COUNTS only
 (no names, no ids). Every difference is classified by a documented explanation (each one is a bug fixed by
 the switch, not a regression); a difference that fits none is UNEXPLAINED. Exit code 1 on any unexplained
-difference (owner D-4-6). Nothing here changes access.
+difference (owner D-4-6). Nothing here changes access. SchoolAdmin and superuser accounts are NOT compared here (the legacy
+rule gave them everything, which S3 changed on purpose); they are counted as ``school_admin_accounts_not_compared`` and
+checked by ``--multi-school``.
 
 Without `--multi-school` the output ends with "multi-school checks: NOT RUN". The multi-school gate (changes/0010, S3) is
 a separate opt-in run: it requires THIS command and `check_access_switch_ready` to be run WITH `--multi-school` and to
-pass. With the flag the enrollment comparison is skipped and each SchoolAdmin's scope is compared instead; it also fails
-when students exist but no SchoolAdmin does (D1), when a school has students but no valid SchoolAdmin covers it (E1)
+pass. With the flag the enrollment comparison is skipped and a STRICT scope check runs (owner decision F6): for each
+SchoolAdmin an independent expectation from the memberships (a separate query, not arithmetic on ``visible_*``) is compared with
+the real ``visible_students/grades/attendances``: a row outside the member schools = FAIL (leak), a row inside them that is
+missing = FAIL (lockout), rows of other schools hidden = INFO only; the temporary superuser branch (until S8) is checked
+separately. It also fails when students exist but no SchoolAdmin does (D1), when a school has students but no valid SchoolAdmin covers it (E1)
 and while active memberships of non-qualifying users exist (D3).
 Machine check: with `--json` BOTH gate outputs (this one and `check_access_switch_ready`) must contain
 `"multi_school_checks_run": true` AND `"multi_school_passed": true` and exit 0; with `--multi-school` the output also
@@ -91,14 +96,17 @@ class Command(BaseCommand):
         parser.add_argument('--detail', action='store_true', help='also print a counts-only breakdown of unexplained differences')
         parser.add_argument(
             '--multi-school', action='store_true',
-            help='instead of the enrollment comparison, compare what each SchoolAdmin sees today (everything) with '
-                 'the membership scope of changes/0010 S3 (counts only; exit 1 if any SchoolAdmin would lose rows)')
+            help='instead of the enrollment comparison, check strictly that each SchoolAdmin sees exactly the rows of '
+                 'the schools of their memberships (counts only; exit 1 on any leak or lockout)')
 
     def handle(self, *args, **opts):
         if opts['multi_school']:
             return self._multi_school(opts)
         User = get_user_model()
-        users = list(User.objects.filter(groups__name__in=[GRADE_LEAD, TEACHER, PARENT]).distinct())
+        staff = User.objects.filter(groups__name__in=[GRADE_LEAD, TEACHER, PARENT]).distinct()
+        # SchoolAdmin / superuser accounts are not comparable to the legacy "everything" rule any more (S3): see --multi-school
+        users = list(staff.exclude(groups__name=access.ADMIN).exclude(is_superuser=True))
+        admin_accounts_skipped = staff.count() - len(users)
         current_year = dict(AcademicYear.objects.filter(is_current=True).values_list('school_id', 'code'))
         enrollment = {}
         for e in Enrollment.objects.filter(ended_on__isnull=True, status__in=CURRENT_STATUSES,
@@ -144,6 +152,7 @@ class Command(BaseCommand):
             'users_with_differences': users_with_diff,
             'explained_by': {k: explained[k] for k in EXPLANATIONS if explained[k]},
             'unexplained': explained['UNEXPLAINED'],
+            'school_admin_accounts_not_compared': admin_accounts_skipped,
             'writes': 'none',
         }
         if opts['detail']:

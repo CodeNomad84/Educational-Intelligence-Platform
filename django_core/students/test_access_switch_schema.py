@@ -53,6 +53,12 @@ class AccessSwitchCountsSchemaTests(TestCase):
         self.assertEqual(sorted(keys - declared), [])           # a new counter must be classified
         self.assertEqual(sorted(declared - keys), [])           # a declared counter must still be produced
 
+    def test_the_report_has_no_prefilled_defaults_and_one_literal_assignment_per_declared_key(self):
+        """S3-1 F1: like ``readiness_counts``, each declared key is written by exactly one ``report['<key>'] = ...``."""
+        from schools import test_multischool_checks as source_reader
+        source_reader.ProducerSourceTests().check(
+            command.access_switch_counts, 'report', command.PROBLEM_KEYS, command.INFO_KEYS)
+
     def test_the_tuples_are_disjoint_and_the_blocker_name_is_the_problem_tuple(self):
         self.assertEqual(set(command.PROBLEM_KEYS) & set(command.INFO_KEYS), set())
         self.assertIs(command.BLOCKERS, command.PROBLEM_KEYS)

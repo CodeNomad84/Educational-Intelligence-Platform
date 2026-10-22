@@ -68,7 +68,7 @@ def access_switch_counts():
         if e['school_class_id']:
             class_enrolled[e['school_class_id']] += 1
 
-    r = Counter({key: 0 for key in PROBLEM_KEYS + INFO_KEYS})   # R-h: every declared counter is always produced
+    r = Counter()   # accumulator only; the REPORT below has no pre-filled defaults (S3-1 F1, like readiness_counts)
     schools_with_students = set()
     class_mirror = Counter(Student.objects.filter(school_class__isnull=False).values_list('school_class_id', flat=True))
     for pk, school_id, class_id, grade in Student.objects.values_list('pk', 'school_id', 'school_class_id', 'grade'):
@@ -122,7 +122,23 @@ def access_switch_counts():
         r['teacher_assignments_active'] += 1
         if class_mirror[class_id] > 0 and class_enrolled[class_id] == 0:  # students linked, none enrolled
             r['teacher_assignments_class_without_current_enrollments'] += 1
-    return dict(r)
+    report = {}
+    report['schools_with_students_but_no_current_year'] = r['schools_with_students_but_no_current_year']
+    report['students_missing_current_enrollment'] = r['students_missing_current_enrollment']
+    report['students_class_grade_conflict_would_vanish'] = r['students_class_grade_conflict_would_vanish']
+    report['enrollment_mirror_disagreements'] = r['enrollment_mirror_disagreements']
+    report['grade_lead_assignments_with_unresolved_year'] = r['grade_lead_assignments_with_unresolved_year']
+    report['grade_lead_assignments_year_has_no_academic_year_row'] = r['grade_lead_assignments_year_has_no_academic_year_row']
+    report['grade_lead_assignments_year_not_current'] = r['grade_lead_assignments_year_not_current']
+    report['teacher_assignments_class_without_current_enrollments'] = r['teacher_assignments_class_without_current_enrollments']
+    report['students'] = r['students']
+    report['info_students_without_class_invisible_to_staff'] = r['info_students_without_class_invisible_to_staff']
+    report['info_students_with_stale_or_unresolved_class_year'] = r['info_students_with_stale_or_unresolved_class_year']
+    report['info_continuing_students_without_current_enrollment'] = r['info_continuing_students_without_current_enrollment']
+    report['grade_lead_assignments_active'] = r['grade_lead_assignments_active']
+    report['info_teacher_assignments_with_blank_or_invalid_subject_grant_nothing'] = r['info_teacher_assignments_with_blank_or_invalid_subject_grant_nothing']
+    report['teacher_assignments_active'] = r['teacher_assignments_active']
+    return report
 
 
 class Command(BaseCommand):

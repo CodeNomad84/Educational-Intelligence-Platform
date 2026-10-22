@@ -1,18 +1,20 @@
 """Pre-flight counts for the multi-school gate (changes/0010 S2; used by S3). Read-only, counts only.
 
 ``readiness_counts`` adds the multi-school BLOCKERS and diagnostics to ``check_access_switch_ready --multi-school``;
-``school_admin_parity`` is the SchoolAdmin section of ``compare_access_parity --multi-school``: what each SchoolAdmin
-sees TODAY (everything) versus what the membership scope of S3 would show. Neither changes access.
+``school_admin_parity`` is the SchoolAdmin section of ``compare_access_parity --multi-school``: a STRICT check (owner
+decision F6, S3 gate) of what each SchoolAdmin really sees (``visible_students/grades/attendances``) against an
+independently computed expectation from the memberships. Neither changes access.
 """
 from collections import Counter
 
 from django.contrib.auth import get_user_model
 
-from students.access import ADMIN, school_ids_for_admin
+from students import access
+from students.access import ADMIN, GRADE_LEAD, PARENT, PLATFORM_ADMIN, TEACHER, school_ids_for_admin
 from students.models import Attendance, Enrollment, Grade, Student
 
 from .membership_audit import classify_memberships
-from .models import School
+from .models import School, SchoolMembership
 
 # DECLARED SCHEMA of ``readiness_counts()`` (S2 review K1): every key it returns is either a PROBLEM (a blocker of
 # ``check_access_switch_ready --multi-school``) or INFORMATIONAL, and it always returns ALL of them (zero-initialised).
@@ -98,24 +100,35 @@ def missing_readiness_keys(result):
 # from PARITY_PROBLEM_KEYS and treats a counter that is in neither tuple as a problem (fail closed); a test reads the
 # source of ``school_admin_parity`` and fails when a counter is added without being classified here (S2 review J1).
 PARITY_PROBLEM_KEYS = (
-    'students_lost',
-    'grades_lost',
-    'attendances_lost',
+    'students_leaked',            # a SchoolAdmin sees a student outside the schools of their valid memberships
+    'grades_leaked',
+    'attendances_leaked',
+    'students_locked_out',        # a SchoolAdmin does not see a student inside those schools
+    'grades_locked_out',
+    'attendances_locked_out',
+    'school_admins_without_membership',   # an active SchoolAdmin whose valid memberships give no school at all
+    'superuser_scope_wrong',      # the temporary superuser branch (until S8): an active one sees all, an inactive one none
     'no_school_admin_while_students_exist',
     'schools_with_students_but_no_school_admin',
     'memberships_invalid',
 )
 PARITY_INFO_KEYS = (
     'users_compared',
-    'users_with_differences',
-    'explained_by_student_without_school',
-    'explained_by_student_in_school_without_membership',
-    'explained_by_no_valid_membership',
+    'superusers_compared',
+    'users_with_other_grants_leak_check_skipped',   # the account also holds another role: its extra rows are legitimate
+    'info_other_school_students_hidden',            # rows of schools the admin does not administer, correctly hidden
+    'info_other_school_grades_hidden',
+    'info_other_school_attendances_hidden',
 )
 PARITY_PROBLEM_TEXT = {
-    'students_lost': 'student rows would be hidden from a SchoolAdmin by the membership scope',
-    'grades_lost': 'grade rows would be hidden from a SchoolAdmin by the membership scope',
-    'attendances_lost': 'attendance rows would be hidden from a SchoolAdmin by the membership scope',
+    'students_leaked': 'student row(s) visible to a SchoolAdmin outside the schools of their memberships (LEAK)',
+    'grades_leaked': 'grade row(s) visible to a SchoolAdmin outside the schools of their memberships (LEAK)',
+    'attendances_leaked': 'attendance row(s) visible to a SchoolAdmin outside the schools of their memberships (LEAK)',
+    'students_locked_out': 'student row(s) of a SchoolAdmin\'s own schools that the account cannot see (LOCKOUT)',
+    'grades_locked_out': 'grade row(s) of a SchoolAdmin\'s own schools that the account cannot see (LOCKOUT)',
+    'attendances_locked_out': 'attendance row(s) of a SchoolAdmin\'s own schools that the account cannot see (LOCKOUT)',
+    'school_admins_without_membership': 'active SchoolAdmin account(s) without any valid membership (they see nothing)',
+    'superuser_scope_wrong': 'superuser account(s) whose scope differs from the temporary rule (active: all rows, inactive: none)',
     'no_school_admin_while_students_exist': 'students exist but no SchoolAdmin account exists (the comparison would pass vacuously)',
     'schools_with_students_but_no_school_admin': 'school(s) have students, classes or academic years but no valid SchoolAdmin covers them',
     'memberships_invalid': 'active membership(s) of users who no longer qualify',
@@ -221,33 +234,83 @@ def readiness_counts():
     return report
 
 
+def _expected_school_ids(user):
+    """The schools a SchoolAdmin may administer, computed WITHOUT ``school_ids_for_admin``: one join over the membership
+    table (active membership, active non-superuser account in group SchoolAdmin and not in PlatformAdmin)."""
+    return set(SchoolMembership.objects.filter(
+        user=user, is_active=True, user__is_active=True, user__is_superuser=False, user__groups__name=ADMIN,
+    ).exclude(user__groups__name=PLATFORM_ADMIN).values_list('school_id', flat=True))
+
+
+def strict_scope_comparison():
+    """F6: for every SchoolAdmin-group account the REAL ``visible_*`` sets against an independent expectation (school of the
+    row in the member schools, computed here from the row maps, not by arithmetic on ``visible_*``). Row outside the
+    expectation = LEAK, expected row missing = LOCKOUT, rows of other schools that are hidden = INFO. An account that
+    also holds another role legitimately sees more, so its leak check is skipped (its lockout check still runs).
+    Superusers (temporary branch until S8) are checked separately: active = every row, inactive = none."""
+    row_school = {
+        'students': dict(Student.objects.values_list('pk', 'school_id')),
+        'grades': dict(Grade.objects.values_list('pk', 'student__school_id')),
+        'attendances': dict(Attendance.objects.values_list('pk', 'student__school_id')),
+    }
+    visible = {'students': access.visible_students, 'grades': access.visible_grades,
+               'attendances': access.visible_attendances}
+    User = get_user_model()
+    other_roles = (TEACHER, GRADE_LEAD, PARENT)
+    totals = Counter()
+
+    def actual(kind, user):
+        return set(visible[kind](user).values_list('pk', flat=True))
+
+    for user in User.objects.filter(groups__name=ADMIN, is_superuser=False).distinct().order_by('pk'):
+        school_ids = _expected_school_ids(user)
+        skip_leaks = user.groups.filter(name__in=other_roles).exists()
+        totals['users_compared'] += 1
+        totals['school_admins_without_membership'] += 1 if (user.is_active and not school_ids) else 0
+        totals['users_with_other_grants_leak_check_skipped'] += 1 if skip_leaks else 0
+        for kind, schools in row_school.items():
+            expected = {pk for pk, school_id in schools.items() if school_id in school_ids}
+            seen = actual(kind, user)
+            totals[f'{kind}_locked_out'] += len(expected - seen)
+            if not skip_leaks:
+                totals[f'{kind}_leaked'] += len(seen - expected)
+            totals[f'info_other_school_{kind}_hidden'] += len(set(schools) - expected - seen)
+
+    for user in User.objects.filter(is_superuser=True).order_by('pk'):
+        totals['superusers_compared'] += 1
+        wrong = False
+        for kind, schools in row_school.items():
+            seen = actual(kind, user)
+            if user.is_active:
+                wrong = wrong or seen != set(schools)
+            elif not user.groups.filter(name__in=other_roles).exists():
+                wrong = wrong or bool(seen)
+        totals['superuser_scope_wrong'] += 1 if wrong else 0
+    return totals
+
+
 def school_admin_parity():
-    """Counts only. A SchoolAdmin sees every student, grade and attendance row today; with S3 only the rows of the
-    schools of the valid memberships. S2 review K-F1: no pre-filled defaults; every declared key is computed by ONE
-    assignment ``result['<key>'] = <expression>`` (read by a test), see ``readiness_counts``."""
+    """Counts only (strict F6 check, see ``strict_scope_comparison``). S2 review K-F1: no pre-filled defaults; every
+    declared key is computed by ONE assignment ``result['<key>'] = <expression>`` (read by a test), see
+    ``readiness_counts``."""
     result = {}
-    total_students = Student.objects.count()
-    total_grades = Grade.objects.count()
-    total_attendances = Attendance.objects.count()
-    students_without_school = Student.objects.filter(school__isnull=True).count()
     admins = school_admin_users()
-    scopes = [school_ids_for_admin(user) for user in admins]
-    kept_students = [Student.objects.filter(school_id__in=ids).count() if ids else 0 for ids in scopes]
-    result['no_school_admin_while_students_exist'] = 1 if (not admins and total_students) else 0
+    totals = strict_scope_comparison()
+    result['no_school_admin_while_students_exist'] = 1 if (not admins and Student.objects.exists()) else 0
     result['memberships_invalid'] = sum(1 for m in classify_memberships() if m['is_active'] and m['reason'])
     result['schools_with_students_but_no_school_admin'] = len(schools_without_admin_cover(admins))
-    result['users_compared'] = len(admins)
-    result['users_with_differences'] = sum(1 for kept in kept_students if total_students - kept)
-    result['students_lost'] = sum(total_students - kept for kept in kept_students)
-    result['grades_lost'] = sum(
-        total_grades - Grade.objects.filter(student__school_id__in=ids).count() if ids else total_grades
-        for ids in scopes)
-    result['attendances_lost'] = sum(
-        total_attendances - Attendance.objects.filter(student__school_id__in=ids).count() if ids
-        else total_attendances for ids in scopes)
-    result['explained_by_student_without_school'] = students_without_school * sum(1 for ids in scopes if ids)
-    result['explained_by_student_in_school_without_membership'] = sum(
-        Student.objects.filter(school__isnull=False).exclude(school_id__in=ids).count() for ids in scopes if ids)
-    result['explained_by_no_valid_membership'] = sum(
-        total_students - kept for ids, kept in zip(scopes, kept_students) if not ids)
+    result['users_compared'] = totals['users_compared']
+    result['superusers_compared'] = totals['superusers_compared']
+    result['users_with_other_grants_leak_check_skipped'] = totals['users_with_other_grants_leak_check_skipped']
+    result['students_leaked'] = totals['students_leaked']
+    result['grades_leaked'] = totals['grades_leaked']
+    result['attendances_leaked'] = totals['attendances_leaked']
+    result['students_locked_out'] = totals['students_locked_out']
+    result['grades_locked_out'] = totals['grades_locked_out']
+    result['attendances_locked_out'] = totals['attendances_locked_out']
+    result['school_admins_without_membership'] = totals['school_admins_without_membership']
+    result['superuser_scope_wrong'] = totals['superuser_scope_wrong']
+    result['info_other_school_students_hidden'] = totals['info_other_school_students_hidden']
+    result['info_other_school_grades_hidden'] = totals['info_other_school_grades_hidden']
+    result['info_other_school_attendances_hidden'] = totals['info_other_school_attendances_hidden']
     return result

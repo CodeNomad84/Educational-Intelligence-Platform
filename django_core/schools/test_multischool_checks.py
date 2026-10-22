@@ -256,47 +256,190 @@ class SchoolAdminParityTests(Base):
         Attendance.objects.create(student=s, date="2026-01-02", status="present")
         return s
 
+    ZERO = ("students_leaked", "grades_leaked", "attendances_leaked", "students_locked_out", "grades_locked_out",
+            "attendances_locked_out", "superuser_scope_wrong")
+
+    def assertClean(self, report):
+        self.assertEqual({key: report[key] for key in self.ZERO}, dict.fromkeys(self.ZERO, 0))
+
     def test_one_school_every_admin_a_member_is_zero_difference(self):
         self.member("sa1")
         self.member("sa2")
         self.data(self.a)
         report = self.parity()
-        self.assertEqual((report["users_compared"], report["students_lost"], report["grades_lost"],
-                          report["attendances_lost"]), (2, 0, 0, 0))
+        self.assertClean(report)
+        self.assertEqual(report["users_compared"], 2)
 
-    def test_admin_without_membership_loses_everything(self):
+    def test_admin_without_membership_sees_nothing_and_the_uncovered_school_fails(self):
+        """No leak and no lockout (nothing is expected), but the school has no valid SchoolAdmin (E1)."""
         make_user("sa", ADMIN)
         self.data(self.a)
         report = self.parity(fail=True)
-        self.assertEqual((report["students_lost"], report["grades_lost"], report["attendances_lost"]), (1, 1, 1))
-        self.assertEqual(report["explained_by_no_valid_membership"], 1)
+        self.assertClean(report)
+        self.assertEqual(report["school_admins_without_membership"], 1)
+        self.assertEqual(report["schools_with_students_but_no_school_admin"], 1)
+        self.assertEqual((report["info_other_school_students_hidden"], report["info_other_school_grades_hidden"],
+                          report["info_other_school_attendances_hidden"]), (1, 1, 1))
 
-    def test_other_school_rows_are_lost_for_a_single_school_member(self):
+    def test_other_school_rows_hidden_from_a_single_school_member_pass_and_are_info_only(self):
         other = School.objects.create(name="B", code="b")
         self.member("sa")
+        self.member("sb", other)
         self.data(self.a)
         self.data(other)
-        report = self.parity(fail=True)
-        self.assertEqual((report["students_lost"], report["grades_lost"], report["attendances_lost"]), (1, 1, 1))
-        self.assertEqual(report["explained_by_student_in_school_without_membership"], 1)
+        report = self.parity()
+        self.assertClean(report)
+        self.assertEqual((report["info_other_school_students_hidden"], report["info_other_school_grades_hidden"],
+                          report["info_other_school_attendances_hidden"]), (2, 2, 2))   # one per admin
 
-    def test_member_of_both_schools_loses_nothing(self):
+    def test_member_of_both_schools_sees_both(self):
         other = School.objects.create(name="B", code="b")
         user = self.member("sa")
         SchoolMembership.objects.create(user=user, school=other)
         self.data(self.a)
         self.data(other)
-        self.assertEqual(self.parity()["students_lost"], 0)
+        report = self.parity()
+        self.assertClean(report)
+        self.assertEqual(report["info_other_school_students_hidden"], 0)
+
+    # --- F6: a leak and a lockout each fail, per model ---------------------------------------------------------------
+    def two_school_state(self):
+        other = School.objects.create(name="B", code="b")
+        self.member("sa")
+        self.member("sb", other)
+        self.data(self.a)
+        self.data(other)
+
+    def test_a_leak_fails_the_gate_for_each_model(self):
+        """Mutation: the scope stops filtering (the real access layer returns every row to a SchoolAdmin)."""
+        from django.db.models import Q
+
+        from students import access
+        self.two_school_state()
+        with mock.patch.object(access, "_school_admin_q", lambda user, roles: Q()):
+            report = self.parity(fail=True)
+        self.assertEqual((report["students_leaked"], report["grades_leaked"], report["attendances_leaked"]), (2, 2, 2))
+        self.assertEqual(report["students_locked_out"], 0)
+        self.assertEqual(report["verdict"], "FAIL")
+
+    def test_each_model_leaking_alone_fails_the_gate(self):
+        from students import access
+        self.two_school_state()
+        for name, key in (("visible_students", "students_leaked"), ("visible_grades", "grades_leaked"),
+                          ("visible_attendances", "attendances_leaked")):
+            model = {"visible_students": Student, "visible_grades": Grade, "visible_attendances": Attendance}[name]
+            with self.subTest(name=name), mock.patch.object(access, name, lambda user, model=model: model.objects.all()):
+                report = self.parity(fail=True)
+                self.assertGreater(report[key], 0)
+
+    def test_a_lockout_fails_the_gate_for_each_model(self):
+        """Mutation: the scope grants nothing (the real access layer hides the admin's own school)."""
+        from students import access
+        self.two_school_state()
+        with mock.patch.object(access, "_school_admin_q", lambda user, roles: None):
+            report = self.parity(fail=True)
+        self.assertEqual((report["students_locked_out"], report["grades_locked_out"],
+                          report["attendances_locked_out"]), (2, 2, 2))
+        self.assertEqual(report["students_leaked"], 0)
+
+    def test_each_model_locked_out_alone_fails_the_gate(self):
+        from students import access
+        self.two_school_state()
+        for name, key, model in (("visible_students", "students_locked_out", Student),
+                                 ("visible_grades", "grades_locked_out", Grade),
+                                 ("visible_attendances", "attendances_locked_out", Attendance)):
+            with self.subTest(name=name), mock.patch.object(access, name, lambda user, model=model: model.objects.none()):
+                report = self.parity(fail=True)
+                self.assertGreater(report[key], 0)
+
+    def test_the_expectation_does_not_come_from_school_ids_for_admin(self):
+        """If ``school_ids_for_admin`` were wrong (here: everything) the access layer leaks, but the independent
+        expectation still comes from the membership table, so the gate fails."""
+        from students import access
+        self.two_school_state()
+        every = set(School.objects.values_list("pk", flat=True))
+        with mock.patch.object(access, "school_ids_for_admin", lambda user: every):
+            report = self.parity(fail=True)
+        self.assertGreater(report["students_leaked"], 0)
+
+    def test_an_account_that_is_no_longer_valid_must_see_nothing(self):
+        """Dual PlatformAdmin / inactive / membership-less accounts: expected empty, so any visible row is a leak."""
+        from students import access
+        dual = self.member("dual")
+        dual.groups.add(Group.objects.get_or_create(name=PLATFORM_ADMIN)[0])
+        self.member("sa")
+        self.data(self.a)
+        self.assertClean(self.parity_allowing_failure())
+        with mock.patch.object(access, "school_ids_for_admin", lambda user: {self.a.pk}):
+            report = self.parity_allowing_failure()
+        self.assertGreater(report["students_leaked"], 0)
+
+    def parity_allowing_failure(self):
+        out = StringIO()
+        try:
+            call_command("compare_access_parity", "--multi-school", "--json", stdout=out)
+        except CommandError:
+            pass
+        return json.loads(out.getvalue())
+
+    def test_another_role_skips_only_the_leak_check(self):
+        """An admin who is also a Teacher legitimately sees more; the lockout check still runs for them."""
+        from students import access
+        user = self.member("both")
+        user.groups.add(Group.objects.get_or_create(name="Teacher")[0])
+        self.data(self.a)
+        report = self.parity()
+        self.assertClean(report)
+        self.assertEqual(report["users_with_other_grants_leak_check_skipped"], 1)
+        with mock.patch.object(access, "visible_students", lambda u: Student.objects.none()):
+            self.assertGreater(self.parity(fail=True)["students_locked_out"], 0)
+
+    # --- the temporary superuser branch (until S8) is checked separately -------------------------------------------
+    def test_superuser_active_sees_all_and_inactive_sees_none(self):
+        make_user("root", ADMIN, is_superuser=True)
+        make_user("oldroot", ADMIN, is_superuser=True, is_active=False)
+        self.member("sa")
+        self.data(self.a)
+        report = self.parity()
+        self.assertEqual((report["superusers_compared"], report["superuser_scope_wrong"]), (2, 0))
+
+    def test_a_wrong_superuser_scope_fails_the_gate(self):
+        """Mutation: the explicit superuser branch removed (the superuser is locked out), or kept for an inactive one."""
+        from students import access
+        make_user("root", ADMIN, is_superuser=True)
+        self.member("sa")
+        self.data(self.a)
+        with mock.patch.object(access, "_sees_every_school", lambda user, roles: False):
+            report = self.parity(fail=True)
+        self.assertEqual(report["superuser_scope_wrong"], 1)
+        User.objects.filter(username="root").update(is_active=False)
+        with mock.patch.object(access, "_sees_every_school", lambda user, roles: user.is_superuser):
+            self.assertEqual(self.parity(fail=True)["superuser_scope_wrong"], 1)
+        self.assertEqual(self.parity()["superuser_scope_wrong"], 0)
 
     def test_superuser_inactive_and_dual_role_handling(self):
         make_user("root", ADMIN, is_superuser=True)
         make_user("off", ADMIN, is_active=False)
         self.data(self.a)
         report = self.parity(fail=True)  # neither is a scoped SchoolAdmin: D1, the comparison would pass vacuously
-        self.assertEqual((report["users_compared"], report["no_school_admin_while_students_exist"]), (0, 1))
+        self.assertEqual((report["users_compared"], report["superusers_compared"],
+                          report["no_school_admin_while_students_exist"]), (1, 1, 1))
         dual = self.member("dual")
         dual.groups.add(Group.objects.get_or_create(name=PLATFORM_ADMIN)[0])
-        self.assertEqual(self.parity(fail=True)["users_compared"], 1)  # a dual-role account would lose everything
+        self.assertEqual(self.parity(fail=True)["users_compared"], 2)
+
+    def test_default_mode_does_not_compare_admin_accounts_with_the_legacy_rule(self):
+        """F6: SchoolAdmin / superuser accounts are labelled as not compared (their legacy 'everything' is gone on purpose)."""
+        user = self.member("both")
+        user.groups.add(Group.objects.get_or_create(name="Teacher")[0])
+        make_user("root", "Teacher", is_superuser=True)
+        make_user("plain", "Teacher")
+        self.data(self.a)
+        out = StringIO()
+        call_command("compare_access_parity", "--json", stdout=out)
+        report = json.loads(out.getvalue())
+        self.assertEqual((report["school_admin_accounts_not_compared"], report["users_compared"], report["unexplained"]),
+                         (2, 1, 0))
 
     def test_no_school_admin_while_students_exist_fails(self):
         """S2 review D1."""
@@ -308,12 +451,12 @@ class SchoolAdminParityTests(Base):
         self.assertEqual(self.parity()["users_compared"], 0)
 
     def test_invalid_active_membership_fails_the_parity_gate(self):
-        """S2 review D3: zero lost rows is not enough while a dormant grant exists."""
+        """S2 review D3: zero leaked/locked-out rows is not enough while a dormant grant exists."""
         user = self.member("sa")
         orphan = self.member("gone")
         orphan.groups.clear()
         report = self.parity(fail=True)
-        self.assertEqual((report["memberships_invalid"], report["students_lost"]), (1, 0))
+        self.assertEqual((report["memberships_invalid"], report["students_leaked"]), (1, 0))
         SchoolMembership.objects.filter(user=orphan).update(is_active=False)
         self.assertEqual(self.parity()["memberships_invalid"], 0)
         self.assertIsNotNone(user.pk)
@@ -331,7 +474,7 @@ class SchoolAdminParityTests(Base):
         out = StringIO()
         call_command("compare_access_parity", "--json", stdout=out)
         report = json.loads(out.getvalue())
-        self.assertNotIn("students_lost", report)
+        self.assertNotIn("students_leaked", report)
         self.assertIn("students_only_legacy", report)
         self.assertEqual(report["multi_school_checks"], "NOT RUN")
 

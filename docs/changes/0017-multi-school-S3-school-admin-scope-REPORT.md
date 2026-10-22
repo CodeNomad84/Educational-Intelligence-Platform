@@ -27,3 +27,8 @@ Final `scripts/run_tests.sh all` (`&&`, exit 0) on the final code: SQLite 836 te
 
 ## OPEN FROM THE S3 ROW
 R-c, R-d deferred (decision 5); R-a per-row provenance (above). No push done.
+
+## Follow-up 2026-10-23 (owner decisions on this report; Tier C, one fix round)
+- **F6 DONE:** `compare_access_parity --multi-school` is now a strict check. For every account of group SchoolAdmin it computes an independent expectation (one membership join, not `school_ids_for_admin`, row schools read from the row maps) and compares it with the real `visible_students/grades/attendances`: a row outside the member schools = `*_leaked` (FAIL), an expected row missing = `*_locked_out` (FAIL), other schools' rows hidden = `info_other_school_*_hidden` (INFO). An account that also holds Teacher/GradeLead/Parent has its leak check skipped (counted) because it legitimately sees more; the lockout check still runs. Superusers are checked separately (`superuser_scope_wrong`: active = every row, inactive = none). The old `students_lost/grades_lost/attendances_lost` and `explained_by_*` counters are gone. The default (non-multi-school) mode no longer compares SchoolAdmin/superuser accounts with `access_legacy`; it reports them as `school_admin_accounts_not_compared`.
+- **S3-1 F1 DONE:** the 4c producer has no pre-filled defaults; each declared key is one literal `report['<key>'] = r['<key>']`, read by `test_the_report_has_no_prefilled_defaults_and_one_literal_assignment_per_declared_key`.
+- Recorded in 0010: no second real School before S4(a) and S5; R-a per-row provenance required before any real data.
