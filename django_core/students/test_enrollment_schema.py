@@ -68,6 +68,15 @@ class EnrollmentSchemaTests(Base):
         with self.assertRaises(ValidationError):
             Enrollment(student=s, academic_year=self.y2, school_class=self.klass, grade=5).full_clean()
 
+    def test_clean_rejects_a_student_of_another_school_than_the_year(self):
+        s = self.student(self.klass)                       # a student of self.school
+        other_year = AcademicYear.objects.create(
+            school=self.other, code="1404-1405", start_date=date(2025, 9, 23), end_date=date(2026, 6, 21))
+        with self.assertRaises(ValidationError) as ctx:
+            Enrollment(student=s, academic_year=other_year, grade=10).full_clean()
+        self.assertIn("academic_year", ctx.exception.message_dict)
+        Enrollment(student=s, academic_year=self.y2, grade=10).full_clean()
+
     def test_history_is_protected_from_deletion(self):
         s = self.student(self.klass)
         enr = Enrollment.objects.create(student=s, academic_year=self.y2, school_class=self.klass, grade=10)

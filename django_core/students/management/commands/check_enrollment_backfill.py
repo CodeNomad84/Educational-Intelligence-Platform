@@ -66,9 +66,6 @@ class Command(BaseCommand):
                     c['already_linked'] += 1
                     continue
                 school_id = school_of.get(student_id)
-                if school_id is None:
-                    c['student_without_school_unlinked'] += 1
-                    continue
                 found = year_for_date(ranges.get(school_id, []), day)
                 if not found:
                     c['date_in_no_year_unlinked'] += 1

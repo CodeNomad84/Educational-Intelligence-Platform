@@ -154,9 +154,6 @@ class Command(BaseCommand):
                 if e.school_class is None:
                     skipped['enrollment_without_class'] += 1
                     continue
-                if e.student.school_id is None:   # S6: save() will not give a legacy row a school; plan = apply
-                    skipped['student_without_school'] += 1
-                    continue
                 to_title = class_map.get(e.school_class.title)
                 if to_title is None:
                     skipped['no_class_mapping'] += 1

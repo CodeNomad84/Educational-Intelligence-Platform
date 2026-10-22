@@ -9,7 +9,7 @@ caller, never raised, so saving a student is never blocked by it.
 
     created / updated / class_changed   a current-year enrollment was written
     unchanged                           already in step
-    no_school, no_class, no_current_year, class_year_mismatch, class_grade_conflict   skipped (why)
+    no_class, no_current_year, class_year_mismatch, class_grade_conflict   skipped (why)
 """
 from django.utils import timezone
 
@@ -17,13 +17,11 @@ from schools.academic_years import RESOLVED, normalize_academic_year
 from schools.models import AcademicYear
 from students.models import Enrollment
 
-SKIPPED = frozenset({'no_school', 'no_class', 'no_current_year', 'class_year_mismatch', 'class_grade_conflict'})
+SKIPPED = frozenset({'no_class', 'no_current_year', 'class_year_mismatch', 'class_grade_conflict'})
 CURRENT_STATUSES = ('active', 'transferred_in')  # owner D-4-1
 
 
 def ensure_current_enrollment(student, *, source='manual', today=None):
-    if student.school_id is None:
-        return 'no_school'
     if student.school_class_id is None:
         return 'no_class'
     year = AcademicYear.objects.filter(school_id=student.school_id, is_current=True).first()

@@ -68,9 +68,6 @@ class Command(BaseCommand):
         class_mirror = Counter(Student.objects.filter(school_class__isnull=False).values_list('school_class_id', flat=True))
         for pk, school_id, class_id, grade in Student.objects.values_list('pk', 'school_id', 'school_class_id', 'grade'):
             r['students'] += 1
-            if school_id is None:
-                r['info_students_without_school'] += 1
-                continue
             schools_with_students.add(school_id)
             if class_id is None:
                 r['info_students_without_class_invisible_to_staff'] += 1

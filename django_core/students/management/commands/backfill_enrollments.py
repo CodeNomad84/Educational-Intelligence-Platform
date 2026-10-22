@@ -128,9 +128,6 @@ class Command(BaseCommand):
                     counts['already_linked'] += 1
                     continue
                 school_id = school_of.get(student_id)
-                if school_id is None:
-                    counts['unlinked_student_without_school'] += 1
-                    continue
                 found = year_for_date(ranges.get(school_id, []), day)
                 if len(found) != 1:
                     counts['unlinked_date_in_no_year' if not found else 'unlinked_date_in_overlapping_years'] += 1
