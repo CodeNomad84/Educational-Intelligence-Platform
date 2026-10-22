@@ -84,7 +84,7 @@ class ReadinessTests(Base):
         for key in ("school_admins_without_membership", "students_without_school", "school_inconsistent_rows",
                     "active_memberships_of_platform_admin_users", "memberships_invalid", "info_schools_count"):
             self.assertNotIn(key, report)
-        self.assertEqual(report.get("info_students_without_school", 0), 0)  # the existing diagnostic (always 0 since S6)
+        self.assertNotIn("info_students_without_school", report)  # the 4c diagnostic was removed with S6-3
 
     def test_school_admin_without_membership_is_a_blocker(self):
         make_user("sa", ADMIN)

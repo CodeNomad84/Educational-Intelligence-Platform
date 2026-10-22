@@ -1,3 +1,5 @@
+> SUPERSEDED IN PART (S6-3, Report 0016): the `save()` guard, `is_existing` and the rollover skip described here were removed once the column became NOT NULL (students.0015). The text below is the historical record.
+
 # CHANGE REPORT — Multi-school hosting, stage S6-1: no adoption of school-less students; code and tests ready for NOT NULL
 Proposal: `0010-multi-school-hosting-PROPOSAL.md` (S6 row, EXPLICIT CONSTRAINT, S6 REQUIREMENTS) · ADR-0012 · Level: L3 (Tier A continuation approved 2026-10-23: S6-1 only, no migration) · Commits: `b4beb90` (S6-1), `363f484` (review round).
 Rule that still applies: NO REAL STUDENT DATA until the P3 exit criteria and the 2.4 audit log. Everything below ran on synthetic data.

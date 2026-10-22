@@ -17,3 +17,6 @@ No Critical/High. F1 Medium 8: `--revert-batch` crashes after 0015 with a raw `I
 
 ## RISKS / OPEN
 Applying 0015 to any real database requires `check_student_school_ready` = READY there first; a rollback of 0015 only restores the schema. S6-3 (dead NULL branches, `save()` guard, `backfill_student_school` kept until S7) is not started. Push: NOT done (Tier C, and the push permission was not yet in CLAUDE.md when this finished).
+
+## DEPLOY RULES (added with S6-3, owner instruction 2026-10-23)
+NEVER `--fake` students.0015 (the column would stay nullable while the model says NOT NULL; `check_student_school_ready` reports the real nullability). Apply 0015 before or together with the S6-3 code; code at `9376a48` or later must not run on a database at 0014, nor on one where 0015 was reversed (reverse together with `git revert` of S6-3). F4 (dead branches) of this report is DONE in S6-3.
