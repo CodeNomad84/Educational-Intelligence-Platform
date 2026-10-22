@@ -26,7 +26,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from openpyxl import Workbook
 
-from schools.models import School, SchoolClass
+from schools.models import School, SchoolClass, SchoolMembership
 
 from .access import ADMIN, PARENT, TEACHER
 from .models import Student
@@ -58,6 +58,8 @@ def xlsx_upload(rows, name='students.xlsx'):
 class ImportCase(TestCase):
     def setUp(self):
         self.admin = make_user('import_admin', ADMIN)
+        # S2b: the importing admin belongs to one school (the default one the test DB holds from students.0009)
+        SchoolMembership.objects.create(user=self.admin, school=School.objects.get())
         self.client.force_login(self.admin)
 
     def post(self, upload):
@@ -70,9 +72,11 @@ class ImportCase(TestCase):
         """Establish the 'exactly one School' precondition explicitly (the test DB already holds the default
         School created by students.0009, so this replaces it instead of relying on it)."""
         SchoolClass.objects.all().delete()
+        SchoolMembership.objects.all().delete()
         School.objects.all().delete()
         school = School.objects.create(code=code, name='Characterization School')
         self.assertEqual(School.objects.count(), 1)
+        SchoolMembership.objects.create(user=self.admin, school=school)  # S2b: the importer's school
         return school
 
     def make_existing(self, national_id='1234567890', **extra):
@@ -92,8 +96,11 @@ class ImportPermissionTests(ImportCase):
         self.assertEqual(self.post(self.body()).status_code, 200)
         root = make_user('import_root', is_superuser=True)
         self.client.force_login(root)
-        self.assertEqual(self.post(csv_upload(f'{HEADER}\nSara,Karimi,1234567891,9,9-A,9120000002,Dr,Nurse\n')
-                                   ).status_code, 200)
+        upload = csv_upload(f'{HEADER}\nSara,Karimi,1234567891,9,9-A,9120000002,Dr,Nurse\n')
+        self.assertEqual(self.post(upload).status_code, 400)   # S2b: a superuser must name the school
+        upload = csv_upload(f'{HEADER}\nSara,Karimi,1234567891,9,9-A,9120000002,Dr,Nurse\n')
+        self.assertEqual(self.client.post(URL, {'file': upload, 'target_school': School.objects.get().pk}
+                                          ).status_code, 200)
 
     def test_bearer_token_authentication_is_enforced_the_same_way(self):
         """JWT is the first configured authenticator; the endpoint must honor it and the same permission."""
@@ -107,7 +114,9 @@ class ImportPermissionTests(ImportCase):
         denied = self.client.post(URL, {'file': self.body()}, **as_bearer(make_user('jwt_parent', PARENT)))
         self.assertEqual(denied.status_code, 403)
         self.assertEqual(Student.objects.count(), 0)
-        allowed = self.client.post(URL, {'file': self.body()}, **as_bearer(make_user('jwt_admin', ADMIN)))
+        jwt_admin = make_user('jwt_admin', ADMIN)
+        SchoolMembership.objects.create(user=jwt_admin, school=School.objects.get())
+        allowed = self.client.post(URL, {'file': self.body()}, **as_bearer(jwt_admin))
         self.assertEqual(allowed.status_code, 200)
         self.assertEqual(Student.objects.count(), 1)
         bad = self.client.post(URL, {'file': self.body()}, HTTP_AUTHORIZATION='Bearer not-a-token')
@@ -456,34 +465,35 @@ class ImportClassResolutionTests(ClassImportCase):
         self.assertEqual((data['unmatched_classes'], data['unmatched_classes_truncated']), ([], False))
 
     def test_a_class_that_exists_only_in_another_school_is_never_selected(self):
+        # S2b: the import's school comes from the importer's membership (first); a class of `second` is not a candidate.
         first, second = self.two_schools()
         self.klass(second, '9-A')
         resp = self.post(sheet(line(nid(1), 9, '9-A')))
         s = self.student(nid(1))
-        self.assertEqual((s.school_id, s.school_class_id), (None, None))
+        self.assertEqual((s.school_id, s.school_class_id), (first.pk, None))
         self.assertEqual(resp.json()['unmatched_classes'],
-                         [{'row': 2, 'value': '9-A', 'reason': 'no_unique_school'}])
+                         [{'row': 2, 'value': '9-A', 'reason': 'no_active_class'}])
 
-    def test_zero_schools_report_no_unique_school_and_still_import_the_student(self):
+    def test_an_importer_without_a_school_is_rejected_and_nothing_is_created(self):
+        # S2b (was: zero schools -> students imported without a school): no membership, no import.
         self.one_school()
-        School.objects.all().delete()
+        SchoolMembership.objects.all().delete()
         resp = self.post(sheet(line(nid(1), 9, '9-A')))
-        self.assertEqual((resp.status_code, resp.json()['created']), (200, 1))
-        s = self.student(nid(1))
-        self.assertEqual((s.school_id, s.school_class_id), (None, None))
-        self.assertEqual(resp.json()['unmatched_classes'],
-                         [{'row': 2, 'value': '9-A', 'reason': 'no_unique_school'}])
-        self.assertEqual(School.objects.count(), 0)   # the import never creates a School
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn('target_school', resp.json())
+        self.assertEqual(Student.objects.count(), 0)
+        self.assertEqual(School.objects.count(), 1)   # the import never creates a School
 
-    def test_several_schools_report_no_unique_school_even_when_a_class_matches_in_each(self):
+    def test_several_schools_link_only_inside_the_importers_school(self):
+        # S2b (was: several schools -> no_unique_school): the class of the importer's school is the only candidate.
         first, second = self.two_schools()
-        self.klass(first, '9-A')
+        mine = self.klass(first, '9-A')
         self.klass(second, '9-A')
         resp = self.post(sheet(line(nid(1), 9, '9-A')))
         s = self.student(nid(1))
-        self.assertEqual((s.school_id, s.school_class_id), (None, None))
-        self.assertEqual([u['reason'] for u in resp.json()['unmatched_classes']], ['no_unique_school'])
-        self.assertEqual(resp.json()['linked'], 0)
+        self.assertEqual((s.school_id, s.school_class_id), (first.pk, mine.pk))
+        self.assertEqual(resp.json()['unmatched_classes'], [])
+        self.assertEqual(resp.json()['linked'], 1)
 
     def test_no_school_or_class_is_created_activated_or_changed_on_any_path(self):
         school = self.one_school()
@@ -876,8 +886,8 @@ class ImportWriteFailureTests(ClassImportCase):
         self.make_existing(nid(1), grade=9)
         real_plan = views._plan_class_links
 
-        def plan_then_someone_else_links(rows):
-            plan = real_plan(rows)   # decided: link nid(1) to X
+        def plan_then_someone_else_links(rows, school_id):
+            plan = real_plan(rows, school_id)   # decided: link nid(1) to X
             Student.objects.filter(national_id=nid(1)).update(school=school, school_class=y, class_name='Y')
             return plan
 
@@ -906,3 +916,68 @@ class ImportLinkedStudentWriteTests(ClassImportCase):
                          (before['school_id'], before['school_class_id'], 'drifted mirror'))
         self.assertEqual(s.created_at, before['created_at'])
         self.assertEqual((resp.json()['updated'], resp.json()['linked'], resp.json()['preserved_links']), (1, 0, 1))
+
+
+class ImportTargetSchoolTests(ClassImportCase):
+    """S2b: the school of an import comes from the importer's memberships or an explicit target, never from the file."""
+
+    def test_several_memberships_require_a_target_and_nothing_is_read_or_written_without_it(self):
+        first, second = self.two_schools()
+        SchoolMembership.objects.create(user=self.admin, school=second)
+        resp = self.post(sheet(line(nid(1), 9)))
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn('target_school', resp.json())
+        self.assertEqual(Student.objects.count(), 0)
+        resp = self.client.post(URL, {'file': sheet(line(nid(1), 9)), 'target_school': second.pk})
+        self.assertEqual((resp.status_code, resp.json()['created']), (200, 1))
+        self.assertEqual(self.student(nid(1)).school_id, second.pk)
+
+    def test_foreign_or_unknown_target_is_rejected_generically(self):
+        first, second = self.two_schools()
+        answers = set()
+        for target in (second.pk, 999999):
+            resp = self.client.post(URL, {'file': sheet(line(nid(1), 9)), 'target_school': target})
+            self.assertEqual(resp.status_code, 400)
+            answers.add(str(resp.json()))
+        self.assertEqual(len(answers), 1)
+        self.assertEqual(Student.objects.count(), 0)
+
+    def test_a_national_id_of_another_school_is_rejected_unchanged_and_without_revealing_it(self):
+        first, second = self.two_schools()
+        other = Student.objects.create(first_name='Secret', last_name='Other', national_id=nid(1), grade=8,
+                                       phone_number='555', school=second)
+        resp = self.post(sheet(line(nid(1), 9, '', first='Changed', last='Name'), line(nid(2), 9)))
+        data = resp.json()
+        self.assertEqual((resp.status_code, data['created'], data['updated']), (200, 1, 0))
+        self.assertEqual(len(data['errors']), 1)
+        text = data['errors'][0]
+        for leak in ('Secret', 'Other', second.name, second.code, '555', 'school', 'مدرسه'):
+            self.assertNotIn(leak, text)
+        other.refresh_from_db()
+        self.assertEqual((other.first_name, other.school_id, other.grade), ('Secret', second.pk, 8))
+        self.assertEqual(self.student(nid(2)).school_id, first.pk)
+
+    def test_a_linked_student_of_another_school_is_rejected_too(self):
+        first, second = self.two_schools()
+        member = self.member(nid(1), 9, self.klass(second, '9-A'))
+        data = self.post(sheet(line(nid(1), 9, '9-A', first='Changed'))).json()
+        self.assertEqual((data['created'], data['updated'], len(data['errors'])), (0, 0, 1))
+        member.refresh_from_db()
+        self.assertEqual((member.first_name, member.school_id), ('M', second.pk))
+
+    def test_a_student_of_the_importers_school_is_updated_and_a_school_less_one_gets_the_school_once(self):
+        first, second = self.two_schools()
+        mine = Student.objects.create(first_name='Mine', last_name='X', national_id=nid(1), grade=8,
+                                      phone_number='1', school=first)
+        legacy = self.make_existing(nid(2), grade=8)
+        data = self.post(sheet(line(nid(1), 9, first='Renamed'), line(nid(2), 9))).json()
+        self.assertEqual((data['created'], data['updated'], data['errors']), (0, 2, []))
+        mine.refresh_from_db()
+        legacy.refresh_from_db()
+        self.assertEqual((mine.first_name, mine.school_id, legacy.school_id), ('Renamed', first.pk, first.pk))
+
+    def test_the_school_is_never_taken_from_the_file(self):
+        first, second = self.two_schools()
+        text = HEADER + ',school,school_id\n' + line(nid(1), 9) + f',{second.code},{second.pk}\n'
+        self.post(csv_upload(text))
+        self.assertEqual(self.student(nid(1)).school_id, first.pk)

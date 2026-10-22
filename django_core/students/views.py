@@ -19,6 +19,7 @@ from .class_resolution import (
 )
 import requests
 from .serializers import StudentSerializer, FileUploadSerializer
+from .student_school import StudentSchoolError, resolve_student_school
 from .permissions import IsAdminUser  # فقط ادمین بتواند آپلود کند
 from django.core.exceptions import ImproperlyConfigured
 from config.service_auth import service_headers
@@ -63,9 +64,21 @@ def _clean_national_id(value):
 
 
 
+class ImportSchoolConflict(Exception):
+    """The national id belongs to a student of ANOTHER school. The message is fixed and generic on purpose: it must
+    not tell the importer anything about that student or school (national_id is still globally unique until S7)."""
+
+    MESSAGE = 'این کد ملی قابل ثبت نیست.'
+
+    def __init__(self):
+        super().__init__(self.MESSAGE)
+
+
 class ClassLinkPlan:
-    def __init__(self, unique_school_id):
-        self.unique_school_id = unique_school_id   # None unless exactly one School exists
+    def __init__(self, school_id):
+        # The school every row of this import belongs to (S2b: resolved ONCE from the importing user's memberships /
+        # the explicit target, never from the file and never from "the only School").
+        self.school_id = school_id
         self.decisions = {}                        # row index -> SchoolClass pk to link
         self.preserved_links = 0                   # existing students whose link was left untouched
         self.class_blank = 0                       # eligible rows with a blank class cell
@@ -87,14 +100,14 @@ def _linked_national_ids(rows):
     return found
 
 
-def _plan_class_links(rows):
+def _plan_class_links(rows, school_id):
     """Decide, for every valid row, whether its student may be linked to an existing class.
 
     Must run AFTER the rows of already-linked students were written: member grades are read from the
     database, i.e. they are the grades that were really persisted."""
-    school_ids = list(School.objects.values_list('pk', flat=True))
-    plan = ClassLinkPlan(school_ids[0] if len(school_ids) == 1 else None)
-    candidates = [ClassCandidate.from_model(c) for c in SchoolClass.objects.all()]
+    school_ids = [school_id]
+    plan = ClassLinkPlan(school_id)
+    candidates = [ClassCandidate.from_model(c) for c in SchoolClass.objects.filter(school_id=school_id)]
 
     existing = {}  # national_id -> (school_id, school_class_id)
     for chunk in _chunks({r.national_id for r in rows}):
@@ -113,8 +126,7 @@ def _plan_class_links(rows):
         if state is not None and state[1] is not None:   # already linked: immutable, uploaded class ignored
             plan.preserved_links += 1
             continue
-        other_school = (state is not None and state[0] is not None and plan.unique_school_id is not None
-                        and state[0] != plan.unique_school_id)
+        other_school = state is not None and state[0] is not None and state[0] != plan.school_id
         per_row = []
         for row in student_rows:
             res = resolve_class(row.class_cell, school_ids=school_ids, candidates=candidates)
@@ -159,15 +171,16 @@ def _write_import_row(row, plan):
         # student's link state at write time, so a link created meanwhile is never overwritten.
         current = (Student.objects.select_for_update().filter(national_id=row.national_id)
                    .values('school_id', 'school_class_id').first())
+        if current is not None and current['school_id'] not in (None, plan.school_id):
+            raise ImportSchoolConflict()   # never overwrite or move a student of another school
         defaults = dict(row.data)
         class_pk = plan.decisions.get(row.index)
         link = False
-        if plan.unique_school_id is not None and (current is None or current['school_class_id'] is None):
-            if current is None or current['school_id'] in (None, plan.unique_school_id):
-                defaults['school_id'] = plan.unique_school_id
-                if class_pk is not None:
-                    defaults['school_class_id'] = class_pk
-                    link = True
+        if current is None or current['school_class_id'] is None:
+            defaults['school_id'] = plan.school_id
+            if class_pk is not None:
+                defaults['school_class_id'] = class_pk
+                link = True
         student, created = Student.objects.update_or_create(national_id=row.national_id, defaults=defaults)
         ensure_current_enrollment(student, source='import')
         return student, created, link
@@ -217,6 +230,14 @@ class StudentViewSet(viewsets.ModelViewSet):
         serializer = FileUploadSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        # S2b: the school of the whole import is decided BEFORE the file is read, by the single rule (membership,
+        # explicit target for several memberships / a superuser). It is never taken from the file.
+        try:
+            import_school_id = resolve_student_school(
+                request.user, target_school_id=serializer.validated_data.get('target_school'))
+        except StudentSchoolError as exc:
+            return Response({'target_school': [exc.message]}, status=status.HTTP_400_BAD_REQUEST)
 
         file = serializer.validated_data['file']
         file_extension = file.name.split('.')[-1].lower()
@@ -337,19 +358,21 @@ class StudentViewSet(viewsets.ModelViewSet):
                         created_count += 1
                     else:
                         updated_count += 1
+                except ImportSchoolConflict as e:
+                    row_errors.append((item.index, f"ردیف {item.index+2}: {e}"))
                 except Exception as e:
                     row_errors.append((item.index, f"ردیف {item.index+2}: خطا - {str(e)}"))
 
             # Pass 2a: students that ALREADY have a class are written first. Their rows never change a link,
             # but may change a grade, and class decisions must see the grades that were really stored.
             already_linked = _linked_national_ids(parsed)
-            no_links = ClassLinkPlan(None)
+            no_links = ClassLinkPlan(import_school_id)
             for item in parsed:
                 if item.national_id in already_linked:
                     write(item, no_links)
 
             # Pass 2b: class decisions for the whole file, on persisted state, before any new link is written.
-            plan = _plan_class_links(parsed)
+            plan = _plan_class_links(parsed, import_school_id)
 
             # Pass 3: write the remaining rows (new students and students without a class), in file order.
             for item in parsed:

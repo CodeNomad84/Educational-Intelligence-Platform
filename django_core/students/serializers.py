@@ -57,3 +57,5 @@ class StudentSerializer(serializers.ModelSerializer):
 
 class FileUploadSerializer(serializers.Serializer):
     file = serializers.FileField()
+    # S2b: stateless target school for the whole import (required for several memberships / a superuser).
+    target_school = serializers.IntegerField(required=False, allow_null=True)

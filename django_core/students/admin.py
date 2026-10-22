@@ -1,6 +1,8 @@
+from django import forms
 from django.contrib import admin
 from .models import Student
 from .models import Student, Grade, Attendance
+from .student_school import StudentSchoolError, allowed_school_ids, resolve_student_school
 
 
 
@@ -24,8 +26,46 @@ class AttendanceInline(admin.TabularInline):
     fields = ['date', 'status', 'note']
     show_change_link = True
 
+class StudentAdminForm(forms.ModelForm):
+    """S2b: the school of a student is decided by the single rule in students/student_school.py. The ``target_school``
+    field is the explicit choice for a student without a class; ``StudentAdmin.get_form`` binds the user (fail closed
+    when it is missing). Open item for S9 (changes/0010 section 7): ADR-0012 section 4 says the platform role has no
+    student access in the Django admin; this field exists because accounts reach this admin today."""
+
+    target_school = forms.ModelChoiceField(queryset=None, required=False, label='مدرسه')
+    bound_user = None
+    bound_existing_school_id = None
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from schools.models import School
+        self.fields['target_school'].queryset = School.objects.filter(
+            pk__in=allowed_school_ids(self.bound_user)).order_by('name')
+
+    def clean(self):
+        cleaned = super().clean()
+        if self.errors.get('school_class') or self.errors.get('target_school'):
+            return cleaned
+        target = cleaned.get('target_school')
+        try:
+            school_id = resolve_student_school(
+                self.bound_user, school_class=cleaned.get('school_class'),
+                target_school_id=target.pk if target is not None else None,
+                existing_school_id=self.bound_existing_school_id)
+        except StudentSchoolError as exc:
+            self.add_error('school_class' if exc.code == 'class_target_mismatch' else 'target_school', exc.message)
+            return cleaned
+        self.instance.school_id = school_id
+        return cleaned
+
+    class Meta:
+        model = Student
+        fields = '__all__'
+
+
 @admin.register(Student)
 class StudentAdmin(admin.ModelAdmin):
+    form = StudentAdminForm
     list_display = ['first_name', 'last_name', 'national_id', 'grade', 'school_class', 'class_name',
                     'phone_number', 'created_at']
     list_filter = ['grade', 'school_class', 'class_name', 'created_at']
@@ -35,7 +75,11 @@ class StudentAdmin(admin.ModelAdmin):
 
     def get_form(self, request, obj=None, **kwargs):
         request._student_being_edited = obj  # lets the class selector keep the current (maybe inactive) class
-        return super().get_form(request, obj, **kwargs)
+        form = super().get_form(request, obj, **kwargs)
+        # Bind the acting user and the stored school to a subclass: the form class itself is shared between requests.
+        return type('BoundStudentAdminForm', (form,), {
+            'bound_user': request.user,
+            'bound_existing_school_id': obj.school_id if obj is not None else None})
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == 'school_class':
