@@ -115,7 +115,7 @@ class SeedAndViewTests(TestCase):
     def test_seed_creates_schooladmin_group_and_admin_roles(self):
         """seed_demo must use the ADMIN constant (ADR-0010): SchoolAdmin exists and the pre-rename group name does not."""
         self.assertEqual(ADMIN, "SchoolAdmin")
-        self.assertEqual(set(Group.objects.values_list("name", flat=True)), {ADMIN, "Parent"})
+        self.assertEqual(set(Group.objects.values_list("name", flat=True)), {ADMIN, "Parent", "Teacher", "GradeLead"})
         User = get_user_model()
         for name in ("demo_admin", "demo_counselor"):
             self.assertIn(ADMIN, roles_for(User.objects.get(username=name)), name)

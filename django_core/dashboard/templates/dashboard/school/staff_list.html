@@ -1,0 +1,19 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+{% include 'dashboard/school/_nav.html' %}
+<table class="table table-sm bg-white">
+  <thead><tr><th>نام کاربری</th><th>نام</th><th>وضعیت</th><th></th></tr></thead>
+  <tbody>
+  {% for p in people %}
+    <tr><td>{{ p.username }}</td><td>{{ p.first_name }} {{ p.last_name }}</td>
+      <td>{% if p.is_active %}فعال{% else %}غیرفعال{% endif %}</td>
+      <td><a href="{% url 'dashboard:school_staff_detail' kind p.pk %}">تخصیص‌ها</a></td></tr>
+  {% empty %}<tr><td colspan="4" class="text-muted">هنوز حسابی ساخته نشده است.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+<div class="card"><div class="card-header">حساب {{ noun }} جدید</div><div class="card-body">
+  <form method="post">{% csrf_token %}{{ form.as_p }}<button class="btn btn-success">ساخت حساب</button></form>
+</div></div>
+{% endblock %}

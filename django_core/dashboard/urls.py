@@ -1,5 +1,5 @@
 from django.urls import path
-from . import views
+from . import school_views, views
 
 app_name = 'dashboard'
 
@@ -16,6 +16,19 @@ urlpatterns = [
     path('upload-document/', views.upload_document_view, name='upload_document'),
     path('delete-document/', views.delete_document_view, name='delete_document'),
     path('students/add/', views.student_create_view, name='student_add'),
+
+    # SchoolAdmin pages (Slice 1)
+    path('school/', school_views.home, name='school_home'),
+    path('school/years/', school_views.years, name='school_years'),
+    path('school/years/<int:pk>/current/', school_views.year_set_current, name='school_year_current'),
+    path('school/classes/', school_views.classes, name='school_classes'),
+    path('school/classes/new/', school_views.class_edit, name='school_class_new'),
+    path('school/classes/<int:pk>/edit/', school_views.class_edit, name='school_class_edit'),
+    path('school/<str:kind>/', school_views.staff_list, name='school_staff'),
+    path('school/<str:kind>/<int:pk>/', school_views.staff_detail, name='school_staff_detail'),
+    path('school/<str:kind>/<int:pk>/active/', school_views.staff_toggle_active, name='school_staff_active'),
+    path('school/<str:kind>/<int:pk>/assignments/<int:assignment_pk>/delete/', school_views.assignment_delete,
+         name='school_assignment_delete'),
 
 ]
 

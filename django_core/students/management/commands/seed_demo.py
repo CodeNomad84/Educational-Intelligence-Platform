@@ -20,6 +20,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from students.access import ADMIN
+from students.enrollment_sync import ensure_current_enrollment
 from students.models import Attendance, Grade, Student
 
 SUBJECTS = ["math", "physics", "chemistry", "literature", "english", "arabic"]
@@ -118,11 +119,14 @@ class Command(BaseCommand):
 
         with transaction.atomic():
             profiles = self._build_profiles()
+            year, classes = self._structure(school)
             students = []
             for idx, p in enumerate(profiles, start=1):
                 s = Student.objects.create(
                     first_name=p["first"], last_name=p["last"], national_id=f"9000{idx:06d}",
-                    grade=p["grade"], class_name=p["cls"], phone_number=f"0900000{idx:04d}", school=school)
+                    grade=p["grade"], class_name=p["cls"], phone_number=f"0900000{idx:04d}", school=school,
+                    school_class=classes[p["cls"]])
+                ensure_current_enrollment(s, source="manual")
                 students.append((s, p))
                 self._attendance(s, p)
                 self._grades(s, p)
@@ -138,7 +142,7 @@ class Command(BaseCommand):
                         student=s, date=self.today - timedelta(days=days_ago),
                         counselor_name="مشاور نمایشی", summary=summary)
             password = opts["password"] or secrets.token_urlsafe(9)
-            self._users(password, students, school)
+            self._users(password, students, school, year, classes)
 
         results = analyze_students(Student.objects.all(), self.today)
         dist = {"HIGH": 0, "MEDIUM": 0, "LOW": 0}
@@ -146,7 +150,7 @@ class Command(BaseCommand):
             dist[r["level"]] += 1
         self.stdout.write(self.style.SUCCESS(
             f"Seeded {len(students)} synthetic students. Risk distribution: {dist}"))
-        self.stdout.write("Demo users (all synthetic):  demo_admin / demo_counselor / demo_parent")
+        self.stdout.write("Demo users (all synthetic):  demo_admin / demo_counselor / demo_parent / demo_teacher / demo_gradelead")
         self.stdout.write(self.style.WARNING(f"Password: {password}"))
 
     # ---------------------------------------------------------------------------------------------
@@ -173,7 +177,8 @@ class Command(BaseCommand):
 
     def _reset(self):
         from demo_intel.models import CounselingNote, InterventionRecord, StudentObservation
-        for model in (StudentObservation, CounselingNote, InterventionRecord, Attendance, Grade, Student):
+        from students.models import Enrollment
+        for model in (StudentObservation, CounselingNote, InterventionRecord, Attendance, Grade, Enrollment, Student):
             model.objects.all().delete()
         get_user_model().objects.filter(username__startswith="demo_").delete()
 
@@ -257,7 +262,23 @@ class Command(BaseCommand):
                                   exam_type="midterm" if EXAM_OFFSETS.index(offset) % 3 == 0 else "quiz"))
         Grade.objects.bulk_create(rows)
 
-    def _users(self, password, students, school):
+    def _structure(self, school):
+        """Slice 1: a current academic year and the classes of the demo, so the SchoolAdmin pages have something to show."""
+        from datetime import date
+
+        from schools.models import AcademicYear, SchoolClass
+        first = self.today.year - 621 if (self.today.month, self.today.day) >= (9, 23) else self.today.year - 622
+        code = f"{first}-{first + 1}"
+        AcademicYear.objects.filter(school=school, is_current=True).exclude(code=code).update(is_current=False)
+        year, _ = AcademicYear.objects.get_or_create(school=school, code=code, defaults=dict(
+            start_date=date(first + 621, 9, 23), end_date=date(first + 622, 6, 21), is_current=True))
+        if not year.is_current:
+            AcademicYear.objects.filter(pk=year.pk).update(is_current=True)
+        classes = {title: SchoolClass.objects.get_or_create(
+            school=school, academic_year=code, title=title, defaults=dict(grade=grade))[0] for grade, title in CLASSES}
+        return year, classes
+
+    def _users(self, password, students, school, year, classes):
         User = get_user_model()
         from schools.models import SchoolMembership
         admin_g, _ = Group.objects.get_or_create(name=ADMIN)
@@ -277,3 +298,23 @@ class Command(BaseCommand):
                 child = next(s for s, p in students if p.get("key") == "improving_after_intervention")
                 child.parent_user = user
                 child.save(update_fields=["parent_user"])
+
+        self._staff(password, school, year, classes)
+
+    def _staff(self, password, school, year, classes):
+        """Slice 1: a demo Subject Teacher (math in two classes) and a demo Grade Lead (grade 10), school staff accounts."""
+        from schools.models import GradeLeadAssignment, SchoolStaff, TeacherAssignment
+        User = get_user_model()
+        for username, first, last, group in (("demo_teacher", "معلم", "نمایشی", "Teacher"),
+                                             ("demo_gradelead", "مربی", "نمایشی", "GradeLead")):
+            user, _ = User.objects.get_or_create(username=username, defaults=dict(first_name=first, last_name=last))
+            user.set_password(password)
+            user.is_staff = False
+            user.save()
+            user.groups.set([Group.objects.get_or_create(name=group)[0]])
+            SchoolStaff.objects.update_or_create(user=user, defaults={"school": school})
+            if group == "Teacher":
+                for title in ("۹-الف", "۱۰-الف"):
+                    TeacherAssignment.objects.get_or_create(teacher=user, school_class=classes[title], subject="math")
+            else:
+                GradeLeadAssignment.objects.get_or_create(user=user, school=school, grade=10, academic_year=year.code)

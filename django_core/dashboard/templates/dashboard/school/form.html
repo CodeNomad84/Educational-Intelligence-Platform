@@ -1,0 +1,10 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}{{ heading }}{% endblock %}
+{% block content %}
+{% include 'dashboard/school/_nav.html' %}
+<div class="card"><div class="card-header">{{ heading }}</div><div class="card-body">
+  <form method="post">{% csrf_token %}{{ form.as_p }}
+    <button class="btn btn-success">ذخیره</button>
+    <a class="btn btn-link" href="{% url back %}">بازگشت</a></form>
+</div></div>
+{% endblock %}

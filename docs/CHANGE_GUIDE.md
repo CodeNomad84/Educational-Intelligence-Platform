@@ -13,6 +13,7 @@ Verified-at: `3404a1a` + Phase 1 branch `phase-1/boot-security`; the commit `340
 | RAG documents table | Django migration `students/0007_rag_documents_table.py` (FastAPI must not create schema) | L3 (ADR-0001) |
 | Login / tokens | `dashboard/views.py` (login_view), `config/urls.py` (`api/token/`), `config/settings/base.py` | L3 |
 | Dashboard/pages | `dashboard/views.py`, `urls.py`, `templates/dashboard/` | React migration TARGET |
+| SchoolAdmin pages (academic year, classes, teacher / grade-lead accounts and assignments; `SchoolStaff` = which school a staff account belongs to) | `dashboard/school_views.py`, `school_forms.py`, `templates/dashboard/school/`, `schools/models.py` (`SchoolStaff`); demo data: `seed_demo` (`demo_teacher`, `demo_gradelead`) | L2 |
 | Student import (CSV/XLSX) | `students/views.py` import action | B-10 |
 | Risk prediction | `students/views.py` predict/features, `fastapi_core/main.py`, `train_nn_model.py`, `models/` | EXPERIMENTAL |
 | Risk thresholds / rules | NOT YET IMPLEMENTED (threshold 0.5 hard-coded in FastAPI) | L2; rule engine Phase 6 |

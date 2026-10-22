@@ -319,3 +319,26 @@ class AcademicYear(models.Model):
                 errors["is_current"] = "برای هر مدرسه فقط یک سال جاری می‌تواند وجود داشته باشد."
         if errors:
             raise ValidationError(errors)
+
+
+class SchoolStaff(models.Model):
+    """The school a staff account (Teacher, Grade Lead) belongs to; created by that school's SchoolAdmin in the dashboard.
+
+    Slice 1. It only says WHICH SchoolAdmin may manage the account; it grants no data access by itself (access
+    comes from the assignments, re-checked at query time in ``students.access``). One school per account.
+    """
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="school_staff", verbose_name="کاربر")
+    school = models.ForeignKey(School, on_delete=models.PROTECT, related_name="staff", verbose_name="مدرسه")
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, editable=False, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "کارکنان مدرسه"
+        verbose_name_plural = "کارکنان مدرسه"
+        ordering = ["school", "user"]
+
+    def __str__(self):
+        return f"{self.user} @ {self.school}"

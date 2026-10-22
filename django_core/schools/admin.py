@@ -8,7 +8,8 @@ from django import forms
 from django.contrib import admin, messages
 from django.contrib.auth import get_user_model
 
-from .models import AcademicYear, GradeLeadAssignment, School, SchoolClass, SchoolMembership, TeacherAssignment
+from .models import (
+    AcademicYear, GradeLeadAssignment, School, SchoolClass, SchoolMembership, SchoolStaff, TeacherAssignment)
 
 
 @admin.register(School)
@@ -181,3 +182,11 @@ class SchoolMembershipAdmin(admin.ModelAdmin):
         if not change and obj.created_by_id is None:
             obj.created_by = request.user
         super().save_model(request, obj, form, change)
+
+
+@admin.register(SchoolStaff)
+class SchoolStaffAdmin(admin.ModelAdmin):
+    list_display = ("user", "school", "created_at")
+    list_filter = ("school",)
+    search_fields = ("user__username",)
+    readonly_fields = ("created_at",)
