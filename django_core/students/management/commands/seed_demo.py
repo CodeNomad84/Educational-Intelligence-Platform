@@ -102,6 +102,7 @@ class Command(BaseCommand):
     # ---------------------------------------------------------------------------------------------
     def handle(self, *args, **opts):
         self._guard()
+        school = self._school(opts["school"])  # validated BEFORE anything is deleted (--reset)
         from demo_intel.engine import analyze_students
         from demo_intel.models import CounselingNote, InterventionRecord, StudentObservation
 
@@ -115,7 +116,6 @@ class Command(BaseCommand):
         elif Student.objects.exists():
             raise CommandError("Demo DB already has students. Use --reset to rebuild it.")
 
-        school = self._school(opts["school"])
         with transaction.atomic():
             profiles = self._build_profiles()
             students = []

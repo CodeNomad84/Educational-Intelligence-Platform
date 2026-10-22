@@ -412,3 +412,35 @@ class SeedDemoSchoolTests(TestCase):
             call_command("seed_demo", "--school", "nope", "--password", "Test-pass-123", verbosity=0)
         call_command("seed_demo", "--school", "second", "--password", "Test-pass-123", verbosity=0)
         self.assertEqual(set(Student.objects.values_list("school__code", flat=True)), {"second"})
+
+
+@override_settings(DATABASES={"default": {**copy.deepcopy(settings.DATABASES["default"]), "NAME": "/x/demo_db.sqlite3"}})
+class SeedDemoResetOrderTests(TestCase):
+    """A bad --school must be reported BEFORE --reset deletes anything."""
+
+    def setUp(self):
+        from schools.models import School
+        call_command("seed_demo", "--password", "Test-pass-123", verbosity=0)
+        School.objects.create(name="Second", code="second")  # now several Schools exist
+        self.before = (Student.objects.count(), StudentObservation.objects.count(),
+                       get_user_model().objects.filter(username__startswith="demo_").count())
+        self.assertGreater(self.before[0], 0)
+
+    def after(self):
+        return (Student.objects.count(), StudentObservation.objects.count(),
+                get_user_model().objects.filter(username__startswith="demo_").count())
+
+    def test_reset_without_school_deletes_nothing(self):
+        with self.assertRaises(CommandError):
+            call_command("seed_demo", "--reset", verbosity=0)
+        self.assertEqual(self.after(), self.before)
+
+    def test_reset_with_a_mistyped_school_deletes_nothing(self):
+        for bad in ("secnd", ""):
+            with self.assertRaises(CommandError):
+                call_command("seed_demo", "--reset", "--school", bad, verbosity=0)
+            self.assertEqual(self.after(), self.before)
+
+    def test_reset_with_a_valid_school_still_rebuilds(self):
+        call_command("seed_demo", "--reset", "--school", "second", "--password", "Test-pass-123", verbosity=0)
+        self.assertEqual(set(Student.objects.values_list("school__code", flat=True)), {"second"})
