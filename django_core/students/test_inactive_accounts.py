@@ -79,7 +79,8 @@ class InactiveAccountTests(TestCase):
         active, inactive = self.pair('Parent')
         self.assertIsNotNone(access._full_tier_q(active, {'Parent'}))
         self.assertIsNone(access._full_tier_q(inactive, {'Parent'}))
-        self.assertIsNone(access_legacy._full_tier_q(inactive, {'Parent'}) if hasattr(access_legacy, '_full_tier_q') else None)
+        self.assertIsNotNone(access_legacy._full_tier_q(active, {'Parent'}))
+        self.assertIsNone(access_legacy._full_tier_q(inactive, {'Parent'}))
 
     def test_the_service_token_of_an_inactive_account_carries_no_role(self):
         import jwt
