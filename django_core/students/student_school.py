@@ -101,3 +101,28 @@ def resolve_student_school(user, *, school_class=None, target_school_id=None, ex
     if existing_school_id is not None and chosen != existing_school_id:
         raise StudentSchoolError(SCHOOL_CHANGE)
     return chosen
+
+
+def class_choices(user, *, keep_pk=None):
+    """Classes the user may pick for a student: active classes of the user's own schools (plus ``keep_pk``, the class the
+    student already has, when it is in one of those schools). Other schools' classes do not exist for the user."""
+    from django.db.models import Q
+
+    from schools.models import SchoolClass
+
+    schools = allowed_school_ids(user)
+    return SchoolClass.objects.filter(Q(is_active=True) | Q(pk=keep_pk), school_id__in=schools)
+
+
+def parent_choices(user, *, keep_pk=None):
+    """Stopgap (changes/0010 D-MS-6): parent accounts already linked to a student of the user's schools (plus the
+    student's current parent). A first-time link of a new parent is a platform duty until the link flow exists."""
+    from django.contrib.auth import get_user_model
+    from django.db.models import Q
+
+    from .models import Student
+
+    schools = allowed_school_ids(user)
+    linked = Student.objects.filter(school_id__in=schools, parent_user__isnull=False).values('parent_user_id')
+    return get_user_model().objects.filter(Q(pk__in=linked) | Q(pk=keep_pk), is_active=True).order_by('username') \
+        if schools else get_user_model().objects.none()

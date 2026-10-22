@@ -1,18 +1,36 @@
 # students/serializers.py
+from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
 from schools.models import SchoolClass
 
 from .models import Student
-from .student_school import StudentSchoolError, resolve_student_school
+from .student_school import MESSAGES, SCHOOL_NOT_ALLOWED, StudentSchoolError, class_choices, parent_choices, resolve_student_school
+
+
+class OwnSchoolClassField(serializers.PrimaryKeyRelatedField):
+    """Only active classes of the requesting user's own schools exist for this field (a foreign class is "does not exist",
+    with the same generic message as a school the user may not use)."""
+    default_error_messages = {'does_not_exist': MESSAGES[SCHOOL_NOT_ALLOWED], 'incorrect_type': MESSAGES[SCHOOL_NOT_ALLOWED]}
+
+    def get_queryset(self):
+        user = getattr(self.context.get('request'), 'user', None)
+        instance = self.parent.instance if self.parent is not None else None
+        return class_choices(user, keep_pk=getattr(instance, 'school_class_id', None))
+
+
+class OwnSchoolParentField(serializers.PrimaryKeyRelatedField):
+    def get_queryset(self):
+        user = getattr(self.context.get('request'), 'user', None)
+        instance = self.parent.instance if self.parent is not None else None
+        return parent_choices(user, keep_pk=getattr(instance, 'parent_user_id', None))
 
 
 class StudentSerializer(serializers.ModelSerializer):
     # school_class is the source of truth for class membership (ADR-0004): only active classes can be
     # chosen, ``school`` is derived server-side and ``class_name`` is a read-only mirror.
-    school_class = serializers.PrimaryKeyRelatedField(
-        queryset=SchoolClass.objects.filter(is_active=True), allow_null=True, required=False,
-    )
+    school_class = OwnSchoolClassField(queryset=SchoolClass.objects.none(), allow_null=True, required=False)
+    parent_user = OwnSchoolParentField(queryset=get_user_model().objects.none(), allow_null=True, required=False)
     # S2b: stateless target school for a student without a class (ignored when a class decides). Never stored as
     # such: ``validate`` turns it into ``school_id`` through the single rule in ``student_school``.
     target_school = serializers.IntegerField(write_only=True, required=False, allow_null=True)

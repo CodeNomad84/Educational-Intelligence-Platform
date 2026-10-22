@@ -82,11 +82,12 @@ class StudentAdmin(admin.ModelAdmin):
             'bound_existing_school_id': obj.school_id if obj is not None else None})
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        from .student_school import class_choices, parent_choices
+        student = getattr(request, '_student_being_edited', None)
         if db_field.name == 'school_class':
-            from django.db.models import Q
-            from schools.models import SchoolClass
-            current = getattr(getattr(request, '_student_being_edited', None), 'school_class_id', None)
-            kwargs['queryset'] = SchoolClass.objects.filter(Q(is_active=True) | Q(pk=current))
+            kwargs['queryset'] = class_choices(request.user, keep_pk=getattr(student, 'school_class_id', None))
+        elif db_field.name == 'parent_user':
+            kwargs['queryset'] = parent_choices(request.user, keep_pk=getattr(student, 'parent_user_id', None))
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     def save_model(self, request, obj, form, change):

@@ -197,19 +197,32 @@ class StudentClassLinkTests(TestCase):
         self.assertEqual(self.student.class_name, '10-A')
 
     def test_school_cannot_disagree_with_the_class(self):
+        from django.core.exceptions import ValidationError
         self.student.school = self.other_school
         self.student.school_class = self.klass
-        self.student.save()
+        with self.assertRaises(ValidationError):
+            self.student.save()
         self.student.refresh_from_db()
         self.assertEqual(self.student.school_id, self.school.pk)
 
-    def test_changing_class_updates_both_derived_fields(self):
+    def test_changing_class_inside_the_school_updates_both_derived_fields(self):
+        self.student.school_class = self.klass
+        self.student.save()
+        self.student.school_class = self.klass2
+        self.student.save()
+        self.student.refresh_from_db()
+        self.assertEqual((self.student.school_id, self.student.class_name), (self.school.pk, '10-B'))
+
+    def test_an_existing_student_cannot_move_to_a_class_of_another_school(self):
+        from django.core.exceptions import ValidationError
         self.student.school_class = self.klass
         self.student.save()
         self.student.school_class = self.foreign
-        self.student.save()
+        with self.assertRaises(ValidationError) as ctx:
+            self.student.save()
+        self.assertNotIn(self.other_school.name, str(ctx.exception))
         self.student.refresh_from_db()
-        self.assertEqual((self.student.school_id, self.student.class_name), (self.other_school.pk, 'X-1'))
+        self.assertEqual((self.student.school_id, self.student.school_class_id), (self.school.pk, self.klass.pk))
 
     def test_clearing_class_keeps_school_and_last_mirror(self):
         self.student.school_class = self.klass

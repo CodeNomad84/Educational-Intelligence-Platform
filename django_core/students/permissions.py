@@ -1,21 +1,13 @@
 # students/permissions.py
 from rest_framework import permissions
 
-from .access import ADMIN, PARENT, TEACHER
+from .access import ADMIN, PARENT, TEACHER, has_any_role
 
 class IsAdminUser(permissions.BasePermission):
-    """
-    اجازه دسترسی فقط به کاربرانی که در گروه Admin هستند یا Superuser هستند.
-    """
+    """School administrators (group SchoolAdmin, or the temporary superuser mapping) through the role check, so an
+    inactive account is refused (``roles_for`` is empty for it)."""
     def has_permission(self, request, view):
-        return (
-            request.user and 
-            request.user.is_authenticated and 
-            (
-                request.user.is_superuser or  # ✅ اضافه کردن این خط
-                request.user.groups.filter(name=ADMIN).exists()
-            )
-        )
+        return bool(request.user and request.user.is_authenticated and has_any_role(request.user, ADMIN))
 
 class IsTeacherUser(permissions.BasePermission):
     """فقط کاربرانی که در گروه Teacher هستند"""

@@ -69,7 +69,7 @@ class ApiCreateTests(Base):
         for extra in ({'target_school': self.b.pk}, {'target_school': 999999}, {'school_class': self.class_b.pk}):
             resp = self.post(user, **extra)
             self.assertEqual(resp.status_code, 400, extra)
-            messages.add(str(resp.json()))
+            messages.add(str(sorted(v[0] for v in resp.json().values())))   # the field may differ, the message may not
         self.assertEqual(len(messages), 1)  # an existing school, a missing one and a foreign class: identical answer
         for text in messages:
             self.assertIn(GENERIC, text)

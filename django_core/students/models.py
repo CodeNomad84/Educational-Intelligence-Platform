@@ -76,6 +76,10 @@ class Student(models.Model):
         """
         if self.school_class_id is not None:
             klass = self.school_class
+            if not self._state.adding and self.school_id is not None and self.school_id != klass.school_id:
+                # an existing student never moves to a class of another school (generic message, no school name)
+                from django.core.exceptions import ValidationError
+                raise ValidationError({'school_class': 'کلاس انتخاب‌شده برای این دانش‌آموز مجاز نیست.'})
             self.school_id = klass.school_id
             self.class_name = klass.title
             update_fields = kwargs.get('update_fields')

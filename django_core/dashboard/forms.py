@@ -2,7 +2,8 @@
 from django import forms
 from schools.models import School, SchoolClass
 from students.models import Student
-from students.student_school import StudentSchoolError, allowed_school_ids, resolve_student_school
+from students.student_school import (
+    StudentSchoolError, allowed_school_ids, class_choices, parent_choices, resolve_student_school)
 
 
 class StudentForm(forms.ModelForm):
@@ -19,7 +20,8 @@ class StudentForm(forms.ModelForm):
         # Class membership is chosen from existing ACTIVE classes only; classes are never auto-created
         # (ADR-0004 §6). ``class_name`` is a read-only mirror and no longer a form field.
         field = self.fields['school_class']
-        field.queryset = SchoolClass.objects.filter(is_active=True).select_related('school')
+        field.queryset = class_choices(user, keep_pk=self.instance.school_class_id).select_related('school')
+        self.fields['parent_user'].queryset = parent_choices(user, keep_pk=self.instance.parent_user_id)
         field.empty_label = '— بدون کلاس —'
         field.required = False
 
