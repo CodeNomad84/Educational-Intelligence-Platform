@@ -257,3 +257,24 @@ class Enrollment(models.Model):
             errors['academic_year'] = "سال تحصیلی با مدرسهٔ دانش‌آموز هم‌خوان نیست."
         if errors:
             raise ValidationError(errors)
+
+
+class Recommendation(models.Model):
+    """A teacher's written recommendation / feedback about a student (Slice 2). Human-written, never AI-generated.
+
+    Visible to the student's full-tier readers (SchoolAdmin of the school, Grade Lead of the grade, the parent) and to its
+    author; see ``students.access.visible_recommendations``.
+    """
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='recommendations')
+    author = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='+', editable=False)
+    subject = models.CharField(max_length=20, choices=SUBJECT_CHOICES, blank=True, verbose_name="درس")
+    text = models.TextField(max_length=2000, verbose_name="توصیه")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at', '-pk']
+        verbose_name = "توصیه"
+        verbose_name_plural = "توصیه‌ها"
+
+    def __str__(self):
+        return f"{self.student} - {self.created_at:%Y-%m-%d}"

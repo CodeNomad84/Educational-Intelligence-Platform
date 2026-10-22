@@ -30,6 +30,9 @@
                 <a href="{% url 'dashboard:library' %}"><i class="bi bi-book"></i> کتابخانه</a>
                 {% endif %}
                 {# DEMO SCOPE end #}
+                {% if IS_TEACHER %}
+                <a href="{% url 'dashboard:teacher_home' %}"><i class="bi bi-journal-check"></i> کلاس‌های من</a>
+                {% endif %}
                 {% if IS_SCHOOL_ADMIN %}
                 <a href="{% url 'dashboard:upload_students' %}"><i class="bi bi-upload"></i> آپلود فایل</a>
                 <a href="{% url 'dashboard:school_home' %}"><i class="bi bi-building"></i> مدیریت مدرسه</a>

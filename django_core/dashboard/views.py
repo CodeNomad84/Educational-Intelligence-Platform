@@ -12,7 +12,7 @@ from django.core.exceptions import ImproperlyConfigured, PermissionDenied
 from config.service_auth import service_headers
 from students.access import (
     ADMIN, GRADE_LEAD, TEACHER, PARENT, roles_for, search_students, visible_attendances, visible_grades,
-    visible_students,
+    visible_recommendations, visible_students,
 )
 from .decorators import role_required
 from students.enrollment_sync import ensure_current_enrollment
@@ -168,6 +168,7 @@ def student_detail_view(request, pk):
         'prediction': prediction_result,
         'input_data': input_data,  # برای نمایش در قالب (اختیاری)
         'can_predict': ADMIN in roles_for(request.user),
+        'recommendations': visible_recommendations(request.user).filter(student=student),
     }
     return render(request, 'dashboard/student_detail.html', context)
 

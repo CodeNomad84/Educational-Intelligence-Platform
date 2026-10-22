@@ -1,0 +1,14 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}کلاس‌های من{% endblock %}
+{% block content %}
+<table class="table table-sm bg-white">
+  <thead><tr><th>کلاس</th><th>درس</th><th></th></tr></thead>
+  <tbody>
+  {% for a in assignments %}
+    <tr><td>{{ a.school_class }}</td><td>{{ a.get_subject_display }}</td>
+      <td><a class="btn btn-sm btn-primary" href="{% url 'dashboard:teacher_grades' a.pk %}">ثبت و مشاهدهٔ نمرات</a></td></tr>
+  {% empty %}<tr><td colspan="3" class="text-muted">کلاسی به شما تخصیص داده نشده است.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

@@ -1,0 +1,16 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}{{ student.first_name }} {{ student.last_name }} — {{ assignment.get_subject_display }}{% endblock %}
+{% block content %}
+<a class="btn btn-link" href="{% url 'dashboard:teacher_grades' assignment.pk %}">← نمرات {{ assignment.school_class }}</a>
+<p>میانگین {{ assignment.get_subject_display }}: <strong>{% if average is not None %}{{ average }}{% else %}—{% endif %}</strong></p>
+<table class="table table-sm bg-white">
+  <thead><tr><th>نوع</th><th>نمره</th><th>تاریخ</th></tr></thead>
+  <tbody>{% for g in grades %}<tr><td>{{ g.get_exam_type_display }}</td><td>{{ g.score }}</td><td>{{ g.date }}</td></tr>
+  {% empty %}<tr><td colspan="3" class="text-muted">نمره‌ای ثبت نشده است.</td></tr>{% endfor %}</tbody>
+</table>
+<div class="card mb-3"><div class="card-header">توصیهٔ جدید (دیده می‌شود برای مدیر مدرسه، مربی پایه و والدین)</div><div class="card-body">
+  <form method="post">{% csrf_token %}{{ form.as_p }}<button class="btn btn-success">ثبت توصیه</button></form></div></div>
+<h5>توصیه‌های من</h5>
+{% for r in recommendations %}<div class="border rounded p-2 mb-2 bg-white"><small class="text-muted">{{ r.created_at|date:"Y-m-d" }}</small><div>{{ r.text|linebreaksbr }}</div></div>
+{% empty %}<p class="text-muted">توصیه‌ای ثبت نشده است.</p>{% endfor %}
+{% endblock %}

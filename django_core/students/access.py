@@ -18,7 +18,7 @@ from schools.academic_years import RESOLVED, normalize_academic_year
 from schools.vocabulary import SUBJECT_KEYS
 
 from .enrollment_sync import CURRENT_STATUSES
-from .models import Attendance, Enrollment, Grade, Student
+from .models import Attendance, Enrollment, Grade, Recommendation, Student
 
 ADMIN = 'SchoolAdmin'  # ADR-0010 (renamed by students/0010); FastAPI auth.ADMIN must match
 TEACHER = 'Teacher'  # Subject Teacher (ADR-0005)
@@ -191,6 +191,18 @@ def visible_attendances(user):
     if full is None:
         return Attendance.objects.none()
     return Attendance.objects.filter(student__in=Student.objects.filter(full))
+
+
+def visible_recommendations(user):
+    """Recommendations the user may read: all of those about students the user reads with a full-detail grant (SchoolAdmin,
+    Grade Lead, Parent), and a Subject Teacher's OWN recommendations about students the teacher may see. Deny by default."""
+    roles = roles_for(user)
+    full = _full_tier_q(user, roles)
+    parts = [Q(student__in=Student.objects.filter(full)) if full is not None else None]
+    if TEACHER in roles and _may_hold_scoped_grants(user):
+        parts.append(Q(author=user, student__in=visible_students(user)))
+    scope = _any(parts)
+    return Recommendation.objects.none() if scope is None else Recommendation.objects.filter(scope)
 
 
 def search_students(queryset, term):
