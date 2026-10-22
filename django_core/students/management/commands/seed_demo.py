@@ -154,7 +154,7 @@ class Command(BaseCommand):
     def _school(code):
         """S2b: every demo student gets an explicit school; no hidden default when several Schools exist."""
         from schools.models import School
-        if code:
+        if code is not None:  # "" is a mistake (e.g. an empty shell variable), never "not given"
             try:
                 return School.objects.get(code=code)
             except School.DoesNotExist:

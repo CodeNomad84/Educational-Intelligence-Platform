@@ -405,6 +405,13 @@ class SeedDemoSchoolTests(TestCase):
             call_command("seed_demo", "--password", "Test-pass-123", verbosity=0)
         self.assertEqual(Student.objects.count(), 0)
 
+    def test_an_empty_school_option_is_an_error_even_with_a_single_school(self):
+        from schools.models import School
+        self.assertEqual(School.objects.count(), 1)  # the case where "" used to silently pick the sole School
+        with self.assertRaises(CommandError):
+            call_command("seed_demo", "--school", "", "--password", "Test-pass-123", verbosity=0)
+        self.assertEqual(Student.objects.count(), 0)
+
     def test_the_school_option_picks_the_school_and_unknown_codes_fail(self):
         from schools.models import School
         School.objects.create(name="Second", code="second")
