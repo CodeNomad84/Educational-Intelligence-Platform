@@ -16,6 +16,11 @@
 #   pulled here).
 # Compared tables (source vs restored; any difference fails): students_student, students_grade, students_recommendation,
 #   schools_auditevent.
+# BACKUPS ARE SENSITIVE (they contain student data). Everything this script writes is created with umask 077 (directories 700,
+#   files 600). By default the dumps live in a temp dir that is deleted on exit. KEEP_BACKUP=1 keeps the SQL dumps in
+#   BACKUP_DIR (default ~/.local/state/eip-backups, OUTSIDE the repository; a directory inside the repository is refused
+#   unless git ignores it, e.g. `backups/`), as <name>-<UTC time>.sql, mode 600. Encrypt and move them off the machine yourself
+#   (docs/RUNBOOK.md section 3); this script does not encrypt.
 # Exit codes: 0 all passed, 1 a check failed, 2 usage error, 3 prerequisites for the pg path missing.
 set -euo pipefail
 
@@ -28,6 +33,7 @@ PG_IMAGE="${PG_IMAGE:-pgvector/pgvector:pg16}"
 DJANGO_IMAGE="${DJANGO_IMAGE:-eip-test-django:local}"
 TABLES="students_student students_grade students_recommendation schools_auditevent"
 WORK=""; PGC=""; NET=""
+umask 077
 
 [ "$#" -le 1 ] || { echo "usage: scripts/backup_restore_check.sh [auto|sqlite|pg]" >&2; exit 2; }
 case "$MODE" in auto|sqlite|pg) ;; *) echo "usage: scripts/backup_restore_check.sh [auto|sqlite|pg]" >&2; exit 2 ;; esac
@@ -40,8 +46,20 @@ cleanup() {
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
-WORK="$(mktemp -d)"
+WORK="$(mktemp -d)"; chmod 700 "$WORK"
 FAILED=0
+keep_backup() {   # keep_backup SOURCE_FILE NAME : copy a dump into BACKUP_DIR (700) as a 600 file, when KEEP_BACKUP=1
+  [ "${KEEP_BACKUP:-0}" = 1 ] || return 0
+  local dir="${BACKUP_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/eip-backups}" real
+  mkdir -p "$dir"; chmod 700 "$dir"; real="$(cd "$dir" && pwd -P)"
+  case "$real/" in "$ROOT"/*)
+    if ! git -C "$ROOT" check-ignore -q -- "$real/x" 2>/dev/null; then
+      echo "REFUSING to keep a backup inside the repository at a path git does not ignore: $real" >&2; FAILED=1; return 0; fi ;;
+  esac
+  local target; target="$real/$2-$(date -u +%Y%m%dT%H%M%SZ).sql"
+  cp "$1" "$target"; chmod 600 "$target"
+  echo "backup kept: $target (mode 600) - SENSITIVE: encrypt it and store it off this machine"
+}
 compare() {   # compare LABEL "t n" lines of source vs restored
   local label="$1" src="$2" dst="$3"
   echo "-- row counts ($label)"; printf '%-28s %10s %10s\n' table source restored
@@ -74,6 +92,7 @@ with open(dump_path, 'w', encoding='utf-8') as out:                         # SQ
         out.write(line + '\n')
 PYEOF
   echo "backup: $(wc -c < "$WORK/backup.sql") bytes of SQL"
+  keep_backup "$WORK/backup.sql" sqlite-demo
   "$PY" -I - "$WORK/backup.sql" "$WORK/restored.sqlite3" <<'PYEOF'
 import sqlite3, sys
 db = sqlite3.connect(sys.argv[2])                                           # a NEW empty file
@@ -137,6 +156,7 @@ s=sqlite3.connect('file:$SOURCE_DB?mode=ro',uri=True); d=sqlite3.connect('$WORK/
   pdj eip_restore_src loaddata /rc/fixture.json
   docker exec -e PGPASSWORD="$pw" "$PGC" pg_dump -U eip_restore -d eip_restore_src > "$WORK/backup.pg.sql"
   echo "backup: $(wc -c < "$WORK/backup.pg.sql") bytes (pg_dump)"
+  keep_backup "$WORK/backup.pg.sql" pg-demo
   psqlc postgres "CREATE DATABASE eip_restore_dst"
   docker exec -i -e PGPASSWORD="$pw" "$PGC" psql -U eip_restore -d eip_restore_dst -v ON_ERROR_STOP=1 -q < "$WORK/backup.pg.sql" >/dev/null
   echo "restored into the empty database eip_restore_dst"

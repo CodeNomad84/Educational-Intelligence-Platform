@@ -16,27 +16,35 @@ from students.access import (
 )
 from schools import audit
 
+from . import throttle
 from .decorators import role_required
 from .home import home_url_for, safe_next
 from students.enrollment_sync import ensure_current_enrollment
 
 # صفحه‌ی ورود
 def login_view(request):
+    status = 200
     if request.method == 'POST':
         username = request.POST.get('username')
         password = request.POST.get('password')
-        user = authenticate(request, username=username, password=password)
-        if user is not None:
+        locked = throttle.is_locked(request, username)   # refused before the password is looked at; same answer for any name
+        user = None if locked else authenticate(request, username=username, password=password)
+        if locked:
+            status = 429
+            messages.error(request, throttle.LOCKED_MESSAGE)
+        elif user is not None:
+            throttle.record_success(username)
             login(request, user)
             return redirect(safe_next(request) or home_url_for(user))
         else:
+            throttle.record_failure(request, username)
             messages.error(request, 'نام کاربری یا رمز عبور اشتباه است.')
     # DEMO SCOPE begin — standalone demo login (vendored assets, DEMO banner); original template kept for non-demo runs
     from django.conf import settings as _demo_settings
     if getattr(_demo_settings, 'DEMO_MODE', False):
-        return render(request, 'demo_intel/login.html')
+        return render(request, 'demo_intel/login.html', status=status)
     # DEMO SCOPE end
-    return render(request, 'dashboard/login.html')
+    return render(request, 'dashboard/login.html', status=status)
 
 # خروج از حساب
 def logout_view(request):

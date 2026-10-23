@@ -306,3 +306,91 @@ class StaffRoleTests(Base):
         self.assertEqual(client.post(reverse('dashboard:school_staff_roles_save', args=[self.staff.pk]),
                                      {'teacher': 'on'}).status_code, 403)
         self.assertEqual(self.client.get(reverse('dashboard:school_staff_roles_save', args=[self.staff.pk])).status_code, 405)
+
+
+class CollisionTests(Base):
+    """Decision (recorded in the commit message): ONE username = ONE account = ONE kind of person in ONE school. Bulk import
+    never merges roles or schools onto an existing account: an id that already belongs to anything other than exactly what the
+    row would create/link in THIS school is one generic row error, identical for every cause, so nothing tells the importer
+    whether the id exists, in which school, or in which role."""
+
+    def generic(self):
+        from dashboard.bulk_accounts import GENERIC
+        return GENERIC
+
+    def test_parent_of_school_a_is_a_generic_error_for_school_b(self):
+        self.confirm([['Ali Test', '9000000001', 7, '7-A', '9000000101', '', 'Father One', '']])
+        parent = User.objects.get(username='9000000101')
+        client_b = Client(); client_b.force_login(self.admin_b)
+        client_b.post(reverse('dashboard:school_accounts'), {'file': xlsx([['Bo Test', '9000000009', 7, '7-A', '9000000101', '', '', '']])})
+        plan = client_b.get(reverse('dashboard:school_accounts_preview')).context['plan']
+        self.assertEqual([(r.status, r.message) for r in plan.rows], [('error', self.generic())])
+        client_b.post(reverse('dashboard:school_accounts_confirm'))
+        self.assertFalse(Student.objects.filter(national_id='9000000009').exists())
+        self.assertEqual(set(Student.objects.filter(parent_user=parent).values_list('school_id', flat=True)), {self.a.pk})
+
+    def test_every_collision_gives_the_same_message_and_no_hint(self):
+        teacher_a = make_user('9000000301', 'Teacher'); SchoolStaff.objects.create(user=teacher_a, school=self.a)
+        parent_a = make_user('9000000111', 'Parent')
+        Student.objects.create(first_name='K', last_name='A', national_id='9000000020', grade=7, phone_number='',
+                               school_class=self.class_a, parent_user=parent_a)
+        parent_b = make_user('9000000112', 'Parent')
+        Student.objects.create(first_name='K', last_name='B', national_id='9000000021', grade=7, phone_number='',
+                               school_class=self.class_b, parent_user=parent_b)
+        stranger = make_user('9000000030')
+        rows = [['S1', '9000000301', 7, '7-A', '', '', '', ''],         # a teacher of this school as a student
+                ['S2', '9000000111', 7, '7-A', '', '', '', ''],         # a parent of this school as a student
+                ['S3', '9000000021', 7, '7-A', '', '', '', ''],         # a student of school B
+                ['S4', '9000000030', 7, '7-A', '', '', '', ''],         # an unrelated account
+                ['S5', '9000000040', 7, '7-A', '9000000301', '', '', ''],    # this school's teacher as a parent
+                ['S6', '9000000041', 7, '7-A', '9000000112', '', '', '']]    # school B's parent
+        plan = self.preview(rows, [['T1', '9000000111', ''], ['T2', '9000000112', ''], ['T3', '9000000030', '']]).context['plan']
+        self.assertEqual({r.status for r in plan.rows}, {'error'})
+        self.assertEqual({r.message for r in plan.rows}, {self.generic()})
+        text = self.preview(rows).content.decode()
+        for forbidden in ('مدرسهٔ B', 'school B', self.b.name + ' ', 'B</td>'):
+            self.assertNotIn(forbidden, text)
+        self.confirm(rows)
+        self.assertEqual(stranger.groups.count(), 0)                    # nothing was merged into the existing accounts
+        self.assertEqual(set(parent_b.groups.values_list('name', flat=True)), {'Parent'})
+        self.assertFalse(Student.objects.filter(national_id__in=['9000000040', '9000000041']).exists())
+
+    def test_one_id_in_two_roles_inside_one_file_is_refused(self):
+        rows = [['Ali Test', '9000000001', 7, '7-A', '9000000101', '', '', ''],
+                ['Parent Dup', '9000000101', 7, '7-A', '', '', '', '']]    # the father's id as a student
+        plan = self.preview(rows, [['Teach Er', '9000000101', '']]).context['plan']
+        self.assertEqual([r.status for r in plan.rows], ['create', 'error', 'error'])
+        self.assertNotIn('9000000101', ''.join(r.message for r in plan.rows))
+
+
+class LoginSheetOnceTests(Base):
+    def test_passwords_exist_only_in_the_download(self):
+        import os
+        import tempfile
+        from django.conf import settings
+        from django.db import connection
+
+        def files():
+            roots = {tempfile.gettempdir(), str(getattr(settings, 'MEDIA_ROOT', '') or '')}
+            return {os.path.join(d, f) for r in roots if r and os.path.isdir(r) for d, _s, fs in os.walk(r) for f in fs}
+
+        before = files()
+        with self.assertNoLogs(level='DEBUG'):
+            response = self.confirm([['Ali Test', '9000000001', 7, '7-A', '9000000101', '', '', '']])
+        passwords = [r[3] for r in load_workbook(io.BytesIO(response.content)).active.iter_rows(min_row=2, values_only=True) if r[3]]
+        self.assertEqual(len(passwords), 2)
+        self.assertEqual(files() - before, set())                       # nothing written to disk by the server
+        with connection.cursor() as cursor:                             # nowhere in the database in plain text
+            for table in connection.introspection.table_names():
+                cursor.execute(f'SELECT * FROM "{table}"')
+                blob = repr(cursor.fetchall())
+                for password in passwords:
+                    self.assertNotIn(password, blob, table)
+        self.assertNotIn('bulk_accounts', self.client.session)   # the uploaded rows are gone too
+        self.assertFalse(any(p in repr(dict(self.client.session)) for p in passwords))
+        shown = ' '.join(str(m) for m in self.client.get(reverse('dashboard:school_accounts')).context['messages'])
+        self.assertFalse(any(p in shown for p in passwords))            # not in any message either
+        again = self.client.post(reverse('dashboard:school_accounts_confirm'))   # no second download, nothing to re-send
+        self.assertEqual(again.status_code, 302)
+        self.assertEqual(self.client.get(reverse('dashboard:school_accounts_confirm')).status_code, 405)
+        self.assertEqual(response['Cache-Control'], 'no-store')
