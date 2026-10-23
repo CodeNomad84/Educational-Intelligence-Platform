@@ -9,7 +9,7 @@ from django.contrib import admin, messages
 from django.contrib.auth import get_user_model
 
 from .models import (
-    AcademicYear, GradeLeadAssignment, School, SchoolClass, SchoolMembership, SchoolStaff, TeacherAssignment)
+    AcademicYear, AuditEvent, GradeLeadAssignment, School, SchoolClass, SchoolMembership, SchoolStaff, TeacherAssignment)
 
 
 @admin.register(School)
@@ -190,3 +190,25 @@ class SchoolStaffAdmin(admin.ModelAdmin):
     list_filter = ("school",)
     search_fields = ("user__username",)
     readonly_fields = ("created_at",)
+
+
+@admin.register(AuditEvent)
+class AuditEventAdmin(admin.ModelAdmin):
+    """Read-only for everyone (the platform account too); the school's SchoolAdmin reads it in the dashboard."""
+    list_display = ("created_at", "username", "school", "action", "object_type", "object_id")
+    list_filter = ("school", "action")
+
+    def has_module_permission(self, request):
+        return False   # not offered in the admin index; the content is school data, read in the dashboard
+
+    def has_view_permission(self, request, obj=None):
+        return False
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

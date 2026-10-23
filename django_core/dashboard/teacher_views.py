@@ -17,6 +17,8 @@ from students.access import TEACHER, visible_grades, visible_recommendations, vi
 from students.enrollment_sync import CURRENT_STATUSES
 from students.models import Enrollment, Grade, Recommendation
 
+from schools import audit
+
 from .decorators import role_required
 
 MAX_SCORE = 20
@@ -90,9 +92,10 @@ def grade_sheet(request, pk):
         if form.is_valid() and not errors and scores:
             for student in students:
                 if student.pk in scores:
-                    Grade.objects.create(
+                    grade = Grade.objects.create(
                         student=student, enrollment=_current_enrollment(student), subject=assignment.subject,
                         exam_type=form.cleaned_data['exam_type'], score=scores[student.pk], date=form.cleaned_data['date'])
+                    audit.record(request.user, audit.GRADE_ADD, grade)
             messages.success(request, f'{len(scores)} نمره ثبت شد.')
             return redirect('dashboard:teacher_grades', pk=assignment.pk)
         if form.is_valid() and not errors and not scores:
@@ -112,6 +115,7 @@ def grade_delete(request, pk, grade_pk):
     assignment = _assignment(request, pk)
     students = _class_students(request.user, assignment).values('pk')
     grade = get_object_or_404(visible_grades(request.user), pk=grade_pk, subject=assignment.subject, student__in=students)
+    audit.record(request.user, audit.GRADE_DELETE, grade)
     grade.delete()
     messages.success(request, 'نمره حذف شد.')
     return redirect('dashboard:teacher_grades', pk=assignment.pk)
@@ -123,9 +127,10 @@ def student_page(request, pk, student_pk):
     student = get_object_or_404(_class_students(request.user, assignment), pk=student_pk)
     form = RecommendationForm(request.POST or None)
     if request.method == 'POST' and form.is_valid():
-        Recommendation.objects.create(student=student, author=request.user, subject=assignment.subject,
-                                      text=form.cleaned_data['text'],
-                                      visible_to_student=form.cleaned_data['visibility'] == 'student')
+        shared = form.cleaned_data['visibility'] == 'student'
+        rec = Recommendation.objects.create(student=student, author=request.user, subject=assignment.subject,
+                                            text=form.cleaned_data['text'], visible_to_student=shared)
+        audit.record(request.user, audit.RECOMMENDATION_ADD, rec, detail='student_visible' if shared else 'staff_only')
         messages.success(request, 'توصیه ثبت شد.')
         return redirect('dashboard:teacher_student', pk=assignment.pk, student_pk=student.pk)
     grades = visible_grades(request.user).filter(student=student, subject=assignment.subject).order_by('-date')

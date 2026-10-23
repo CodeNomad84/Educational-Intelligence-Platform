@@ -41,6 +41,7 @@ urlpatterns = [
     path('school/', school_views.home, name='school_home'),
     path('school/years/', school_views.years, name='school_years'),
     path('school/years/<int:pk>/current/', school_views.year_set_current, name='school_year_current'),
+    path('school/audit/', school_views.audit_log, name='school_audit'),
     path('school/classes/', school_views.classes, name='school_classes'),
     path('school/classes/new/', school_views.class_edit, name='school_class_new'),
     path('school/classes/<int:pk>/edit/', school_views.class_edit, name='school_class_edit'),

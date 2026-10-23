@@ -12,6 +12,8 @@ from students.access import (
     ADMIN, COUNSELOR, GRADE_LEAD, visible_counselor_notes, visible_referrals, visible_students)
 from students.models import CounselorNote, Referral
 
+from schools import audit
+
 from .decorators import role_required
 from .school_forms import staff_queryset
 from .student360 import summary_context
@@ -46,8 +48,9 @@ def student_refer(request, pk):
     student = get_object_or_404(visible_students(request.user).filter(full_tier=True).select_related('school'), pk=pk)
     form = ReferralForm(request.POST, student=student)
     if form.is_valid():
-        Referral.objects.create(student=student, school=student.school, counselor=form.cleaned_data['counselor'],
-                                referred_by=request.user, reason=form.cleaned_data['reason'])
+        referral = Referral.objects.create(student=student, school=student.school, counselor=form.cleaned_data['counselor'],
+                                           referred_by=request.user, reason=form.cleaned_data['reason'])
+        audit.record(request.user, audit.REFERRAL_CREATE, referral)
         messages.success(request, 'دانش‌آموز به مشاور ارجاع شد.')
     else:
         messages.error(request, 'ارجاع ثبت نشد: ' + ' '.join(e for errs in form.errors.values() for e in errs))
@@ -71,9 +74,12 @@ def case(request, pk):
     referral, student = _case(request, pk)
     form = NoteForm(request.POST or None)
     if request.method == 'POST' and form.is_valid():
-        CounselorNote.objects.create(referral=referral, author=request.user, text=form.cleaned_data['text'])
+        note = CounselorNote.objects.create(referral=referral, author=request.user, text=form.cleaned_data['text'])
+        audit.record(request.user, audit.NOTE_ADD, note)
         messages.success(request, 'یادداشت ثبت شد.')
         return redirect('dashboard:counselor_case', pk=referral.pk)
+    audit.record(request.user, audit.VIEW_CASE, referral)
+    audit.record(request.user, audit.SHOW_PARENT_PHONES, student)    # the case page displays the parents' phone numbers
     context = summary_context(request, student)
     context.update(referral=referral, form=form,
                    notes=visible_counselor_notes(request.user).filter(referral=referral).select_related('author'))
@@ -87,5 +93,6 @@ def case_close(request, pk):
     referral.status = 'closed'
     referral.closed_at = timezone.now()
     referral.save(update_fields=['status', 'closed_at'])
+    audit.record(request.user, audit.REFERRAL_CLOSE, referral)
     messages.success(request, 'پرونده بسته شد؛ دسترسی مشاور به این دانش‌آموز پایان یافت.')
     return redirect('dashboard:counselor_home')

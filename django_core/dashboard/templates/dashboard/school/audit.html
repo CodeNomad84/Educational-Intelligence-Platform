@@ -1,0 +1,18 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}گزارش دسترسی‌ها و تغییرات{% endblock %}
+{% block content %}
+{% include 'dashboard/school/_nav.html' %}
+<form method="get" class="mb-3 d-flex gap-2">
+  <select name="action" class="form-select w-auto" onchange="this.form.submit()"><option value="">همهٔ رویدادها</option>
+    {% for a in actions %}<option value="{{ a }}" {% if a == action %}selected{% endif %}>{{ a }}</option>{% endfor %}</select>
+</form>
+<p class="text-muted small">فقط شناسه‌ها و نوع رویداد ثبت می‌شود؛ هیچ متنی (نمره، یادداشت، تلفن) در این گزارش ذخیره نمی‌شود.</p>
+<table class="table table-sm bg-white">
+  <thead><tr><th>زمان</th><th>کاربر</th><th>نقش</th><th>رویداد</th><th>شیء</th><th>جزئیات</th></tr></thead>
+  <tbody>
+  {% for e in events %}<tr><td>{{ e.created_at|date:"Y-m-d H:i" }}</td><td>{{ e.username }}</td><td>{{ e.roles }}</td><td>{{ e.action }}</td>
+    <td>{{ e.object_type }} #{{ e.object_id }}</td><td>{{ e.detail }}</td></tr>
+  {% empty %}<tr><td colspan="6" class="text-muted">رویدادی ثبت نشده است.</td></tr>{% endfor %}
+  </tbody>
+</table>
+{% endblock %}

@@ -342,3 +342,33 @@ class SchoolStaff(models.Model):
 
     def __str__(self):
         return f"{self.user} @ {self.school}"
+
+
+class AuditEvent(models.Model):
+    """Who did what to which object, when (audit log, 2.4). Append-only; stores NO content: only ids, an action name and a
+    short fixed code. Readable by the SchoolAdmin of the event's school (dashboard /school/audit/) and by nobody else."""
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    username = models.CharField(max_length=150)        # snapshot: still readable if the account is deleted
+    roles = models.CharField(max_length=120, blank=True)   # snapshot of the acting roles
+    school = models.ForeignKey(School, on_delete=models.PROTECT, related_name="audit_events")
+    action = models.CharField(max_length=40, db_index=True)
+    object_type = models.CharField(max_length=40, blank=True)
+    object_id = models.CharField(max_length=20, blank=True)
+    detail = models.CharField(max_length=40, blank=True)   # a fixed code (e.g. "student_visible"); never free text
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ["-created_at", "-pk"]
+        indexes = [models.Index(fields=["school", "-created_at"])]
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError("Audit events are append-only.")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("Audit events cannot be deleted.")
+
+    def __str__(self):
+        return f"{self.created_at:%Y-%m-%d %H:%M} {self.username} {self.action} {self.object_type}#{self.object_id}"

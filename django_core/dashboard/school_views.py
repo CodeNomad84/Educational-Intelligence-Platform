@@ -14,6 +14,9 @@ from schools.models import AcademicYear, GradeLeadAssignment, School, SchoolClas
 from students.access import ADMIN, COUNSELOR, GRADE_LEAD, TEACHER, visible_students
 from students.student_school import allowed_school_ids
 
+from schools import audit
+from schools.models import AuditEvent
+
 from .decorators import role_required
 from .school_forms import (
     AcademicYearForm, GradeLeadAssignmentForm, SchoolClassForm, StaffAccountForm, TeacherAssignmentForm,
@@ -126,6 +129,7 @@ def staff_list(request, school, kind):
     form = StaffAccountForm(request.POST or None, school=school, group_name=group, created_by=request.user)
     if request.method == 'POST' and form.is_valid():
         user = form.save()
+        audit.record(request.user, audit.STAFF_ACCOUNT_CREATE, user, school=school, detail=kind)
         messages.success(request, f'حساب {noun} ساخته شد: {user.username}')
         return redirect('dashboard:school_staff_detail', kind=kind, pk=user.pk)
     return _render(request, school, 'staff_list.html', kind=kind, title=title, noun=noun, form=form,
@@ -177,3 +181,14 @@ def staff_toggle_active(request, school, kind, pk):
     person.save(update_fields=['is_active'])
     messages.success(request, f'حساب {noun} {"فعال" if person.is_active else "غیرفعال"} شد.')
     return redirect('dashboard:school_staff_detail', kind=kind, pk=person.pk)
+
+
+@school_page
+def audit_log(request, school):
+    """The audit log of the CURRENT school (read-only; no content is stored in it): the newest 300 events."""
+    events = AuditEvent.objects.filter(school=school)
+    action = request.GET.get('action', '')
+    if action:
+        events = events.filter(action=action)
+    actions = AuditEvent.objects.filter(school=school).order_by().values_list('action', flat=True).distinct()
+    return _render(request, school, 'audit.html', events=events[:300], actions=sorted(actions), action=action)

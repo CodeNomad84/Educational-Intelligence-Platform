@@ -11,6 +11,7 @@ from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
+from schools import audit
 from students import study_assistant
 from students.access import ADMIN, STUDENT, visible_grades, visible_recommendations, visible_students
 
@@ -92,6 +93,7 @@ def create_account(request, pk):
     form = StudentAccountForm(request.POST, student=student)
     if form.is_valid():
         user = form.save()
+        audit.record(request.user, audit.STUDENT_ACCOUNT_CREATE, student)
         messages.success(request, f'حساب دانش‌آموز ساخته شد: {user.username}')
     else:
         messages.error(request, 'حساب ساخته نشد: ' + ' '.join(e for errs in form.errors.values() for e in errs))

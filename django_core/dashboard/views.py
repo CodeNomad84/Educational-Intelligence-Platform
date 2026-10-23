@@ -14,6 +14,8 @@ from students.access import (
     ADMIN, COUNSELOR, GRADE_LEAD, STUDENT, TEACHER, PARENT, roles_for, search_students, visible_attendances, visible_grades,
     visible_recommendations, visible_students,
 )
+from schools import audit
+
 from .decorators import role_required
 from .home import home_url_for, safe_next
 from students.enrollment_sync import ensure_current_enrollment
@@ -92,6 +94,7 @@ def student_detail_view(request, pk):
     # Object-level access: the lookup is scoped to the students this user may see,
     # so another family's child is a 404 (not a 403, to avoid confirming it exists).
     student = get_object_or_404(visible_students(request.user), pk=pk)
+    audit.record(request.user, audit.VIEW_DETAIL, student)
     # DEMO SCOPE begin — demo intelligence profile for staff (parents keep the original page)
     from django.conf import settings as _demo_settings
     if getattr(_demo_settings, 'DEMO_MODE', False) and ADMIN in roles_for(request.user):

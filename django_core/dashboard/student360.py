@@ -12,6 +12,8 @@ from students.access import (
     visible_recommendations, visible_referrals, visible_students)
 from students.models import Enrollment
 
+from schools import audit
+
 from .decorators import role_required
 
 UNKNOWN_YEAR = 'بدون سال'
@@ -56,6 +58,7 @@ def summary_context(request, student):
 @role_required(ADMIN, GRADE_LEAD, PARENT)
 def student_360(request, pk):
     student = get_object_or_404(visible_students(request.user).filter(full_tier=True), pk=pk)
+    audit.record(request.user, audit.VIEW_360, student)
     context = summary_context(request, student)
     context['referrals'] = visible_referrals(request.user).filter(student=student).select_related('counselor')
     context['counselor_notes'] = visible_counselor_notes(request.user).filter(
