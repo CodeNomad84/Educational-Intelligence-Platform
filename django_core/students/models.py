@@ -17,6 +17,9 @@ class Student(models.Model):
     class_name = models.CharField(max_length=50, blank=True, verbose_name="کلاس")
     father_job = models.CharField(max_length=100, blank=True, verbose_name="شغل پدر")
     mother_job = models.CharField(max_length=100, blank=True, verbose_name="شغل مادر")
+    # Owner correction A2: shown ONLY on the case page of a referred student (counselor), never in lists, the API or details.
+    father_phone = models.CharField(max_length=20, blank=True, verbose_name="تلفن پدر")
+    mother_phone = models.CharField(max_length=20, blank=True, verbose_name="تلفن مادر")
     
     # ارتباط به مدل User (برای والدین)
     parent_user = models.ForeignKey(
@@ -273,6 +276,8 @@ class Recommendation(models.Model):
     author = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='+', editable=False)
     subject = models.CharField(max_length=20, choices=SUBJECT_CHOICES, blank=True, verbose_name="درس")
     text = models.TextField(max_length=2000, verbose_name="توصیه")
+    # Owner correction A4: staff-only by default; True = the student (and the parents) can read this text.
+    visible_to_student = models.BooleanField(default=False, verbose_name="قابل نمایش به دانش‌آموز")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

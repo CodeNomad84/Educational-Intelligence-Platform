@@ -1,0 +1,47 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}داشبورد پایه{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h5 class="mb-0">نمای کلی پایهٔ شما</h5>
+  <a class="btn btn-outline-primary btn-sm" href="{% url 'dashboard:student_list' %}">فهرست دانش‌آموزان پایه</a>
+</div>
+<div class="row g-3 mb-3">
+  <div class="col-6 col-lg-3"><div class="card card-stats"><div class="text-muted">دانش‌آموزان</div><h3>{{ o.total }}</h3></div></div>
+  <div class="col-6 col-lg-3"><div class="card card-stats"><div class="text-muted">میانگین نمرات (از ۲۰)</div><h3>{% if o.average is not None %}{{ o.average }}{% else %}—{% endif %}</h3></div></div>
+  <div class="col-6 col-lg-3"><div class="card card-stats"><div class="text-muted">غیبت ۳۰ روز اخیر</div><h3>{% if o.absence is not None %}{{ o.absence }}٪{% else %}—{% endif %}</h3></div></div>
+  <div class="col-6 col-lg-3"><div class="card card-stats"><div class="text-muted">نیازمند توجه</div><h3>{{ o.attention_count }}</h3></div></div>
+</div>
+<div class="row g-3 mb-3">
+  <div class="col-lg-6"><div class="card h-100"><div class="card-header">توزیع نمرات</div><div class="card-body"><div style="height:220px"><canvas id="scoreChart"></canvas></div></div></div></div>
+  <div class="col-lg-6"><div class="card h-100"><div class="card-header">روند غیبت هفتگی (٪)</div><div class="card-body"><div style="height:220px"><canvas id="absChart"></canvas></div></div></div></div>
+</div>
+<div class="row g-3">
+  <div class="col-lg-7"><div class="card h-100"><div class="card-header">دانش‌آموزان نیازمند توجه</div>
+    <table class="table table-sm mb-0"><thead><tr><th>نام</th><th>کلاس</th><th>دلیل</th><th></th></tr></thead><tbody>
+    {% for a in o.attention %}<tr><td>{{ a.student.first_name }} {{ a.student.last_name }}</td><td>{{ a.student.class_name }}</td>
+      <td class="small">{{ a.reasons|join:"؛ " }}</td>
+      <td><a class="btn btn-sm btn-outline-primary" href="{% url 'dashboard:student_360' a.student.pk %}">پرونده ۳۶۰</a></td></tr>
+    {% empty %}<tr><td colspan="4" class="text-center text-muted">موردی یافت نشد.</td></tr>{% endfor %}
+    </tbody></table></div></div>
+  <div class="col-lg-5"><div class="card h-100"><div class="card-header">کلاس‌های پایه</div>
+    <table class="table table-sm mb-0"><thead><tr><th>کلاس</th><th>تعداد</th><th>میانگین</th><th>غیبت</th><th>توجه</th></tr></thead><tbody>
+    {% for c in o.classes %}<tr><td>{{ c.name }}</td><td>{{ c.count }}</td><td>{% if c.average is not None %}{{ c.average }}{% else %}—{% endif %}</td>
+      <td>{% if c.absence is not None %}{{ c.absence }}٪{% else %}—{% endif %}</td><td>{{ c.attention }}</td></tr>
+    {% empty %}<tr><td colspan="5" class="text-muted text-center">کلاسی یافت نشد.</td></tr>{% endfor %}
+    </tbody></table></div></div>
+</div>
+<p class="text-muted small mt-3">قواعد ساده و قابل‌توضیح: میانگین کمتر از ۱۲ یا غیبت ۳۰ روز اخیر دست‌کم ۲۰٪. این یک پیش‌بینی نیست و نیازمند بررسی انسانی است.</p>
+{{ o.score_buckets|json_script:"d-score" }}
+{{ o.absence_trend|json_script:"d-abs" }}
+{% endblock %}
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+const J = id => JSON.parse(document.getElementById(id).textContent);
+const sc = J('d-score'), ab = J('d-abs');
+new Chart(document.getElementById('scoreChart'), {type:'bar', data:{labels:sc.labels, datasets:[{data:sc.values, backgroundColor:'#2b5fd9'}]},
+  options:{maintainAspectRatio:false, plugins:{legend:{display:false}}}});
+new Chart(document.getElementById('absChart'), {type:'line', data:{labels:ab.labels, datasets:[{data:ab.values, borderColor:'#c0392b', tension:.3, spanGaps:true}]},
+  options:{maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}}}});
+</script>
+{% endblock %}

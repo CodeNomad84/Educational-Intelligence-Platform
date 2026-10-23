@@ -102,7 +102,7 @@ class GradeTests(Base):
 
 class RecommendationTests(Base):
     def add(self, text='Needs more practice'):
-        return self.client.post(reverse('dashboard:teacher_student', args=[self.assign.pk, self.s1.pk]), {'text': text})
+        return self.client.post(reverse('dashboard:teacher_student', args=[self.assign.pk, self.s1.pk]), {'text': text, 'visibility': 'staff'})
 
     def test_teacher_adds_a_recommendation_and_sees_it(self):
         self.assertEqual(self.add().status_code, 302)
@@ -113,15 +113,18 @@ class RecommendationTests(Base):
 
     def test_who_can_read_it(self):
         self.add()
-        expected = {self.teacher: 1, self.admin: 1, self.lead: 1, self.parent: 1, self.teacher2: 0, self.other_admin: 0}
+        # staff-only by default (owner correction A4): the parent does not read it
+        expected = {self.teacher: 1, self.admin: 1, self.lead: 1, self.parent: 0, self.teacher2: 0, self.other_admin: 0}
         for user, count in expected.items():
             self.assertEqual(visible_recommendations(user).count(), count, user.username)
         for user, status in ((self.admin, 200), (self.parent, 200), (self.lead, 200), (self.other_admin, 404)):
             self.client.force_login(user)
             resp = self.client.get(reverse('dashboard:student_detail', args=[self.s1.pk]))
             self.assertEqual(resp.status_code, status, user.username)
-            if status == 200:
+            if status == 200 and user != self.parent:
                 self.assertContains(resp, 'Needs more practice')
+            if user == self.parent:
+                self.assertNotContains(resp, 'Needs more practice')
 
     def test_an_inactive_or_unrelated_account_reads_none(self):
         self.add()

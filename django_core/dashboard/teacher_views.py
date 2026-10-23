@@ -53,8 +53,13 @@ class GradeSheetForm(forms.Form):
     date = forms.DateField(label='تاریخ آزمون', widget=forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}))
 
 
+VISIBILITY_CHOICES = [('staff', 'فقط کادر مدرسه'), ('student', 'قابل نمایش به دانش‌آموز')]
+
+
 class RecommendationForm(forms.Form):
     text = forms.CharField(label='توصیه', max_length=2000, widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3}))
+    visibility = forms.ChoiceField(label='چه کسی می‌بیند؟', choices=VISIBILITY_CHOICES, initial='staff',
+                                   widget=forms.RadioSelect)
 
 
 @role_required(TEACHER)
@@ -119,7 +124,8 @@ def student_page(request, pk, student_pk):
     form = RecommendationForm(request.POST or None)
     if request.method == 'POST' and form.is_valid():
         Recommendation.objects.create(student=student, author=request.user, subject=assignment.subject,
-                                      text=form.cleaned_data['text'])
+                                      text=form.cleaned_data['text'],
+                                      visible_to_student=form.cleaned_data['visibility'] == 'student')
         messages.success(request, 'توصیه ثبت شد.')
         return redirect('dashboard:teacher_student', pk=assignment.pk, student_pk=student.pk)
     grades = visible_grades(request.user).filter(student=student, subject=assignment.subject).order_by('-date')

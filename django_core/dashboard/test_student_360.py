@@ -44,7 +44,8 @@ class Base(TestCase):
         Attendance.objects.create(student=self.child, date='2026-01-03', status='absent')
         teacher = make_user('teacher', 'Teacher')
         TeacherAssignment.objects.create(teacher=teacher, school_class=self.c7, subject='math')
-        Recommendation.objects.create(student=self.child, author=teacher, subject='math', text='Keep practising fractions')
+        Recommendation.objects.create(student=self.child, author=teacher, subject='math', text='Keep practising fractions',
+                                      visible_to_student=True)
         self.admin = make_user('admin', 'SchoolAdmin')
         SchoolMembership.objects.create(user=self.admin, school=self.a)
         self.admin_b = make_user('admin-b', 'SchoolAdmin')
@@ -87,9 +88,9 @@ class HappyPathTests(Base):
             self.client.force_login(user)
             self.assertContains(self.client.get(reverse('dashboard:student_list')), self.url(self.child))
 
-    def test_the_grade_lead_lands_on_the_list_of_its_grade(self):
+    def test_the_grade_lead_lands_on_the_dashboard_and_the_list_filters_by_grade(self):
         from dashboard.home import home_url_for
-        self.assertEqual(home_url_for(self.lead), '/students/?grade=7')
+        self.assertEqual(home_url_for(self.lead), '/grade/')
         self.client.force_login(self.lead)
         body = self.client.get('/students/?grade=7').content.decode()
         self.assertIn('Child', body)
@@ -121,3 +122,53 @@ class ScopeTests(Base):
         body = self.client.get(self.url(self.child)).content.decode()
         for secret in ('Eight', 'Foreign', self.grade8.national_id, self.foreign.national_id):
             self.assertNotIn(secret, body)
+
+
+class GradeDashboardTests(Base):
+    """Owner correction A1: the Grade Lead dashboard shows only the own grade of the own school."""
+
+    def setUp(self):
+        super().setUp()
+        self.bad = self.student('Weak', self.c7, 7)
+        for score in (4, 6):
+            Grade.objects.create(student=self.bad, enrollment=self.bad.enrollments.get(), subject='math',
+                                 exam_type='quiz', score=score, date='2026-01-05')
+        Grade.objects.create(student=self.grade8, enrollment=self.grade8.enrollments.get(), subject='math',
+                             exam_type='quiz', score=2, date='2026-01-05')            # grade 8: must not appear
+        Grade.objects.create(student=self.foreign, enrollment=self.foreign.enrollments.get(), subject='math',
+                             exam_type='quiz', score=1, date='2026-01-05')            # other school: must not appear
+
+    def test_counts_classes_and_attention_cover_only_the_own_grade(self):
+        from dashboard.grade_dashboard import grade_overview
+        o = grade_overview(self.lead)
+        self.assertEqual(o['total'], 2)                                   # Child and Weak, not Eight, not Foreign
+        self.assertEqual([c['name'] for c in o['classes']], ['7-A'])
+        self.assertEqual([a['student'].pk for a in o['attention']], [self.bad.pk])
+        self.assertEqual(sum(o['score_buckets']['values']), 4)             # 2 grades of Child + 2 of Weak
+
+    def test_the_page_shows_no_other_grade_or_school(self):
+        self.client.force_login(self.lead)
+        resp = self.client.get(reverse('dashboard:grade_dashboard'))
+        self.assertEqual(resp.status_code, 200)
+        body = resp.content.decode()
+        self.assertIn('Weak', body)
+        self.assertIn(reverse('dashboard:student_360', args=[self.bad.pk]), body)
+        for secret in ('Eight', 'Foreign', '8-A', '7-B'):
+            self.assertNotIn(secret, body)
+
+    def test_wrong_roles_get_403_and_inactive_or_anonymous_are_refused(self):
+        url = reverse('dashboard:grade_dashboard')
+        for user in (self.admin, self.parent, self.teacher, make_user('root', is_superuser=True)):
+            self.client.force_login(user)
+            self.assertEqual(self.client.get(url).status_code, 403, user.username)
+        self.client.logout()
+        self.assertEqual(self.client.get(url).status_code, 302)
+        User.objects.filter(pk=self.lead.pk).update(is_active=False)
+        self.client.force_login(User.objects.get(pk=self.lead.pk))
+        self.assertEqual(self.client.get(url).status_code, 302)
+
+    def test_a_grade_lead_without_assignment_sees_an_empty_dashboard(self):
+        self.client.force_login(make_user('lead2', 'GradeLead'))
+        resp = self.client.get(reverse('dashboard:grade_dashboard'))
+        self.assertEqual(resp.status_code, 200)
+        self.assertNotIn('Child', resp.content.decode())

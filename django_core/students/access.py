@@ -213,16 +213,19 @@ def visible_attendances(user):
 
 
 def visible_recommendations(user):
-    """Recommendations the user may read: all of those about students the user reads with a full-detail grant (SchoolAdmin,
-    Grade Lead, Parent), and a Subject Teacher's OWN recommendations about students the teacher may see. Deny by default."""
+    """Recommendations the user may read. Owner correction A4: a recommendation is STAFF-ONLY unless the teacher marked it
+    ``visible_to_student``. SchoolAdmin, Grade Lead and Counselor (referred students) read all of their students'; a Subject
+    Teacher reads the own; the student and the parents read only the student-visible ones. Deny by default."""
     roles = roles_for(user)
-    full = _full_tier_q(user, roles)
-    parts = [Q(student__in=Student.objects.filter(full)) if full is not None else None]
+    staff = _any([_school_admin_q(user, roles), _grade_lead_q(user, roles), _counselor_q(user, roles)])
+    parts = [Q(student__in=Student.objects.filter(staff)) if staff is not None else None]
+    if PARENT in roles and user.is_active:
+        parts.append(Q(student__parent_user=user, visible_to_student=True))
+    own = _own_student_q(user, roles)
+    if own is not None:
+        parts.append(Q(student__in=Student.objects.filter(own), visible_to_student=True))
     if TEACHER in roles and _may_hold_scoped_grants(user):
         parts.append(Q(author=user, student__in=visible_students(user)))
-    own = _own_student_q(user, roles)
-    if own is not None:   # a student reads the feedback written about themselves
-        parts.append(Q(student__in=Student.objects.filter(own)))
     scope = _any(parts)
     return Recommendation.objects.none() if scope is None else Recommendation.objects.filter(scope)
 
@@ -244,13 +247,16 @@ def visible_referrals(user):
 
 
 def visible_counselor_notes(user):
-    """Counselor notes: the SchoolAdmin of the school and the counselor of the (open) case. Nobody else."""
+    """Counselor notes: the counselor of the (open) case, the Grade Lead of the student's grade (read-only) and the school's SchoolAdmin. Teachers, parents and students never."""
     roles = roles_for(user)
     admin = _school_admin_q(user, roles)
     parts = [Q(referral__student__in=Student.objects.filter(admin)) if admin is not None else None]
     counselor = _counselor_q(user, roles)
     if counselor is not None:
         parts.append(Q(referral__counselor=user, referral__student__in=Student.objects.filter(counselor)))
+    lead = _grade_lead_q(user, roles)   # read-only: there is no write path for a Grade Lead
+    if lead is not None:
+        parts.append(Q(referral__student__in=Student.objects.filter(lead)))
     scope = _any(parts)
     return CounselorNote.objects.none() if scope is None else CounselorNote.objects.filter(scope)
 

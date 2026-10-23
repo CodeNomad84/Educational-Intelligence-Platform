@@ -125,6 +125,7 @@ class Command(BaseCommand):
                 s = Student.objects.create(
                     first_name=p["first"], last_name=p["last"], national_id=f"9000{idx:06d}",
                     grade=p["grade"], class_name=p["cls"], phone_number=f"0900000{idx:04d}", school=school,
+                    father_phone=f"0911000{idx:04d}", mother_phone=f"0912000{idx:04d}",
                     school_class=classes[p["cls"]])
                 ensure_current_enrollment(s, source="manual")
                 students.append((s, p))

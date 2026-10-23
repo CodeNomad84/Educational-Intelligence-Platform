@@ -47,7 +47,7 @@ class StudentForm(forms.ModelForm):
         fields = [
             'first_name', 'last_name', 'national_id',
             'grade', 'school_class', 'phone_number',
-            'father_job', 'mother_job', 'parent_user'
+            'father_job', 'mother_job', 'father_phone', 'mother_phone', 'parent_user'
         ]
         widgets = {
             'first_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'نام'}),
@@ -58,6 +58,8 @@ class StudentForm(forms.ModelForm):
             'phone_number': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'شماره تماس'}),
             'father_job': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'شغل پدر'}),
             'mother_job': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'شغل مادر'}),
+            'father_phone': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'تلفن پدر'}),
+            'mother_phone': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'تلفن مادر'}),
             'parent_user': forms.Select(attrs={'class': 'form-select'}),
         }
         labels = {

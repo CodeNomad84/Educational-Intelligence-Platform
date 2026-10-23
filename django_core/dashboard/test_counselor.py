@@ -136,20 +136,22 @@ class CounselorAccessTests(Base):
         self.assertContains(page, self.s7.national_id)
         self.assertEqual(self.client.get(reverse('dashboard:student_360', args=[self.s7.pk])).status_code, 403)
 
-    def test_notes_are_visible_only_to_the_counselor_and_the_school_admin(self):
+    def test_notes_are_visible_to_the_counselor_the_grade_lead_and_the_school_admin_only(self):
         self.client.force_login(self.counselor)
         self.client.post(reverse('dashboard:counselor_case', args=[self.referral.pk]), {'text': 'Private counselor note'})
         note = CounselorNote.objects.get()
         self.assertEqual((note.author_id, note.referral_id), (self.counselor.pk, self.referral.pk))
         self.assertContains(self.client.get(reverse('dashboard:counselor_case', args=[self.referral.pk])),
                             'Private counselor note')
-        readers = {self.counselor: 1, self.admin: 1, self.admin_b: 0, self.counselor_b: 0, self.lead: 0, self.parent: 0}
+        readers = {self.counselor: 1, self.admin: 1, self.admin_b: 0, self.counselor_b: 0, self.lead: 1, self.parent: 0}   # lead: grade 7, read-only (A3)
         for user, count in readers.items():
             self.assertEqual(visible_counselor_notes(user).count(), count, user.username)
         self.client.force_login(self.admin)
         self.assertContains(self.client.get(reverse('dashboard:student_360', args=[self.s7.pk])), 'Private counselor note')
         self.client.force_login(self.lead)
-        self.assertNotContains(self.client.get(reverse('dashboard:student_360', args=[self.s7.pk])), 'Private counselor note')
+        self.assertContains(self.client.get(reverse('dashboard:student_360', args=[self.s7.pk])), 'Private counselor note')
+        self.client.force_login(self.parent)
+        self.assertEqual(self.client.get(reverse('dashboard:student_360', args=[self.s7.pk])).status_code, 404)
 
     def test_closing_the_case_ends_the_access(self):
         self.client.force_login(self.counselor)

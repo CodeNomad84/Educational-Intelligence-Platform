@@ -25,5 +25,5 @@
 <ul>{% for label, n in attendance.rows %}<li>{{ label }}: {{ n }}</li>{% endfor %}</ul>
 {% else %}<p class="text-muted">حضور و غیابی ثبت نشده است.</p>{% endif %}
 <h5 class="mt-4">توصیه‌های معلمان</h5>
-{% for r in recommendations %}<div class="border rounded p-2 mb-2 bg-white"><small class="text-muted">{{ r.created_at|date:"Y-m-d" }}{% if r.subject %} — {{ r.get_subject_display }}{% endif %}{% if r.author %} — {{ r.author.first_name }} {{ r.author.last_name }}{% endif %}</small><div>{{ r.text|linebreaksbr }}</div></div>
+{% for r in recommendations %}<div class="border rounded p-2 mb-2 bg-white"><small class="text-muted">{{ r.created_at|date:"Y-m-d" }}{% if r.subject %} — {{ r.get_subject_display }}{% endif %}{% if r.visible_to_student %} — قابل نمایش به دانش‌آموز{% else %} — فقط کادر مدرسه{% endif %}{% if r.author %} — {{ r.author.first_name }} {{ r.author.last_name }}{% endif %}</small><div>{{ r.text|linebreaksbr }}</div></div>
 {% empty %}<p class="text-muted">توصیه‌ای ثبت نشده است.</p>{% endfor %}

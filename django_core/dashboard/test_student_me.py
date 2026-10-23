@@ -50,7 +50,8 @@ class Base(TestCase):
                 Grade.objects.create(student=student, enrollment=enrollment, subject='math', exam_type='quiz',
                                      score=score, date=f'2026-01-0{i + 1}')
         Attendance.objects.create(student=self.me, date='2026-01-02', status='absent')
-        Recommendation.objects.create(student=self.me, author=self.teacher, subject='math', text='Practise fractions daily')
+        Recommendation.objects.create(student=self.me, author=self.teacher, subject='math', text='Practise fractions daily',
+                                      visible_to_student=True)
         Recommendation.objects.create(student=self.mate, author=self.teacher, subject='math', text='Mate secret feedback')
         self.admin = make_user('admin', 'SchoolAdmin')
         SchoolMembership.objects.create(user=self.admin, school=self.a)

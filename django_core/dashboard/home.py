@@ -6,7 +6,7 @@ from students.access import ADMIN, COUNSELOR, GRADE_LEAD, PARENT, STUDENT, TEACH
 
 
 def home_url_for(user):
-    """SchoolAdmin -> /school/, Teacher -> /teacher/, Grade Lead and Parent -> their student list; the platform superuser
+    """SchoolAdmin -> /school/, Teacher -> /teacher/, Grade Lead -> /grade/, Parent -> /students/; the platform superuser
     -> /admin/. Counselor -> /counselor/."""
     if user.is_superuser and user.is_active:
         return '/admin/'
@@ -17,11 +17,8 @@ def home_url_for(user):
         return reverse('dashboard:counselor_home')
     if TEACHER in roles:
         return reverse('dashboard:teacher_home')
-    if GRADE_LEAD in roles:   # the list of the own grade (first active assignment); without one the plain list
-        from schools.models import GradeLeadAssignment
-        grade = GradeLeadAssignment.objects.filter(user=user, is_active=True).order_by('grade').values_list(
-            'grade', flat=True).first()
-        return reverse('dashboard:student_list') + (f'?grade={grade}' if grade else '')
+    if GRADE_LEAD in roles:   # the dashboard of the own grade(s); the student list stays one click away
+        return reverse('dashboard:grade_dashboard')
     if PARENT in roles:
         return reverse('dashboard:student_list')
     if STUDENT in roles:

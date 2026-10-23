@@ -10,7 +10,7 @@
 </tbody></table>
 {% endif %}
 {% if counselor_notes %}
-<h5 class="mt-4">یادداشت‌های مشاور (فقط مدیر مدرسه و مشاور)</h5>
+<h5 class="mt-4">یادداشت‌های مشاور (فقط مشاور، مسئول پایه و مدیر مدرسه)</h5>
 {% for n in counselor_notes %}<div class="border rounded p-2 mb-2 bg-white"><small class="text-muted">{{ n.created_at|date:"Y-m-d" }}</small><div>{{ n.text|linebreaksbr }}</div></div>{% endfor %}
 {% endif %}
 {% if student_account %}<p class="mt-4"><strong>حساب دانش‌آموز:</strong> {{ student_account.username }}</p>{% endif %}
