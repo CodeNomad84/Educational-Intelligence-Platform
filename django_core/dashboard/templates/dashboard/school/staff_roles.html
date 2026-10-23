@@ -1,0 +1,22 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}نقش‌های کارکنان{% endblock %}
+{% block content %}
+{% include 'dashboard/school/_nav.html' %}
+{% if not year %}<div class="alert alert-warning">سال تحصیلی جاری تعریف نشده است؛ نقش مربی پایه بدون آن قابل ثبت نیست.</div>{% endif %}
+<p class="text-muted">فقط کارکنان همین مدرسه؛ مدیر مدرسه ساخته نمی‌شود و نقش مدیر/پلتفرم از اینجا تغییر نمی‌کند. پایه‌ها برای سال جاری ثبت می‌شوند.</p>
+<table class="table table-sm bg-white align-middle">
+  <thead><tr><th>نام کاربری</th><th>نام</th><th>معلم</th><th>مربی پایه</th><th>پایه‌ها (مربی پایه)</th><th>مشاور</th><th></th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+    <tr>
+      <td><form id="f{{ r.person.pk }}" method="post" action="{% url 'dashboard:school_staff_roles_save' r.person.pk %}">{% csrf_token %}</form>{{ r.person.username }}</td><td>{{ r.person.first_name }} {{ r.person.last_name }}</td>
+      <td><input form="f{{ r.person.pk }}" type="checkbox" name="teacher" {% if r.teacher %}checked{% endif %}></td>
+      <td><input form="f{{ r.person.pk }}" type="checkbox" name="gradelead" {% if r.gradelead %}checked{% endif %}></td>
+      <td>{% for value, label in grade_choices %}<label class="me-2"><input form="f{{ r.person.pk }}" type="checkbox" name="grades" value="{{ value }}" {% if value in r.grades %}checked{% endif %}> {{ label }}</label>{% endfor %}</td>
+      <td><input form="f{{ r.person.pk }}" type="checkbox" name="counselor" {% if r.counselor %}checked{% endif %}></td>
+      <td><button form="f{{ r.person.pk }}" class="btn btn-sm btn-success">ذخیره</button></td></tr>
+  {% empty %}<tr><td colspan="7" class="text-muted">هنوز کارکنانی ثبت نشده است.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

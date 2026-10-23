@@ -15,6 +15,7 @@ The superuser is the PLATFORM account: it manages schools and accounts and sees 
 3. *Users → Add*: the school administrator's username and a strong password; put the user in the group **SchoolAdmin** (not staff, not superuser).
 4. *School memberships → Add*: that user + the school. Without a membership the administrator sees nothing.
 5. The administrator logs in at `/login/` and lands on `/school/`: academic year → classes → teacher / grade-lead / counselor accounts and assignments → students (add or import) → student and parent accounts. The audit log is at `/school/audit/`.
+6. **Bulk accounts (SchoolAdmin, `/school/accounts/`):** download the empty template, fill sheet `Students` (`name, national_id, grade, class`, optional `father_national_id, mother_national_id, father_name, mother_name`) and/or `Teachers` (`name, national_id`, optional `phone`); store national ids as TEXT. Upload → preview (nothing is written; errors listed per row) → confirm. The confirm step downloads `login-sheet.xlsx` with a random initial password per account (username = national id; parent username = father's id, else mother's, one parent account for all children). Print and hand it out, then delete the file: passwords are shown once and cannot be recovered. Every new user must change the password at first login; every user can change it at `/account/`. At most 150 new accounts per upload (hashing ~0.5 s each: split large files by grade, and run gunicorn with `--timeout 180`). Roles of existing staff (Teacher / GradeLead with grades / Counselor) are set at `/school/staff-roles/`; a SchoolAdmin can not create SchoolAdmins or touch other schools' users.
 Do not create a second real school before the open risks below are accepted (rule recorded in `docs/changes/0010`).
 
 ## 3. Backup and restore
@@ -32,7 +33,8 @@ Do not create a second real school before the open risks below are accepted (rul
 ## 5. Open risks (not fixed)
 * Django admin is not school-scoped for SchoolAdmins (use the dashboard); only the superuser should use `/admin/`.
 * `national_id` is globally unique (one school per person for now); a person in two schools is not supported.
-* The SchoolAdmin-created passwords are initial passwords: no forced change, no lockout / rate limiting, no password-strength rules beyond length 8, no 2FA.
+* Passwords: bulk-created accounts are forced to change the generated password at first login (web pages only: `/api/token/` still issues JWTs to a flagged account - NOT FIXED), but there is no lockout / rate limiting, no strength rules beyond length 8 (and not all-digits), no 2FA, and no "reset a user's password" page yet (a lost login sheet means a platform-admin reset in `/admin/`).
+* Bulk accounts keep the uploaded rows (names, ids) in the server-side session for up to 30 minutes until confirmed or cancelled; passwords are never stored. The sheet is a plain xlsx (a PDF needs a new dependency and a Persian font: not done).
 * The audit log is append-only in the application, not tamper-proof against someone with database access; it is not yet reviewed for completeness (e.g. list pages, exports, Django admin actions).
 * Import: the concurrent-write race is handled (conditional write, generic error) but the PostgreSQL thread test is skipped; batch files of the maintenance commands are signed but have no per-row provenance (R-a).
 * FastAPI documents are school-scoped by the token; ingestion is disabled, so the scope has not been exercised with real documents.

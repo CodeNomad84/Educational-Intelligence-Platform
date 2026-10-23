@@ -1,5 +1,5 @@
 from django.urls import path
-from . import counselor_views, grade_dashboard, school_views, student360, student_views, teacher_views, views
+from . import account_views, bulk_views, counselor_views, grade_dashboard, school_views, student360, student_views, teacher_views, views
 
 app_name = 'dashboard'
 
@@ -36,6 +36,19 @@ urlpatterns = [
     path('teacher/<int:pk>/grades/', teacher_views.grade_sheet, name='teacher_grades'),
     path('teacher/<int:pk>/grades/<int:grade_pk>/delete/', teacher_views.grade_delete, name='teacher_grade_delete'),
     path('teacher/<int:pk>/students/<int:student_pk>/', teacher_views.student_page, name='teacher_student'),
+
+    # Account (every signed-in user): profile and password change
+    path('account/', account_views.profile, name='profile'),
+    path('account/password/', account_views.password_change, name='password_change'),
+
+    # SchoolAdmin: bulk accounts from Excel and staff roles (before the generic 'school/<kind>/' routes)
+    path('school/accounts/', bulk_views.accounts, name='school_accounts'),
+    path('school/accounts/template/', bulk_views.accounts_template, name='school_accounts_template'),
+    path('school/accounts/preview/', bulk_views.accounts_preview, name='school_accounts_preview'),
+    path('school/accounts/confirm/', bulk_views.accounts_confirm, name='school_accounts_confirm'),
+    path('school/accounts/cancel/', bulk_views.accounts_cancel, name='school_accounts_cancel'),
+    path('school/staff-roles/', bulk_views.staff_roles, name='school_staff_roles'),
+    path('school/staff-roles/<int:pk>/', bulk_views.staff_roles_save, name='school_staff_roles_save'),
 
     # SchoolAdmin pages (Slice 1)
     path('school/', school_views.home, name='school_home'),

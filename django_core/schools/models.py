@@ -372,3 +372,26 @@ class AuditEvent(models.Model):
 
     def __str__(self):
         return f"{self.created_at:%Y-%m-%d %H:%M} {self.username} {self.action} {self.object_type}#{self.object_id}"
+
+
+class AccountProfile(models.Model):
+    """Per-account security state and contact data that the Django user model does not have.
+
+    ``must_change_password`` is set on accounts created with a generated initial password (bulk onboarding); the
+    ``ForcePasswordChangeMiddleware`` then allows nothing but the password-change page and logout until it is cleared.
+    A missing row means False, so every account that existed before this table is unaffected. ``phone`` is the optional
+    phone of a staff account (never shown in lists, never sent to AI).
+    """
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="account_profile", verbose_name="کاربر")
+    must_change_password = models.BooleanField(default=False, verbose_name="تغییر اجباری رمز")
+    phone = models.CharField(max_length=15, blank=True, verbose_name="تلفن")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "نمایهٔ حساب"
+        verbose_name_plural = "نمایهٔ حساب‌ها"
+
+    def __str__(self):
+        return f"{self.user} (must_change_password={self.must_change_password})"

@@ -1,0 +1,17 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}حساب‌های گروهی از اکسل{% endblock %}
+{% block content %}
+{% include 'dashboard/school/_nav.html' %}
+<div class="card mb-3"><div class="card-body">
+  <p>یک فایل xlsx با برگهٔ <code>Students</code> (name، national_id، grade، class؛ اختیاری: father_national_id، mother_national_id، father_name، mother_name) و/یا برگهٔ <code>Teachers</code> (name، national_id؛ اختیاری: phone) بارگذاری کنید.
+  نام کاربری هر حساب کد ملی است؛ ستون کد ملی را به‌صورت «متن» ذخیره کنید (صفر ابتدایی). کلاس باید از پیش در سال تحصیلی جاری این مدرسه تعریف شده باشد.
+  رمز اولیهٔ هر کاربر تصادفی است و فقط یک بار در برگهٔ ورود (xlsx) به شما داده می‌شود؛ کاربر در اولین ورود باید رمز خود را عوض کند.
+  حداکثر {{ max_new }} حساب جدید در هر بار؛ فایل‌های بزرگ‌تر را (مثلاً بر اساس پایه) تقسیم کنید.</p>
+  <a href="{% url 'dashboard:school_accounts_template' %}" class="btn btn-outline-secondary btn-sm">دانلود قالب خالی</a>
+</div></div>
+<div class="card"><div class="card-header">بارگذاری فایل (پیش‌نمایش، بدون ثبت)</div><div class="card-body">
+  <form method="post" enctype="multipart/form-data">{% csrf_token %}
+    <input type="file" name="file" accept=".xlsx" class="form-control mb-2" required>
+    <button class="btn btn-primary">پیش‌نمایش</button></form>
+</div></div>
+{% endblock %}

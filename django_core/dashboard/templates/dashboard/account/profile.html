@@ -1,0 +1,14 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}حساب من{% endblock %}
+{% block content %}
+{% if forced %}<div class="alert alert-warning">برای ادامه، رمز عبور اولیه را عوض کنید.</div>{% endif %}
+<div class="card mb-3"><div class="card-body">
+  <div><strong>نام کاربری:</strong> {{ user.username }}</div>
+  <div><strong>نام:</strong> {{ user.first_name }} {{ user.last_name }}</div>
+  <div><strong>نقش:</strong> {{ roles|join:"، " }}</div>
+</div></div>
+<div class="card"><div class="card-header">تغییر رمز عبور</div><div class="card-body">
+  <form method="post" action="{% url 'dashboard:password_change' %}">{% csrf_token %}{{ form.as_p }}
+    <button class="btn btn-success">ذخیره رمز جدید</button></form>
+</div></div>
+{% endblock %}
