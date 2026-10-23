@@ -20,7 +20,12 @@ def home_url_for(user):
         return reverse('dashboard:school_home')
     if TEACHER in roles:
         return reverse('dashboard:teacher_home')
-    if roles & {GRADE_LEAD, PARENT}:
+    if GRADE_LEAD in roles:   # the list of the own grade (first active assignment); without one the plain list
+        from schools.models import GradeLeadAssignment
+        grade = GradeLeadAssignment.objects.filter(user=user, is_active=True).order_by('grade').values_list(
+            'grade', flat=True).first()
+        return reverse('dashboard:student_list') + (f'?grade={grade}' if grade else '')
+    if PARENT in roles:
         return reverse('dashboard:student_list')
     return reverse('dashboard:login')
 

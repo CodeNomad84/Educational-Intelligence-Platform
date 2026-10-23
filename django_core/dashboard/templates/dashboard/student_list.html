@@ -28,7 +28,8 @@
                     <td>{% if student.full_tier %}{{ student.national_id }}{% else %}—{% endif %}</td>
                     <td>{{ student.get_grade_display }}</td>
                     <td>{{ student.class_name }}</td>
-                    <td><a href="{% url 'dashboard:student_detail' student.id %}" class="btn btn-sm btn-info">مشاهده</a></td>
+                    <td><a href="{% url 'dashboard:student_detail' student.id %}" class="btn btn-sm btn-info">مشاهده</a>
+                        {% if student.full_tier %}<a href="{% url 'dashboard:student_360' student.id %}" class="btn btn-sm btn-primary">پرونده ۳۶۰</a>{% endif %}</td>
                 </tr>
                 {% empty %}
                 <tr><td colspan="5" class="text-center">دانش‌آموزی ثبت نشده است.</td></tr>

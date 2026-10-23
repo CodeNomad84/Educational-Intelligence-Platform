@@ -79,6 +79,9 @@ def dashboard_view(request):
 @role_required(ADMIN, GRADE_LEAD, TEACHER, PARENT)
 def student_list_view(request):
     students = search_students(visible_students(request.user), request.GET.get('search'))
+    grade = request.GET.get('grade', '')
+    if grade.isdigit():   # a Grade Lead lands on the list of the own grade (?grade=N); the scope itself is unchanged
+        students = students.filter(grade=int(grade))
     return render(request, 'dashboard/student_list.html', {'students': students})
 
 # جزئیات یک دانش‌آموز + نمایش نتیجه‌ی پیش‌بینی

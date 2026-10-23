@@ -4,6 +4,7 @@
 <div class="card">
     <div class="card-header bg-primary text-white">
         <h4>{{ student.first_name }} {{ student.last_name }} - {{ student.get_grade_display }}</h4>
+        {% if student.full_tier %}<a class="btn btn-sm btn-light" href="{% url 'dashboard:student_360' student.pk %}">پرونده ۳۶۰</a>{% endif %}
     </div>
     <div class="card-body">
         <div class="row">

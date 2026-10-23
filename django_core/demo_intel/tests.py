@@ -479,7 +479,7 @@ class DemoLoginLandingTests(TestCase):
     EXPECTED = {
         "demo_admin": ("/school/", ["/school/years/", "/school/classes/", "/school/teachers/", "/school/gradeleads/"]),
         "demo_teacher": ("/teacher/", ["/teacher/", "/students/"]),
-        "demo_gradelead": ("/students/", ["/students/"]),
+        "demo_gradelead": ("/students/?grade=10", ["/students/"]),
         "demo_parent": ("/students/", ["/students/"]),
         "demo_counselor": ("/demo/counselor/", ["/dashboard/", "/demo/counselor/", "/school/"]),
     }
