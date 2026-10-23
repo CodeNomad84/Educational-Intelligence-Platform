@@ -1,0 +1,14 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}پرونده ارجاعی: {{ student.first_name }} {{ student.last_name }}{% endblock %}
+{% block content %}
+<a class="btn btn-link" href="{% url 'dashboard:counselor_home' %}">← پرونده‌های ارجاعی</a>
+<div class="alert alert-warning"><strong>دلیل ارجاع:</strong> {{ referral.reason }}
+  <small class="text-muted d-block">{{ referral.created_at|date:"Y-m-d" }}</small></div>
+{% include 'dashboard/_student_summary.html' %}
+<h5 class="mt-4">یادداشت‌های مشاور (فقط شما و مدیر مدرسه)</h5>
+{% for n in notes %}<div class="border rounded p-2 mb-2 bg-white"><small class="text-muted">{{ n.created_at|date:"Y-m-d" }}</small><div>{{ n.text|linebreaksbr }}</div></div>
+{% empty %}<p class="text-muted">یادداشتی ثبت نشده است.</p>{% endfor %}
+<div class="card mb-3"><div class="card-body"><form method="post">{% csrf_token %}{{ form.as_p }}<button class="btn btn-success">ثبت یادداشت</button></form></div></div>
+<form method="post" action="{% url 'dashboard:counselor_close' referral.pk %}" onsubmit="return confirm('با بستن پرونده دسترسی شما به این دانش‌آموز پایان می‌یابد. ادامه؟')">{% csrf_token %}
+  <button class="btn btn-outline-secondary">بستن پرونده</button></form>
+{% endblock %}

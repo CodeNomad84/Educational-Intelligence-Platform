@@ -6,6 +6,7 @@
   {% if person.is_active %}فعال{% else %}<span class="text-danger">غیرفعال</span>{% endif %}
   <form method="post" action="{% url 'dashboard:school_staff_active' kind person.pk %}" class="d-inline">{% csrf_token %}
     <button class="btn btn-sm btn-outline-warning">{% if person.is_active %}غیرفعال‌سازی{% else %}فعال‌سازی{% endif %}</button></form></p>
+{% if kind != 'counselors' %}
 <table class="table table-sm bg-white">
   <thead><tr>{% if kind == 'teachers' %}<th>کلاس</th><th>درس</th>{% else %}<th>پایه</th><th>سال تحصیلی</th>{% endif %}<th></th></tr></thead>
   <tbody>
@@ -21,5 +22,6 @@
 <div class="card"><div class="card-header">تخصیص جدید</div><div class="card-body">
   <form method="post">{% csrf_token %}{{ form.as_p }}<button class="btn btn-success">افزودن</button></form>
 </div></div>
+{% else %}<p class="text-muted">دسترسی مشاور فقط از طریق ارجاع‌های مدیر مدرسه و مربی پایه ایجاد می‌شود.</p>{% endif %}
 <a class="btn btn-link mt-2" href="{% url 'dashboard:school_staff' kind %}">بازگشت</a>
 {% endblock %}

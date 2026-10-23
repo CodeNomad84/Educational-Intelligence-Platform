@@ -132,8 +132,8 @@ class StudentApiAuthzTests(TestCase):
         post.assert_not_called()  # the AI service is never contacted on a teacher's behalf
 
     def test_unmapped_staff_roles_see_nothing(self):
-        # Mentor / Counselor / Manager are not recognised roles: they get no access at all.
-        for group in ('Mentor', 'Counselor', 'Manager'):
+        # Mentor / Manager are not recognised roles: they get no access at all.
+        for group in ('Mentor', 'Manager'):   # Counselor is a recognised role since Slice 4a (dashboard/test_counselor.py)
             user = make_user(f'{group.lower()}_a', group)
             self.assertEqual(roles_for(user), set(), group)
             self.client.force_login(user)

@@ -18,14 +18,14 @@ from schools.academic_years import RESOLVED, normalize_academic_year
 from schools.vocabulary import SUBJECT_KEYS
 
 from .enrollment_sync import CURRENT_STATUSES
-from .models import Attendance, Enrollment, Grade, Recommendation, Student
+from .models import Attendance, CounselorNote, Enrollment, Grade, Recommendation, Referral, Student
 
 ADMIN = 'SchoolAdmin'  # ADR-0010 (renamed by students/0010); FastAPI auth.ADMIN must match
 TEACHER = 'Teacher'  # Subject Teacher (ADR-0005)
 GRADE_LEAD = 'GradeLead'  # ADR-0005; group created by setup_staff_roles; read since C5a
 COUNSELOR = 'Counselor'  # ADR-0005; same, access arrives with referrals (2.6)
 PARENT = 'Parent'
-ALL_ROLES = (ADMIN, TEACHER, GRADE_LEAD, PARENT)
+ALL_ROLES = (ADMIN, TEACHER, GRADE_LEAD, PARENT, COUNSELOR)
 # ADR-0012 / changes/0010: platform role (stage S1 creates the empty group only). Deliberately NOT in ALL_ROLES:
 # ``roles_for`` and the FastAPI token do not recognise it yet, so adding it changes nobody's access.
 PLATFORM_ADMIN = 'PlatformAdmin'
@@ -136,11 +136,19 @@ def _school_admin_q(user, roles):
     return Q(school_id__in=school_ids) if school_ids else None
 
 
+def _counselor_q(user, roles):
+    """Q on ``Student``: students with an OPEN referral to this counselor, in the counselor's own school (Slice 4a)."""
+    if COUNSELOR not in roles or not _may_hold_scoped_grants(user):
+        return None
+    cases = Referral.objects.filter(counselor=user, status='open', school__staff__user=user)
+    return Q(pk__in=cases.values('student_id'))
+
+
 def _full_tier_q(user, roles):
     """Rows where the user holds a full-detail grant: SchoolAdmin (own schools), Parent (own child) or Grade Lead
     (own grade)."""
     return _any([_school_admin_q(user, roles), Q(parent_user=user) if PARENT in roles and user.is_active else None,
-                 _grade_lead_q(user, roles)])
+                 _grade_lead_q(user, roles), _counselor_q(user, roles)])
 
 
 def visible_students(user):
@@ -203,6 +211,34 @@ def visible_recommendations(user):
         parts.append(Q(author=user, student__in=visible_students(user)))
     scope = _any(parts)
     return Recommendation.objects.none() if scope is None else Recommendation.objects.filter(scope)
+
+
+def visible_referrals(user):
+    """Referrals the user may read: SchoolAdmin those of the own schools, a Grade Lead the ones they made (for students still in
+    their grade), a counselor their own open cases. Parents and teachers none."""
+    roles = roles_for(user)
+    admin = _school_admin_q(user, roles)
+    parts = [Q(student__in=Student.objects.filter(admin)) if admin is not None else None]
+    lead = _grade_lead_q(user, roles)
+    if lead is not None:
+        parts.append(Q(referred_by=user, student__in=Student.objects.filter(lead)))
+    counselor = _counselor_q(user, roles)
+    if counselor is not None:
+        parts.append(Q(counselor=user, status='open', student__in=Student.objects.filter(counselor)))
+    scope = _any(parts)
+    return Referral.objects.none() if scope is None else Referral.objects.filter(scope)
+
+
+def visible_counselor_notes(user):
+    """Counselor notes: the SchoolAdmin of the school and the counselor of the (open) case. Nobody else."""
+    roles = roles_for(user)
+    admin = _school_admin_q(user, roles)
+    parts = [Q(referral__student__in=Student.objects.filter(admin)) if admin is not None else None]
+    counselor = _counselor_q(user, roles)
+    if counselor is not None:
+        parts.append(Q(referral__counselor=user, referral__student__in=Student.objects.filter(counselor)))
+    scope = _any(parts)
+    return CounselorNote.objects.none() if scope is None else CounselorNote.objects.filter(scope)
 
 
 def search_students(queryset, term):

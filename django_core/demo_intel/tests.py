@@ -115,10 +115,10 @@ class SeedAndViewTests(TestCase):
     def test_seed_creates_schooladmin_group_and_admin_roles(self):
         """seed_demo must use the ADMIN constant (ADR-0010): SchoolAdmin exists and the pre-rename group name does not."""
         self.assertEqual(ADMIN, "SchoolAdmin")
-        self.assertEqual(set(Group.objects.values_list("name", flat=True)), {ADMIN, "Parent", "Teacher", "GradeLead"})
+        self.assertEqual(set(Group.objects.values_list("name", flat=True)), {ADMIN, "Parent", "Teacher", "GradeLead", "Counselor"})
         User = get_user_model()
-        for name in ("demo_admin", "demo_counselor"):
-            self.assertIn(ADMIN, roles_for(User.objects.get(username=name)), name)
+        self.assertIn(ADMIN, roles_for(User.objects.get(username="demo_admin")))
+        self.assertEqual(roles_for(User.objects.get(username="demo_counselor")), {"Counselor"})   # Slice 4a: a real role
         self.assertNotIn(ADMIN, roles_for(User.objects.get(username="demo_parent")))
 
     def test_admin_role_demo_login_reaches_admin_pages(self):
@@ -150,7 +150,7 @@ class SeedAndViewTests(TestCase):
         self.assertEqual(self.client.get(f"/students/{other.id}/").status_code, 404)
 
     def test_staff_profile_shows_intelligence_card(self):
-        self.client.force_login(get_user_model().objects.get(username="demo_counselor"))
+        self.client.force_login(get_user_model().objects.get(username="demo_admin"))
         s = Student.objects.get(first_name="علی", last_name="احمدی")
         html = self.client.get(f"/students/{s.id}/").content.decode()
         self.assertIn("کارت هوشمند", html)
@@ -481,7 +481,7 @@ class DemoLoginLandingTests(TestCase):
         "demo_teacher": ("/teacher/", ["/teacher/", "/students/"]),
         "demo_gradelead": ("/students/?grade=10", ["/students/"]),
         "demo_parent": ("/students/", ["/students/"]),
-        "demo_counselor": ("/demo/counselor/", ["/dashboard/", "/demo/counselor/", "/school/"]),
+        "demo_counselor": ("/counselor/", ["/counselor/"]),
     }
 
     @classmethod

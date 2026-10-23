@@ -91,7 +91,7 @@ class DashboardAuthzTests(TestCase):
         post.assert_not_called()
 
     def test_unmapped_staff_roles_denied_everywhere(self):
-        for group in ('Mentor', 'Counselor', 'Manager'):
+        for group in ('Mentor', 'Manager'):   # Counselor is a recognised role since Slice 4a (dashboard/test_counselor.py)
             self.client.force_login(make_user(f'{group.lower()}_a', group))
             for name, args in [('dashboard', ()), ('chat', ()), ('library', ()), ('student_add', ())]:
                 self.assertEqual(self.client.get(self.url(name, *args)).status_code, 403, f'{group} {name}')

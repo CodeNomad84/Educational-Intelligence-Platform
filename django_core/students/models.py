@@ -278,3 +278,41 @@ class Recommendation(models.Model):
 
     def __str__(self):
         return f"{self.student} - {self.created_at:%Y-%m-%d}"
+
+
+class Referral(models.Model):
+    """A SchoolAdmin or Grade Lead refers a student to a school counselor with a short reason (Slice 4a).
+
+    An OPEN referral is what lets the counselor read the student (``students.access._counselor_q``): only referred
+    students, only while open, only in the counselor's own school. Closing it ends the counselor's access.
+    """
+    STATUS_CHOICES = [('open', 'باز'), ('closed', 'بسته')]
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='referrals')
+    school = models.ForeignKey('schools.School', on_delete=models.PROTECT, related_name='+', editable=False)
+    counselor = models.ForeignKey(User, on_delete=models.PROTECT, related_name='+', verbose_name="مشاور")
+    referred_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='+', editable=False)
+    reason = models.TextField(max_length=500, verbose_name="دلیل ارجاع")
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='open')
+    created_at = models.DateTimeField(auto_now_add=True)
+    closed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at', '-pk']
+        constraints = [
+            models.UniqueConstraint(fields=['student', 'counselor'], condition=models.Q(status='open'),
+                                    name='uniq_open_referral_student_counselor'),
+        ]
+
+    def __str__(self):
+        return f"{self.student} -> {self.counselor} ({self.status})"
+
+
+class CounselorNote(models.Model):
+    """A counselor's note on a referral. Readable only by the counselor of the case and the school's SchoolAdmin."""
+    referral = models.ForeignKey(Referral, on_delete=models.CASCADE, related_name='notes')
+    author = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='+', editable=False)
+    text = models.TextField(max_length=2000, verbose_name="یادداشت")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at', '-pk']

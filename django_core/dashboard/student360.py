@@ -8,7 +8,8 @@ from django.db.models import Count
 from django.shortcuts import get_object_or_404, render
 
 from students.access import (
-    ADMIN, GRADE_LEAD, PARENT, visible_attendances, visible_grades, visible_recommendations, visible_students)
+    ADMIN, GRADE_LEAD, PARENT, roles_for, visible_attendances, visible_counselor_notes, visible_grades,
+    visible_recommendations, visible_referrals, visible_students)
 from students.models import Enrollment
 
 from .decorators import role_required
@@ -39,15 +40,28 @@ def attendance_summary(attendances):
             'present_rate': round(100 * counts.get('present', 0) / total) if total else None}
 
 
-@role_required(ADMIN, GRADE_LEAD, PARENT)
-def student_360(request, pk):
-    student = get_object_or_404(visible_students(request.user).filter(full_tier=True), pk=pk)
+def summary_context(request, student):
+    """The read-only summary shared by the Student 360 page and the counselor's case page (all through the access layer)."""
     enrollments = (Enrollment.objects.filter(student=student).select_related('academic_year', 'school_class')
                    .order_by('-academic_year__start_date'))
-    return render(request, 'dashboard/student_360.html', {
+    return {
         'student': student,
         'enrollments': enrollments,
         'grade_years': grades_by_year(visible_grades(request.user).filter(student=student)),
         'attendance': attendance_summary(visible_attendances(request.user).filter(student=student)),
         'recommendations': visible_recommendations(request.user).filter(student=student).select_related('author'),
-    })
+    }
+
+
+@role_required(ADMIN, GRADE_LEAD, PARENT)
+def student_360(request, pk):
+    student = get_object_or_404(visible_students(request.user).filter(full_tier=True), pk=pk)
+    context = summary_context(request, student)
+    context['referrals'] = visible_referrals(request.user).filter(student=student).select_related('counselor')
+    context['counselor_notes'] = visible_counselor_notes(request.user).filter(
+        referral__student=student).select_related('author')
+    roles = roles_for(request.user)
+    if roles & {ADMIN, GRADE_LEAD}:
+        from .counselor_views import ReferralForm
+        context['referral_form'] = ReferralForm(student=student)
+    return render(request, 'dashboard/student_360.html', context)

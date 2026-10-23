@@ -14,6 +14,7 @@ Verified-at: `3404a1a` + Phase 1 branch `phase-1/boot-security`; the commit `340
 | Login / tokens | `dashboard/views.py` (login_view), `config/urls.py` (`api/token/`), `config/settings/base.py` | L3 |
 | Dashboard/pages | `dashboard/views.py`, `urls.py`, `templates/dashboard/` | React migration TARGET |
 | Student 360 page (SchoolAdmin / Grade Lead / Parent, read-only: identity, enrollment path, grades per year, attendance, recommendations) | `dashboard/student360.py`, `templates/dashboard/student_360.html` | L2 |
+| Referral to a counselor, Counselor role and case pages, counselor notes (`Referral`, `CounselorNote`, `visible_referrals`, `visible_counselor_notes`, `_counselor_q`) | `dashboard/counselor_views.py`, `templates/dashboard/counselor/`, `students/access.py`, `students/models.py` | L3 (role + access rule) |
 | Teacher pages (enter grades per class + subject, write recommendations; `Recommendation` model, `visible_recommendations`) | `dashboard/teacher_views.py`, `templates/dashboard/teacher/`, `students/models.py`, `students/access.py` | L2 |
 | SchoolAdmin pages (academic year, classes, teacher / grade-lead accounts and assignments; `SchoolStaff` = which school a staff account belongs to) | `dashboard/school_views.py`, `school_forms.py`, `templates/dashboard/school/`, `schools/models.py` (`SchoolStaff`); demo data: `seed_demo` (`demo_teacher`, `demo_gradelead`) | L2 |
 | Student import (CSV/XLSX) | `students/views.py` import action | B-10 |

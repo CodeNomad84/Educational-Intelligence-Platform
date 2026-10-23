@@ -285,7 +285,6 @@ class Command(BaseCommand):
         parent_g, _ = Group.objects.get_or_create(name="Parent")
         for username, first, last, group in [
             ("demo_admin", "مدیر", "نمایشی", admin_g),
-            ("demo_counselor", "مشاور", "نمایشی", admin_g),  # DEMO: counselor view uses the Admin role (see DEMO_GUIDE)
             ("demo_parent", "ولی", "نمایشی", parent_g),
         ]:
             user, _ = User.objects.get_or_create(username=username, defaults=dict(first_name=first, last_name=last))
@@ -299,14 +298,15 @@ class Command(BaseCommand):
                 child.parent_user = user
                 child.save(update_fields=["parent_user"])
 
-        self._staff(password, school, year, classes)
+        self._staff(password, school, year, classes, students)
 
-    def _staff(self, password, school, year, classes):
+    def _staff(self, password, school, year, classes, students):
         """Slice 1: a demo Subject Teacher (math in two classes) and a demo Grade Lead (grade 10), school staff accounts."""
         from schools.models import GradeLeadAssignment, SchoolStaff, TeacherAssignment
         User = get_user_model()
         for username, first, last, group in (("demo_teacher", "معلم", "نمایشی", "Teacher"),
-                                             ("demo_gradelead", "مربی", "نمایشی", "GradeLead")):
+                                             ("demo_gradelead", "مربی", "نمایشی", "GradeLead"),
+                                             ("demo_counselor", "مشاور", "نمایشی", "Counselor")):
             user, _ = User.objects.get_or_create(username=username, defaults=dict(first_name=first, last_name=last))
             user.set_password(password)
             user.is_staff = False
@@ -318,3 +318,13 @@ class Command(BaseCommand):
                     TeacherAssignment.objects.get_or_create(teacher=user, school_class=classes[title], subject="math")
             else:
                 GradeLeadAssignment.objects.get_or_create(user=user, school=school, grade=10, academic_year=year.code)
+        self._referral(school, students)
+
+    def _referral(self, school, students):
+        """Slice 4a: one open demo referral (SchoolAdmin -> counselor) so the counselor pages have a case to show."""
+        from students.models import Referral
+        User = get_user_model()
+        child = next(s for s, p in students if p.get("key") == "attendance_ali")
+        Referral.objects.create(student=child, school=school, counselor=User.objects.get(username="demo_counselor"),
+                                referred_by=User.objects.get(username="demo_admin"),
+                                reason="غیبت‌های مکرر در هفته‌های اخیر؛ لطفاً گفت‌وگو با دانش‌آموز و خانواده.")

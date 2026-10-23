@@ -11,7 +11,7 @@ from django.core.exceptions import ImproperlyConfigured, PermissionDenied
 
 from config.service_auth import service_headers
 from students.access import (
-    ADMIN, GRADE_LEAD, TEACHER, PARENT, roles_for, search_students, visible_attendances, visible_grades,
+    ADMIN, COUNSELOR, GRADE_LEAD, TEACHER, PARENT, roles_for, search_students, visible_attendances, visible_grades,
     visible_recommendations, visible_students,
 )
 from .decorators import role_required
@@ -48,7 +48,7 @@ def dashboard_view(request):
     if request.user.is_superuser and request.user.is_active:
         return redirect('/admin/')   # Slice 0: the superuser is the platform account; it has no school data here
     if ADMIN not in roles:  # school-wide aggregates: SchoolAdmin only
-        if roles & {PARENT, GRADE_LEAD, TEACHER}:
+        if roles & {PARENT, GRADE_LEAD, TEACHER, COUNSELOR}:
             # Aggregates are SchoolAdmin only; every other role lands on its own home.
             return redirect(home_url_for(request.user))
         raise PermissionDenied

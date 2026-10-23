@@ -11,7 +11,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from schools.models import AcademicYear, GradeLeadAssignment, School, SchoolClass, TeacherAssignment
-from students.access import ADMIN, GRADE_LEAD, TEACHER, visible_students
+from students.access import ADMIN, COUNSELOR, GRADE_LEAD, TEACHER, visible_students
 from students.student_school import allowed_school_ids
 
 from .decorators import role_required
@@ -19,7 +19,8 @@ from .school_forms import (
     AcademicYearForm, GradeLeadAssignmentForm, SchoolClassForm, StaffAccountForm, TeacherAssignmentForm,
     staff_queryset, suggested_year)
 
-KINDS = {'teachers': (TEACHER, 'معلم‌ها', 'معلم'), 'gradeleads': (GRADE_LEAD, 'مربیان پایه', 'مربی پایه')}
+KINDS = {'teachers': (TEACHER, 'معلم‌ها', 'معلم'), 'gradeleads': (GRADE_LEAD, 'مربیان پایه', 'مربی پایه'),
+         'counselors': (COUNSELOR, 'مشاوران', 'مشاور')}
 
 
 def _current_school(request):
@@ -63,6 +64,7 @@ def home(request, school):
         'students': visible_students(request.user).filter(school=school).count(),
         'teachers': staff_queryset(school, TEACHER).count(),
         'gradeleads': staff_queryset(school, GRADE_LEAD).count(),
+        'counselors': staff_queryset(school, COUNSELOR).count(),
     }
     return _render(request, school, 'home.html', year=year, counts=counts)
 
@@ -134,6 +136,9 @@ def staff_list(request, school, kind):
 def staff_detail(request, school, kind, pk):
     group, title, noun = _kind(kind)
     person = get_object_or_404(staff_queryset(school, group), pk=pk)
+    if kind == 'counselors':   # a counselor has no assignments: access comes from referrals
+        return _render(request, school, 'staff_detail.html', kind=kind, title=title, noun=noun, person=person, form=None,
+                       assignments=[])
     if kind == 'teachers':
         form = TeacherAssignmentForm(request.POST or None, school=school, teacher=person, created_by=request.user)
         rows = TeacherAssignment.objects.filter(teacher=person, school_class__school=school).select_related('school_class')
@@ -153,6 +158,8 @@ def staff_detail(request, school, kind, pk):
 def assignment_delete(request, school, kind, pk, assignment_pk):
     group, _title, _noun = _kind(kind)
     person = get_object_or_404(staff_queryset(school, group), pk=pk)
+    if kind == 'counselors':
+        raise Http404
     if kind == 'teachers':
         get_object_or_404(TeacherAssignment, pk=assignment_pk, teacher=person, school_class__school=school).delete()
     else:

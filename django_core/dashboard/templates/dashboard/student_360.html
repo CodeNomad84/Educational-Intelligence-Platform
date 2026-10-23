@@ -2,33 +2,22 @@
 {% block title %}پرونده ۳۶۰: {{ student.first_name }} {{ student.last_name }}{% endblock %}
 {% block content %}
 <a class="btn btn-link" href="{% url 'dashboard:student_list' %}">← فهرست دانش‌آموزان</a>
-<div class="row g-3">
-  <div class="col-md-4"><div class="card h-100"><div class="card-header">هویت</div><div class="card-body">
-    <p><strong>نام:</strong> {{ student.first_name }} {{ student.last_name }}</p>
-    <p><strong>کد ملی:</strong> {{ student.national_id }}</p>
-    <p><strong>پایه:</strong> {{ student.get_grade_display }}</p>
-    <p><strong>کلاس:</strong> {{ student.class_name|default:"—" }}</p>
-    <p class="mb-0"><strong>مدرسه:</strong> {{ student.school.name }}</p>
-  </div></div></div>
-  <div class="col-md-8"><div class="card h-100"><div class="card-header">مسیر تحصیلی (ثبت‌نام‌ها)</div><div class="card-body p-0">
-    <table class="table table-sm mb-0"><thead><tr><th>سال</th><th>کلاس</th><th>پایه</th><th>وضعیت</th></tr></thead><tbody>
-    {% for e in enrollments %}<tr><td>{{ e.academic_year.code }}</td><td>{{ e.school_class|default:"—" }}</td><td>{{ e.get_grade_display }}</td><td>{{ e.get_status_display }}</td></tr>
-    {% empty %}<tr><td colspan="4" class="text-muted">ثبت‌نامی وجود ندارد.</td></tr>{% endfor %}
-    </tbody></table></div></div></div>
-</div>
-<h5 class="mt-4">نمرات به تفکیک سال و درس</h5>
-{% for year, subjects, year_average in grade_years %}
-<div class="card mb-3"><div class="card-header">{{ year }} — میانگین کل: <strong>{{ year_average }}</strong></div><div class="card-body p-0">
-  <table class="table table-sm mb-0"><thead><tr><th>درس</th><th>تعداد نمره</th><th>میانگین</th></tr></thead><tbody>
-  {% for name, count, avg in subjects %}<tr><td>{{ name }}</td><td>{{ count }}</td><td>{{ avg }}</td></tr>{% endfor %}
-  </tbody></table></div></div>
-{% empty %}<p class="text-muted">نمره‌ای ثبت نشده است.</p>{% endfor %}
-<h5 class="mt-4">حضور و غیاب</h5>
-{% if attendance.total %}
-<p>{{ attendance.total }} روز ثبت شده{% if attendance.present_rate is not None %} — حضور: <strong>{{ attendance.present_rate }}٪</strong>{% endif %}</p>
-<ul>{% for label, n in attendance.rows %}<li>{{ label }}: {{ n }}</li>{% endfor %}</ul>
-{% else %}<p class="text-muted">حضور و غیابی ثبت نشده است.</p>{% endif %}
-<h5 class="mt-4">توصیه‌های معلمان</h5>
-{% for r in recommendations %}<div class="border rounded p-2 mb-2 bg-white"><small class="text-muted">{{ r.created_at|date:"Y-m-d" }}{% if r.subject %} — {{ r.get_subject_display }}{% endif %}{% if r.author %} — {{ r.author.first_name }} {{ r.author.last_name }}{% endif %}</small><div>{{ r.text|linebreaksbr }}</div></div>
-{% empty %}<p class="text-muted">توصیه‌ای ثبت نشده است.</p>{% endfor %}
+{% include 'dashboard/_student_summary.html' %}
+{% if referrals %}
+<h5 class="mt-4">ارجاع به مشاور</h5>
+<table class="table table-sm bg-white"><thead><tr><th>مشاور</th><th>دلیل</th><th>وضعیت</th><th>تاریخ</th></tr></thead><tbody>
+{% for r in referrals %}<tr><td>{{ r.counselor.first_name }} {{ r.counselor.last_name }}</td><td>{{ r.reason }}</td><td>{{ r.get_status_display }}</td><td>{{ r.created_at|date:"Y-m-d" }}</td></tr>{% endfor %}
+</tbody></table>
+{% endif %}
+{% if counselor_notes %}
+<h5 class="mt-4">یادداشت‌های مشاور (فقط مدیر مدرسه و مشاور)</h5>
+{% for n in counselor_notes %}<div class="border rounded p-2 mb-2 bg-white"><small class="text-muted">{{ n.created_at|date:"Y-m-d" }}</small><div>{{ n.text|linebreaksbr }}</div></div>{% endfor %}
+{% endif %}
+{% if referral_form %}
+<div class="card mt-4"><div class="card-header">ارجاع به مشاور</div><div class="card-body">
+  {% if referral_form.fields.counselor.queryset.exists %}
+  <form method="post" action="{% url 'dashboard:student_refer' student.pk %}">{% csrf_token %}{{ referral_form.as_p }}<button class="btn btn-warning">ارجاع</button></form>
+  {% else %}<p class="text-muted mb-0">مشاوری برای این مدرسه تعریف نشده است (مدیریت مدرسه ← مشاوران).</p>{% endif %}
+</div></div>
+{% endif %}
 {% endblock %}
