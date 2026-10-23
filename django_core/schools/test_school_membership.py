@@ -347,7 +347,8 @@ class MembershipScopeTests(TestCase):
 
         for module in (dashboard_views, student_views, serializers, permissions, service_auth):
             source = inspect.getsource(module)
-            self.assertNotIn("school_ids_for_admin", source, module.__name__)
+            if module is not service_auth:   # S5: the service token carries the ``schools`` claim, through the helper only
+                self.assertNotIn("school_ids_for_admin", source, module.__name__)
             self.assertNotIn("SchoolMembership", source, module.__name__)
 
     def test_helper_lives_in_the_access_module(self):

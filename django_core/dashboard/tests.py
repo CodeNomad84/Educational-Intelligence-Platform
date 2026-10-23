@@ -161,6 +161,17 @@ class ServiceTokenTests(TestCase):
         self.assertEqual(claims['roles'], [TEACHER])
         self.assertLessEqual(claims['exp'] - claims['iat'], 60)
 
+    def test_token_carries_the_school_ids_of_a_school_admin_only(self):
+        from schools.models import School, SchoolMembership
+        school = School.objects.create(name='S', code='s-claim')
+        SchoolMembership.objects.create(user=self.admin, school=school)
+        with override_settings(SERVICE_JWT_SECRET=self.secret):
+            self.assertEqual(self.decode(service_headers(self.admin))['schools'], [school.pk])
+            self.assertEqual(self.decode(service_headers(self.teacher))['schools'], [])
+            self.assertEqual(self.decode(service_headers(make_user('root-claim', is_superuser=True)))['schools'], [])
+            type(self.admin).objects.filter(pk=self.admin.pk).update(is_active=False)
+            self.assertEqual(self.decode(service_headers(type(self.admin).objects.get(pk=self.admin.pk)))['schools'], [])
+
     def test_missing_or_short_secret_fails_closed(self):
         for value in ('', 'short'):
             with override_settings(SERVICE_JWT_SECRET=value):

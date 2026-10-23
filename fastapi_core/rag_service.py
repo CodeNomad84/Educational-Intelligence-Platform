@@ -105,23 +105,24 @@ def get_embedding(text: str) -> List[float]:
         raise EmbeddingError("Embedding model is unavailable.") from None
 
 # ---------- توابع مدیریت اسناد ----------
-def add_document(title: str, content: str, parent_id: str = None, metadata: Dict[str, Any] = None):
+def add_document(title: str, content: str, school_id: int, parent_id: str = None, metadata: Dict[str, Any] = None):
+    """``school_id`` is required: a document without a school is visible to nobody."""
     embedding = get_embedding(content)
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute(
         """
-        INSERT INTO documents (title, content, embedding, metadata, parent_id) 
-        VALUES (%s, %s, %s, %s, %s)
+        INSERT INTO documents (title, content, embedding, metadata, parent_id, school_id) 
+        VALUES (%s, %s, %s, %s, %s, %s)
         """,
-        (title, content, embedding, json.dumps(metadata or {}), parent_id)
+        (title, content, embedding, json.dumps(metadata or {}), parent_id, school_id)
     )
     conn.commit()
     cur.close()
     conn.close()
     logger.info(f"✅ Document '{title}' added successfully!")
 
-def add_documents_batch(documents_list: List[Tuple[str, str, Dict, str]]):
+def add_documents_batch(documents_list: List[Tuple[str, str, Dict, str]], school_id: int):
     if not documents_list:
         return
     # Embed everything BEFORE opening a DB connection: an embedding failure then raises without
@@ -132,10 +133,10 @@ def add_documents_batch(documents_list: List[Tuple[str, str, Dict, str]]):
     for (title, content, metadata, parent_id), embedding in zip(documents_list, embeddings):
         cur.execute(
             """
-            INSERT INTO documents (title, content, embedding, metadata, parent_id) 
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO documents (title, content, embedding, metadata, parent_id, school_id) 
+            VALUES (%s, %s, %s, %s, %s, %s)
             """,
-            (title, content, embedding, json.dumps(metadata or {}), parent_id)
+            (title, content, embedding, json.dumps(metadata or {}), parent_id, school_id)
         )
     conn.commit()
     cur.close()
@@ -143,22 +144,24 @@ def add_documents_batch(documents_list: List[Tuple[str, str, Dict, str]]):
     logger.info(f"✅ {len(documents_list)} documents added in batch.")
 
 # ---------- توابع جستجو ----------
-def search_documents(query: str, top_k: int = 3) -> List[Tuple]:
+def search_documents(query: str, top_k: int = 3, school_ids: List[int] = ()) -> List[Tuple]:
+    """ACL BEFORE ranking: only documents of the caller's schools are candidates (no schools = nothing)."""
     query_embedding = get_embedding(query)
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute("""
         SELECT title, content, metadata, 1 - (embedding <=> %s::vector) AS similarity
         FROM documents
+        WHERE school_id = ANY(%s)
         ORDER BY similarity DESC
         LIMIT %s
-    """, (query_embedding, top_k))
+    """, (query_embedding, list(school_ids), top_k))
     results = cur.fetchall()
     cur.close()
     conn.close()
     return results
 
-def get_all_documents() -> List[Dict]:
+def get_all_documents(school_ids: List[int] = ()) -> List[Dict]:
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute("""
@@ -171,12 +174,13 @@ def get_all_documents() -> List[Dict]:
                 MIN(created_at) as created_at,
                 COUNT(*) as total_chunks
             FROM documents
+            WHERE school_id = ANY(%s)
             GROUP BY parent_id
             ORDER BY MIN(created_at) DESC
         )
         SELECT id, parent_id, title, metadata_text::jsonb, created_at, total_chunks
         FROM file_info
-    """)
+    """, (list(school_ids),))
     results = cur.fetchall()
     cur.close()
     conn.close()
@@ -239,10 +243,10 @@ def generate_answer_with_llm(query: str, context_docs: List[Tuple]) -> str:
         best_doc = context_docs[0]
         return f"متاسفم، در پردازش سوال شما خطایی رخ داد. مرتبط‌ترین سند:\n\n{best_doc[1][:500]}..."
 
-def delete_document(doc_id: int) -> bool:
+def delete_document(doc_id: int, school_ids: List[int] = ()) -> bool:
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute("DELETE FROM documents WHERE id = %s", (doc_id,))
+    cur.execute("DELETE FROM documents WHERE id = %s AND school_id = ANY(%s)", (doc_id, list(school_ids)))
     deleted = cur.rowcount > 0
     conn.commit()
     cur.close()
@@ -253,10 +257,10 @@ def delete_document(doc_id: int) -> bool:
         logger.warning(f"⚠️ Document with id {doc_id} not found.")
     return deleted
 
-def delete_document_by_parent_id(parent_id: str) -> bool:
+def delete_document_by_parent_id(parent_id: str, school_ids: List[int] = ()) -> bool:
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute("DELETE FROM documents WHERE parent_id = %s", (parent_id,))
+    cur.execute("DELETE FROM documents WHERE parent_id = %s AND school_id = ANY(%s)", (parent_id, list(school_ids)))
     deleted = cur.rowcount > 0
     conn.commit()
     cur.close()
@@ -268,8 +272,8 @@ def delete_document_by_parent_id(parent_id: str) -> bool:
     return deleted
 
 # ---------- تابع اصلی چت ----------
-def chat(query: str) -> Dict:
-    docs = search_documents(query)
+def chat(query: str, school_ids: List[int] = ()) -> Dict:
+    docs = search_documents(query, school_ids=school_ids)
     if not docs:
         return {
             "answer": "متأسفم، هیچ سند مرتبطی با سؤال شما پیدا نشد. لطفاً سؤال خود را دقیق‌تر بپرسید یا از طریق کتابخانه اسناد جدید آپلود کنید.",

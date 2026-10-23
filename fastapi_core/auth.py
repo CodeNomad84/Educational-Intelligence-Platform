@@ -107,3 +107,22 @@ def require_roles(*allowed: str) -> Callable[[dict], dict]:
         return payload
 
     return dependency
+
+
+def school_ids(payload: dict) -> list:
+    """The school ids of the token's ``schools`` claim (SchoolAdmin scope, signed by Django). A missing or malformed claim is an
+    invalid token (fail closed: an old token without the claim cannot read or delete any document)."""
+    value = payload.get("schools")
+    if not isinstance(value, list) or not all(type(v) is int and v > 0 for v in value):
+        raise HTTPException(status_code=401, detail="Invalid token.")
+    return sorted(set(value))
+
+
+def require_roles_with_schools(*allowed: str) -> Callable[[dict], dict]:
+    """Like ``require_roles`` and additionally validates the ``schools`` claim; the payload carries the validated list."""
+    base = require_roles(*allowed)
+
+    def dependency(payload: dict = Depends(base)) -> dict:
+        return {**payload, "schools": school_ids(payload)}
+
+    return dependency

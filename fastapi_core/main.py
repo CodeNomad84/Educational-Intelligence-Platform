@@ -6,7 +6,8 @@ import tempfile
 import logging
 from pathlib import Path
 
-from auth import require_roles, disabled_in_phase1, validate_service_secret, ADMIN
+from auth import (
+    require_roles, require_roles_with_schools, school_ids, disabled_in_phase1, validate_service_secret, ADMIN)
 import joblib
 import torch
 import numpy as np
@@ -91,6 +92,14 @@ class UploadResponse(BaseModel):
     chunks: int
 
 # ---------- تابع کمکی ----------
+def _single_school(payload: dict) -> int:
+    """The one school a document is stored for (ingestion is disabled in Phase 1; a token with several schools must choose)."""
+    ids = school_ids(payload)
+    if len(ids) != 1:
+        raise HTTPException(status_code=403, detail="Exactly one school is required.")
+    return ids[0]
+
+
 def extract_text_from_pdf(pdf_path: str) -> str:
     import fitz
     doc = fitz.open(pdf_path)
@@ -141,7 +150,7 @@ app.include_router(router_v1)
 @app.post("/chat/")
 async def chat_endpoint(request: ChatRequest, payload: dict = Depends(disabled_in_phase1)):  # RAG out of Phase 1 scope
     try:
-        result = chat(request.query)
+        result = chat(request.query, school_ids(payload))   # ACL before retrieval (route disabled in Phase 1)
         return result
     except Exception as e:
         logger.error(f"خطا در چت: {e}", exc_info=True)
@@ -150,17 +159,17 @@ async def chat_endpoint(request: ChatRequest, payload: dict = Depends(disabled_i
 @app.post("/documents/")
 async def add_document_endpoint(request: DocumentRequest, payload: dict = Depends(disabled_in_phase1)):  # ingestion disabled: no embedding model
     try:
-        add_document(request.title, request.content, metadata=request.metadata)
+        add_document(request.title, request.content, school_id=_single_school(payload), metadata=request.metadata)
         return {"status": "success", "message": "سند با موفقیت اضافه شد."}
     except Exception as e:
         logger.error(f"خطا در افزودن سند: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"خطا در افزودن سند: {str(e)}")
 
 @app.get("/documents/list/")
-async def list_documents(payload: dict = Depends(require_roles(ADMIN))):  # document-level ACL not verified for other roles
+async def list_documents(payload: dict = Depends(require_roles_with_schools(ADMIN))):  # only the caller's schools (token claim)
     # فقط کاربران احراز هویت شده می‌توانند لیست اسناد را مشاهده کنند
     try:
-        docs = get_all_documents()
+        docs = get_all_documents(payload["schools"])
         return {"documents": docs}
     except Exception as e:
         logger.error(f"خطا در دریافت لیست اسناد: {e}", exc_info=True)
@@ -169,7 +178,7 @@ async def list_documents(payload: dict = Depends(require_roles(ADMIN))):  # docu
 @app.get("/documents/search/")
 async def search_documents_endpoint(query: str, top_k: int = 3, payload: dict = Depends(disabled_in_phase1)):  # embedding-based; RAG out of Phase 1 scope
     try:
-        results = search_documents(query, top_k)
+        results = search_documents(query, top_k, school_ids(payload))
         return {
             "results": [
                 {"title": r[0], "content": r[1][:200] + "...", "similarity": r[3]}
@@ -241,7 +250,7 @@ async def upload_document(file: UploadFile = File(...), payload: dict = Depends(
         if documents_to_add:
             # بررسی ساختار اولین سند برای اطمینان
             logger.debug(f"نمونه سند اول: {documents_to_add[0]}")
-            add_documents_batch(documents_to_add)
+            add_documents_batch(documents_to_add, school_id=_single_school(payload))
 
         logger.info(f"فایل {file.filename} با موفقیت پردازش شد. تعداد قطعات: {len(chunks)}")
 
@@ -258,9 +267,9 @@ async def upload_document(file: UploadFile = File(...), payload: dict = Depends(
         raise HTTPException(status_code=500, detail=f"خطا در پردازش فایل: {str(e)}")
 
 @app.delete("/documents/{doc_id}")
-async def delete_document_endpoint(doc_id: int, payload: dict = Depends(require_roles(ADMIN))):
+async def delete_document_endpoint(doc_id: int, payload: dict = Depends(require_roles_with_schools(ADMIN))):
     try:
-        deleted = delete_document(doc_id)
+        deleted = delete_document(doc_id, payload["schools"])   # 404 also for another school's document
         if deleted:
             return {"status": "success", "message": "سند با موفقیت حذف شد."}
         else:
@@ -272,9 +281,9 @@ async def delete_document_endpoint(doc_id: int, payload: dict = Depends(require_
         raise HTTPException(status_code=500, detail="Internal error while deleting the document.")
 
 @app.delete("/documents/parent/{parent_id}")
-async def delete_document_by_parent_endpoint(parent_id: str, payload: dict = Depends(require_roles(ADMIN))):
+async def delete_document_by_parent_endpoint(parent_id: str, payload: dict = Depends(require_roles_with_schools(ADMIN))):
     try:
-        deleted = delete_document_by_parent_id(parent_id)
+        deleted = delete_document_by_parent_id(parent_id, payload["schools"])
         if deleted:
             return {"status": "success", "message": "فایل با موفقیت حذف شد."}
         else:

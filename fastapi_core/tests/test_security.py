@@ -71,10 +71,10 @@ def _fake_modules():
     rag.chat = lambda q: calls.append(('chat', q)) or {'answer': 'ok', 'sources': []}
     rag.add_document = lambda *a, **k: calls.append(('add_document', a, k))
     rag.add_documents_batch = lambda docs: calls.append(('add_documents_batch', docs))
-    rag.get_all_documents = lambda: calls.append(('get_all_documents',)) or []
-    rag.search_documents = lambda q, k=3: calls.append(('search_documents', q, k)) or []
-    rag.delete_document_by_parent_id = lambda pid: calls.append(('delete_parent', pid)) or True
-    rag.delete_document = lambda i: calls.append(('delete_document', i)) or True
+    rag.get_all_documents = lambda schools=(): calls.append(('get_all_documents', list(schools))) or []
+    rag.search_documents = lambda q, k=3, schools=(): calls.append(('search_documents', q, k)) or []
+    rag.delete_document_by_parent_id = lambda pid, schools=(): calls.append(('delete_parent', pid, list(schools))) or True
+    rag.delete_document = lambda i, schools=(): calls.append(('delete_document', i, list(schools))) or True
     return {'torch': torch, 'numpy': numpy, 'joblib': joblib, 'train_nn_model': train, 'rag_service': rag}
 
 
@@ -103,7 +103,7 @@ def tearDownModule():
 
 def token(_roles, **over):
     now = int(time.time())
-    claims = {'iss': ISS, 'aud': AUD, 'sub': '1', 'roles': _roles, 'iat': now, 'exp': now + 60}
+    claims = {'iss': ISS, 'aud': AUD, 'sub': '1', 'roles': _roles, 'schools': [1], 'iat': now, 'exp': now + 60}
     claims.update(over)
     claims = {k: v for k, v in claims.items() if v is not None}  # a None override removes the claim
     return jwt.encode(claims, SECRET, algorithm='HS256')
@@ -304,15 +304,41 @@ class AuthorizationTests(BaseCase):
         self.assertEqual(self.client.delete('/documents/1', headers=h).status_code, 200)
         self.assertEqual(self.client.get('/documents/list/', headers=bearer(['Teacher'])).status_code, 403)
 
+    def test_documents_are_filtered_by_the_schools_of_the_token(self):
+        """S5: list and both deletes receive the token's school ids (so the SQL can filter them); a token without or with a
+        malformed ``schools`` claim is refused; an empty claim reaches the RAG layer as an empty list (= nothing)."""
+        calls = FAKES['rag_service'].calls
+        calls.clear()
+        self.client.get('/documents/list/', headers=bearer([ADMIN_ROLE], schools=[3, 2, 3]))
+        self.client.delete('/documents/7', headers=bearer([ADMIN_ROLE], schools=[3]))
+        self.client.delete('/documents/parent/abc', headers=bearer([ADMIN_ROLE], schools=[]))
+        self.assertEqual(calls, [('get_all_documents', [2, 3]), ('delete_document', 7, [3]), ('delete_parent', 'abc', [])])
+        calls.clear()
+        for bad in (None, 'x', [True], ['1'], [0], [-1], {'a': 1}, [1.5]):
+            for method, path in (('get', '/documents/list/'), ('delete', '/documents/1'), ('delete', '/documents/parent/x')):
+                resp = getattr(self.client, method)(path, headers=bearer([ADMIN_ROLE], schools=bad))
+                self.assertEqual(resp.status_code, 401, (bad, path))
+        self.assertEqual(calls, [])                      # nothing reached the RAG layer
+
+    def test_every_sql_statement_on_documents_filters_by_school(self):
+        """Source pin (the real SQL runs on PostgreSQL only): reads, deletes and inserts of ``documents`` carry school_id."""
+        source = (ROOT / 'rag_service.py').read_text(encoding='utf-8')
+        executes = re.findall(r'cur\.execute\(\s*(?:"""(.*?)"""|"([^"]*)")', source, re.S)
+        statements = [a or b for a, b in executes if 'documents' in (a or b)]
+        statements = [s for s in statements if 'to_regclass' not in s]
+        self.assertGreaterEqual(len(statements), 5)
+        for statement in statements:
+            self.assertIn('school_id', statement, statement.strip()[:60])
+
     def test_delete_missing_document_is_404_not_500(self):
         h = bearer([ADMIN_ROLE])
-        with mock.patch.object(main, 'delete_document', lambda i: False), \
-                mock.patch.object(main, 'delete_document_by_parent_id', lambda p: False):
+        with mock.patch.object(main, 'delete_document', lambda *a: False), \
+                mock.patch.object(main, 'delete_document_by_parent_id', lambda *a: False):
             self.assertEqual(self.client.delete('/documents/999999', headers=h).status_code, 404)
             self.assertEqual(self.client.delete('/documents/parent/none', headers=h).status_code, 404)
 
     def test_delete_internal_error_is_500_without_leaking_details(self):
-        def boom(_):
+        def boom(*_):
             raise RuntimeError('db-host-secret-detail')
         h = bearer([ADMIN_ROLE])
         with mock.patch.object(main, 'delete_document', boom), mock.patch.object(main, 'delete_document_by_parent_id', boom):
@@ -364,9 +390,9 @@ class EmbeddingFailureTests(unittest.TestCase):
         self.assertNotIn('secret-internal-detail', str(ctx.exception))
 
     def test_no_write_or_search_with_a_placeholder_vector(self):
-        for call in (lambda: self.rag.add_document('t', 'c'),
-                     lambda: self.rag.add_documents_batch([('t', 'c', {}, 'p')]),
-                     lambda: self.rag.search_documents('q')):
+        for call in (lambda: self.rag.add_document('t', 'c', 1),
+                     lambda: self.rag.add_documents_batch([('t', 'c', {}, 'p')], 1),
+                     lambda: self.rag.search_documents('q', 3, [1])):
             with self.assertRaises(self.rag.EmbeddingError):
                 call()
         self.assertEqual(self.db_calls, [])  # the database was never reached

@@ -33,7 +33,7 @@ def service_headers(user):
 
     Raises ImproperlyConfigured when the secret is missing/too short (fail closed).
     """
-    from students.access import roles_for  # local import: avoid app-loading cycles
+    from students.access import roles_for, school_ids_for_admin  # local import: avoid app-loading cycles
 
     secret = getattr(settings, 'SERVICE_JWT_SECRET', '') or ''
     if _is_weak(secret):
@@ -47,6 +47,8 @@ def service_headers(user):
         'aud': AUDIENCE,
         'sub': str(user.pk),
         'roles': sorted(roles_for(user)),
+        # SchoolAdmin scope (FastAPI filters documents by it, ACL before retrieval); empty for every other role
+        'schools': sorted(school_ids_for_admin(user)),
         'iat': now,
         'exp': now + TTL_SECONDS,
     }
