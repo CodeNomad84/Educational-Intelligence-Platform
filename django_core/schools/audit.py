@@ -15,6 +15,9 @@ RECOMMENDATION_ADD = 'recommendation_add'
 STAFF_ACCOUNT_CREATE = 'staff_account_create'
 STUDENT_ACCOUNT_CREATE = 'student_account_create'
 BULK_ACCOUNTS = 'bulk_accounts'          # detail = counts only, e.g. s12p9t3e1
+PASSWORD_RESET = 'password_reset'          # detail = who reset: gradelead | admin; object = the account; no password
+PASSWORD_RESET_CAPPED = 'password_reset_capped'   # a grade lead hit the hourly cap (flag for the SchoolAdmin)
+RESET_SETTING_CHANGE = 'reset_setting_change'     # detail = on | off
 STAFF_ROLES_CHANGE = 'staff_roles_change'  # detail = resulting roles, e.g. T,G
 
 

@@ -1,0 +1,18 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}بازنشانی رمز{% endblock %}
+{% block content %}
+{% include 'dashboard/school/_nav.html' %}
+<div class="card mb-3"><div class="card-body">
+  <form method="post" action="{% url 'dashboard:school_resets_setting' %}" class="d-flex gap-3 align-items-center">{% csrf_token %}
+    <label><input type="checkbox" name="enabled" {% if setting %}checked{% endif %}> مربیان پایه بتوانند رمز دانش‌آموزان و والدین پایهٔ خودشان را بازنشانی کنند (پیش‌فرض: خاموش)</label>
+    <button class="btn btn-sm btn-primary">ذخیره</button></form>
+</div></div>
+<div class="alert alert-warning">پیش از بازنشانی، هویت درخواست‌کننده را تأیید کنید؛ برای حساب والدین با دقت بیشتر. رمز موقت فقط یک بار نمایش داده می‌شود.</div>
+<form method="get" class="mb-2 d-flex gap-2"><input name="q" value="{{ q }}" class="form-control w-auto" placeholder="نام کاربری یا نام"><button class="btn btn-outline-secondary">جستجو</button></form>
+<table class="table table-sm bg-white">
+  <thead><tr><th>نام کاربری</th><th>نام</th><th></th></tr></thead>
+  <tbody>{% for p in people %}<tr><td dir="ltr">{{ p.username }}</td><td>{{ p.first_name }} {{ p.last_name }}</td>
+    <td><form method="post" action="{% url 'dashboard:school_reset' p.pk %}">{% csrf_token %}<button class="btn btn-sm btn-outline-danger">بازنشانی رمز</button></form></td></tr>
+  {% empty %}<tr><td colspan="3" class="text-muted">حسابی پیدا نشد.</td></tr>{% endfor %}</tbody>
+</table>
+{% endblock %}

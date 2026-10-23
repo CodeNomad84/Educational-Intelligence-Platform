@@ -1,5 +1,5 @@
 from django.urls import path
-from . import account_views, bulk_views, counselor_views, grade_dashboard, school_views, student360, student_views, teacher_views, views
+from . import account_views, bulk_views, password_reset, counselor_views, grade_dashboard, school_views, student360, student_views, teacher_views, views
 
 app_name = 'dashboard'
 
@@ -47,6 +47,11 @@ urlpatterns = [
     path('school/accounts/preview/', bulk_views.accounts_preview, name='school_accounts_preview'),
     path('school/accounts/confirm/', bulk_views.accounts_confirm, name='school_accounts_confirm'),
     path('school/accounts/cancel/', bulk_views.accounts_cancel, name='school_accounts_cancel'),
+    path('school/resets/', password_reset.admin_resets, name='school_resets'),
+    path('school/resets/setting/', password_reset.admin_reset_setting, name='school_resets_setting'),
+    path('school/resets/<int:pk>/', password_reset.admin_reset, name='school_reset'),
+    path('grade/resets/', password_reset.grade_resets, name='grade_resets'),
+    path('grade/resets/<int:pk>/', password_reset.grade_reset, name='grade_reset'),
     path('school/staff-roles/', bulk_views.staff_roles, name='school_staff_roles'),
     path('school/staff-roles/<int:pk>/', bulk_views.staff_roles_save, name='school_staff_roles_save'),
 

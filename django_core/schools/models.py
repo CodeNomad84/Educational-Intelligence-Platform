@@ -19,6 +19,8 @@ class School(models.Model):
 
     name = models.CharField(max_length=200, verbose_name="نام مدرسه")
     code = models.SlugField(max_length=50, unique=True, verbose_name="کد مدرسه")
+    # Set only by the SchoolAdmin of this school (audit-logged). OFF: only the SchoolAdmin resets passwords.
+    grade_leads_may_reset_passwords = models.BooleanField(default=False, db_default=False, verbose_name="مربی پایه می‌تواند رمز را بازنشانی کند")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

@@ -1,0 +1,12 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}رمز موقت{% endblock %}
+{% block content %}
+<div class="alert alert-warning">
+  این رمز فقط همین یک بار نمایش داده می‌شود و هیچ‌جا ذخیره نمی‌شود. آن را به‌صورت حضوری یا از مسیر رسمی مدرسه به صاحب حساب بدهید؛ او در اولین ورود باید رمز خود را عوض کند.
+  {% if is_parent %}<strong>این حساب متعلق به یک والد است: قبل از تحویل رمز، هویت درخواست‌کننده را به‌طور حضوری (یا با تماس با شمارهٔ ثبت‌شده در مدرسه) تأیید کنید؛ رمز را از طریق پیامک، تلگرام یا تلفن به فرد ناشناس ندهید.</strong>{% endif %}
+</div>
+<div class="card"><div class="card-body">
+  <div><strong>نام کاربری:</strong> <span dir="ltr">{{ target.username }}</span></div>
+  <div><strong>رمز موقت:</strong> <code dir="ltr" class="fs-4">{{ password }}</code></div>
+</div></div>
+{% endblock %}

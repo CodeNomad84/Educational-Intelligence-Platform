@@ -159,6 +159,14 @@ def _full_tier_q(user, roles):
                  _grade_lead_q(user, roles), _counselor_q(user, roles)])
 
 
+def grade_lead_students(user):
+    """Students covered by the user's GRADE LEAD assignments ONLY (own school, own grade, current enrollment), never by any other
+    grant the account may also hold (Parent, Teacher, SchoolAdmin...). Used by the password-reset page, which must not widen
+    through a second role. Empty for a user who is not an active, non-staff Grade Lead."""
+    scope = _grade_lead_q(user, roles_for(user))
+    return Student.objects.filter(scope) if scope is not None else Student.objects.none()
+
+
 def visible_students(user):
     """Students the user may read: the union of the user's grants. Deny by default.
 

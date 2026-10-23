@@ -1,0 +1,15 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}بازنشانی رمز دانش‌آموزان و والدین پایه{% endblock %}
+{% block content %}
+<div class="alert alert-warning">پیش از بازنشانی، هویت درخواست‌کننده را تأیید کنید (حضوری یا از مسیر رسمی مدرسه). برای حساب <strong>والدین</strong> دقت بیشتری لازم است: رمز را فقط حضوری یا با تأیید قطعی هویت بدهید. هر بازنشانی در گزارش دسترسی‌ها ثبت می‌شود و حداکثر ۲۰ بازنشانی در ساعت مجاز است.</div>
+<table class="table table-sm bg-white align-middle">
+  <thead><tr><th>دانش‌آموز</th><th>کلاس</th><th>حساب دانش‌آموز</th><th>حساب والد</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+    <tr><td>{{ r.student.first_name }} {{ r.student.last_name }}</td><td>{{ r.student.class_name }}</td>
+      <td>{% if r.student_ok %}<form method="post" action="{% url 'dashboard:grade_reset' r.student.student_user_id %}" class="d-inline">{% csrf_token %}<button class="btn btn-sm btn-outline-danger">بازنشانی</button></form>{% else %}—{% endif %}</td>
+      <td>{% if r.parent_ok %}<form method="post" action="{% url 'dashboard:grade_reset' r.student.parent_user_id %}" class="d-inline">{% csrf_token %}<button class="btn btn-sm btn-outline-danger">بازنشانی</button></form>{% else %}—{% endif %}</td></tr>
+  {% empty %}<tr><td colspan="4" class="text-muted">دانش‌آموزی نیست.</td></tr>{% endfor %}
+  </tbody>
+</table>
+{% endblock %}

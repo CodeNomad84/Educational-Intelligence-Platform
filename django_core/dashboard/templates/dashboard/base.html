@@ -34,6 +34,7 @@
                 {# DEMO SCOPE end #}
                 {% if IS_GRADE_LEAD %}
                 <a href="{% url 'dashboard:grade_dashboard' %}"><i class="bi bi-bar-chart"></i> داشبورد پایه</a>
+                <a href="{% url 'dashboard:grade_resets' %}"><i class="bi bi-key"></i> بازنشانی رمز</a>
                 {% endif %}
                 {% if IS_TEACHER %}
                 <a href="{% url 'dashboard:teacher_home' %}"><i class="bi bi-journal-check"></i> کلاس‌های من</a>

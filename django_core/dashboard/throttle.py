@@ -52,6 +52,11 @@ def record_success(username):
     cache.delete(_key('user', username))
 
 
+def clear(username):
+    """Forget the failed attempts of a username (after a password reset); the address counters are not touched."""
+    cache.delete(_key('user', username))
+
+
 from rest_framework import status as _status  # noqa: E402
 from rest_framework.exceptions import APIException  # noqa: E402
 from rest_framework.response import Response  # noqa: E402
