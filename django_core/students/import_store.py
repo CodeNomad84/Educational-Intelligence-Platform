@@ -3,10 +3,12 @@
 
 Every read here is scoped to the school of the import (``school_id``, resolved ONCE from the importer's validated
 membership by ``resolve_student_school``): students of other schools are invisible to the planning reads. The only
-two functions that must look across schools are ``locked_state`` and ``write_row``: ``national_id`` is globally
+one function that must look across schools is ``locked_state``: ``national_id`` is globally
 unique until S7, so the write step has to detect that an id belongs to ANOTHER school (it returns only the ids of
 school and class, never data) and then refuse the row. A test pins which functions may omit ``school_id``.
 """
+from django.db import IntegrityError, transaction
+
 from .models import Student
 
 CHUNK = 500
@@ -54,11 +56,28 @@ def locked_state(national_id):
             .values('school_id', 'school_class_id').first())
 
 
-def write_row(national_id, defaults):
-    """CROSS-SCHOOL by necessity: ``update_or_create`` by national id. The caller has already refused rows of other
-    schools inside the same transaction and re-checks the result."""
-    return Student.objects.update_or_create(national_id=national_id, defaults=defaults)
+class ImportConflict(Exception):
+    """The write lost a race (or hit the global ``national_id`` uniqueness): another school's student owns the id."""
+
+
+def write_row(school_id, national_id, defaults):
+    """Conditional write (S4(a)): UPDATE only a student of THIS school (row-locked where the database supports it); otherwise
+    INSERT and let the unique ``national_id`` decide - an ``IntegrityError`` (another school, or a concurrent import, got
+    there first) becomes ``ImportConflict``. Nothing of another school is ever read for update or overwritten, whatever
+    ``locked_state`` saw a moment earlier (a lock on a row that does not exist yet locks nothing, and SQLite has no row lock)."""
+    existing = Student.objects.select_for_update().filter(school_id=school_id, national_id=national_id).first()
+    if existing is not None:
+        for field, value in defaults.items():
+            setattr(existing, field, value)
+        # like update_or_create: persist only the fields being written (+ auto_now ones), so derived mirrors are not rewritten
+        existing.save(update_fields=list(defaults) + [f.name for f in Student._meta.concrete_fields if getattr(f, 'auto_now', False)])
+        return existing, False
+    try:
+        with transaction.atomic():
+            return Student.objects.create(**{**defaults, 'national_id': national_id}), True
+    except IntegrityError:
+        raise ImportConflict() from None
 
 
 # Functions allowed to omit ``school_id`` (pinned by a test); every other function of this module must take it.
-CROSS_SCHOOL_BY_NECESSITY = ('locked_state', 'write_row')
+CROSS_SCHOOL_BY_NECESSITY = ('locked_state',)

@@ -174,7 +174,10 @@ def _write_import_row(row, plan):
         if class_pk is not None and 'school_class_id' in defaults and not SchoolClass.objects.filter(
                 pk=class_pk, school_id=plan.school_id).exists():
             raise ImportSchoolConflict()   # a planned link into a class of ANOTHER school would move the student: refuse
-        student, created = import_store.write_row(row.national_id, defaults)
+        try:
+            student, created = import_store.write_row(plan.school_id, row.national_id, defaults)
+        except import_store.ImportConflict:
+            raise ImportSchoolConflict() from None   # lost a race / the id belongs to another school: generic refusal
         if student.school_id != plan.school_id:
             raise ImportSchoolConflict()   # belt and braces, inside the row's transaction: the row is rolled back
         ensure_current_enrollment(student, source='import')

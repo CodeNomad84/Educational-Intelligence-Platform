@@ -97,8 +97,8 @@ class ExistingStudentCannotMoveTests(Base):
         before = self.row(own.pk)
         real_write = import_store.write_row
 
-        def moving_write(national_id, defaults):
-            student, created = real_write(national_id, {**defaults, 'school_id': self.b.pk})
+        def moving_write(school_id, national_id, defaults):
+            student, created = real_write(school_id, national_id, {**defaults, 'school_id': self.b.pk})
             return student, created
 
         with mock.patch.object(import_store, 'write_row', moving_write):
@@ -112,8 +112,32 @@ class ExistingStudentCannotMoveTests(Base):
         self.assertEqual(Student.objects.get(national_id='9500000006').school_id, self.b.pk)
 
 
+    def test_a_lost_race_for_a_new_national_id_is_a_generic_row_error_and_overwrites_nothing(self):
+        """S4(a): another school owns the id although the cross-school check saw nothing (the competitor committed after
+        that check; simulated by a stale ``locked_state`` that reports "free"). The unique id refuses the INSERT, the row gets
+        the generic error, the other school's student is untouched and nothing is raised to the caller."""
+        self.student('9500000077', self.b)
+        with mock.patch.object(import_store, 'locked_state', lambda national_id: None):
+            body = self.post(self.importer('imp_a', self.a), 'Racer,L,9500000077,8,,0912,Dr,Nurse').json()
+        rival = Student.objects.get(national_id='9500000077')
+        self.assertEqual((rival.school_id, rival.first_name), (self.b.pk, 'Old'))
+        self.assertEqual((body['created'], body['updated']), (0, 0))
+        self.assertIn(GENERIC, body['errors'][0])
+        self.assertEqual(Student.objects.filter(national_id='9500000077').count(), 1)
+
+    def test_an_update_only_ever_touches_a_student_of_the_importing_school(self):
+        own = self.student('9500000078', self.a)
+        other = self.student('9500000079', self.b)
+        before = self.row(other.pk)
+        body = self.post(self.importer('imp_a', self.a), 'Renamed,L,9500000078,8,,0912,Dr,Nurse\nHijack,L,9500000079,8,,0912,Dr,Nurse').json()
+        self.assertEqual(body['updated'], 1)
+        self.assertEqual(self.row(other.pk), before)
+        own.refresh_from_db()
+        self.assertEqual(own.first_name, 'Renamed')
+
+
 class ImportStoreScopeTests(TestCase):
-    def test_every_function_takes_school_id_except_the_two_cross_school_ones(self):
+    def test_every_function_takes_school_id_except_the_one_cross_school_one(self):
         tree = ast.parse(inspect.getsource(import_store))
         functions = {n.name: [a.arg for a in n.args.args] for n in tree.body
                      if isinstance(n, ast.FunctionDef) and not n.name.startswith('_')}
@@ -124,7 +148,7 @@ class ImportStoreScopeTests(TestCase):
                 self.assertEqual(args[0], 'school_id', name)
         self.assertEqual(set(import_store.CROSS_SCHOOL_BY_NECESSITY) - set(functions), set())
         # review F6: the exemption list is pinned and every scoped function really filters on the school
-        self.assertEqual(import_store.CROSS_SCHOOL_BY_NECESSITY, ('locked_state', 'write_row'))
+        self.assertEqual(import_store.CROSS_SCHOOL_BY_NECESSITY, ('locked_state',))
         for name in functions:
             if name not in import_store.CROSS_SCHOOL_BY_NECESSITY:
                 self.assertIn('school_id=school_id', inspect.getsource(getattr(import_store, name)), name)
