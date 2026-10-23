@@ -157,13 +157,13 @@ class SeedAndViewTests(TestCase):
         self.assertIn("قاعده", html)
 
     def test_assistant_answers_from_data_and_is_labelled(self):
-        out = assistant.answer("کدام دانش‌آموزان نیاز به توجه دارند؟")
+        out = assistant.answer("کدام دانش‌آموزان نیاز به توجه دارند؟", students=Student.objects.all())
         self.assertTrue(out["rows"])
         self.assertIn("بازبینی انسانی", out["disclaimer"])
-        why = assistant.answer("چرا علی احمدی در معرض خطر است؟")
+        why = assistant.answer("چرا علی احمدی در معرض خطر است؟", students=Student.objects.all())
         self.assertTrue(why["bullets"])
         self.assertEqual(why["rows"][0]["name"], "علی احمدی")
-        self.assertIn("پشتیبانی نمی‌شود", assistant.answer("آب و هوا چطور است؟")["title"])
+        self.assertIn("پشتیبانی نمی‌شود", assistant.answer("آب و هوا چطور است؟", students=Student.objects.all())["title"])
         self.assertEqual(why["label"], "Rule-Based Prototype Assistant")
 
     def test_assistant_never_reads_counseling_text(self):
@@ -321,22 +321,22 @@ class HardeningViewAndAssistantTests(TestCase):
                                    grade=9, class_name="۹-الف", phone_number="0", school=_demo_school())
 
     def test_ambiguous_name(self):
-        out = assistant.answer("چرا تکراری در معرض خطر است؟")
+        out = assistant.answer("چرا تکراری در معرض خطر است؟", students=Student.objects.all())
         self.assertEqual(out["title"], "لطفاً نام کامل دانش‌آموز را وارد کنید")
         self.assertEqual(len(out["bullets"]), 2)
         self.assertFalse(out["rows"])
 
     def test_first_and_last_names_of_different_students_are_ambiguous(self):
-        out = assistant.answer("مهسا احمدی چگونه بهتر شد؟")
+        out = assistant.answer("مهسا احمدی چگونه بهتر شد؟", students=Student.objects.all())
         self.assertEqual(out["title"], "لطفاً نام کامل دانش‌آموز را وارد کنید")
 
     def test_unknown_student(self):
-        out = assistant.answer("چرا غزاله کوهستانی در معرض خطر است؟")
+        out = assistant.answer("چرا غزاله کوهستانی در معرض خطر است؟", students=Student.objects.all())
         self.assertEqual(out["title"], "دانش‌آموزی با این نام پیدا نشد")
-        self.assertEqual(assistant.answer("why is Ali Ahmadi at risk")["title"], "دانش‌آموزی با این نام پیدا نشد")
+        self.assertEqual(assistant.answer("why is Ali Ahmadi at risk", students=Student.objects.all())["title"], "دانش‌آموزی با این نام پیدا نشد")
 
     def test_improvement_question(self):
-        out = assistant.answer("مهسا فرهادی چگونه بهتر شد؟")
+        out = assistant.answer("مهسا فرهادی چگونه بهتر شد؟", students=Student.objects.all())
         text = " ".join(out["bullets"])
         self.assertIn("وضعیت قبلی", text)
         self.assertIn("جلسهٔ مشاوره", text)          # the intervention
@@ -345,11 +345,11 @@ class HardeningViewAndAssistantTests(TestCase):
         self.assertEqual(out["label"], "Rule-Based Prototype Assistant")
 
     def test_improvement_on_student_without_improvement_is_honest(self):
-        out = assistant.answer("رضا کاظمی چگونه بهتر شد؟")
+        out = assistant.answer("رضا کاظمی چگونه بهتر شد؟", students=Student.objects.all())
         self.assertIn("شواهد روشنی از بهبود دیده نمی‌شود", " ".join(out["paragraphs"]))
 
     def test_attention_question_not_blocked_by_name_logic(self):
-        out = assistant.answer("کدام دانش‌آموزان نیاز به توجه دارند؟")
+        out = assistant.answer("کدام دانش‌آموزان نیاز به توجه دارند؟", students=Student.objects.all())
         self.assertEqual(len(out["rows"]), 9)
 
     def test_persian_digits_and_no_internal_ids(self):
@@ -519,3 +519,38 @@ class DemoLoginLandingTests(TestCase):
 
     def test_the_login_form_carries_next(self):
         self.assertContains(self.client.get("/login/?next=/school/"), 'name="next" value="/school/"')
+
+
+class DemoPagesAreSchoolScopedTests(TestCase):
+    """Stabilisation B2: the demo pages show only the students the user may read (no more ``Student.objects.all()``)."""
+
+    def setUp(self):
+        from schools.models import School, SchoolMembership
+        User = get_user_model()
+        self.a = School.objects.create(name="A", code="a")
+        self.b = School.objects.create(name="B", code="b")
+        for code, school in (("alpha", self.a), ("bravo", self.b)):
+            Student.objects.create(first_name=code.title(), last_name=code.title() + "son", national_id=f"93{ord(code[0])}00000", grade=9,
+                                   phone_number="1", school=school, class_name="9-A")
+        self.admin = User.objects.create_user("scoped-admin", password="x")
+        self.admin.groups.add(Group.objects.get_or_create(name=ADMIN)[0])
+        SchoolMembership.objects.create(user=self.admin, school=self.a)
+        self.client.force_login(self.admin)
+
+    def test_every_demo_page_shows_only_the_own_school(self):
+        for url in ("/dashboard/", "/demo/counselor/", "/demo/students/", "/demo/assistant/?q=Alpha"):
+            body = self.client.get(url).content.decode()
+            self.assertNotIn("Bravo", body, url)
+        self.assertIn("Alpha", self.client.get("/demo/students/").content.decode())
+
+    def test_the_assistant_never_names_or_counts_another_schools_student(self):
+        out = assistant.answer("چرا Bravo Bravoson در معرض خطر است؟", students=Student.objects.filter(school=self.a))
+        self.assertEqual(out["title"], "دانش‌آموزی با این نام پیدا نشد")
+        with self.assertRaises(TypeError):
+            assistant.answer("x")          # the student set is mandatory: no hidden global query
+
+    def test_the_platform_superuser_sees_no_students_on_the_demo_pages(self):
+        root = get_user_model().objects.create_superuser("scoped-root", password="x")
+        self.client.force_login(root)
+        for url in ("/demo/students/", "/demo/counselor/"):
+            self.assertEqual(self.client.get(url).status_code, 403, url)

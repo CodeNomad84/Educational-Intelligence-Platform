@@ -4,7 +4,7 @@ from django.shortcuts import render
 from django.utils import timezone
 
 from dashboard.decorators import role_required
-from students.access import ADMIN
+from students.access import ADMIN, visible_students
 from students.models import Student
 
 from . import assistant as assistant_mod
@@ -13,15 +13,16 @@ from .engine import analyze_students
 from .models import CounselingNote, InterventionRecord, StudentObservation
 
 
-def _all():
+def _all(user):
+    """Today, the students the USER may read (scoped through the access layer), and their analysis."""
     today = timezone.localdate()
-    students = list(Student.objects.all())
+    students = list(visible_students(user))
     return today, students, analyze_students(students, today)
 
 
 def school_dashboard(request):
     """Called from dashboard.views.dashboard_view (DEMO SCOPE hook); caller has verified the Admin role."""
-    today, students, results = _all()
+    today, students, results = _all(request.user)
     overview = school_overview(students, results, today)
     top = [{"student": s, "r": results[s.id]} for s in overview["attention"][:8]]
     return render(request, "demo_intel/school_dashboard.html", {"o": overview, "top": top, "active": "dashboard"})
@@ -29,7 +30,7 @@ def school_dashboard(request):
 
 @role_required(ADMIN)
 def counselor_view(request):
-    today, students, results = _all()
+    today, students, results = _all(request.user)
     cases = []
     for s in sort_by_attention(students, results):
         r = results[s.id]
@@ -45,7 +46,7 @@ def counselor_view(request):
 
 @role_required(ADMIN)
 def demo_student_list(request):
-    today, students, results = _all()
+    today, students, results = _all(request.user)
     level = request.GET.get("level", "")
     cls = request.GET.get("class", "")
     q = request.GET.get("q", "").strip()
@@ -86,6 +87,6 @@ def student_profile(request, student):
 @role_required(ADMIN)
 def assistant_view(request):
     query = request.POST.get("query", "").strip() if request.method == "POST" else request.GET.get("q", "").strip()
-    result = assistant_mod.answer(query) if query else None
+    result = assistant_mod.answer(query, students=visible_students(request.user)) if query else None
     return render(request, "demo_intel/assistant.html", {
         "result": result, "query": query, "suggestions": assistant_mod.SUGGESTIONS, "active": "assistant"})

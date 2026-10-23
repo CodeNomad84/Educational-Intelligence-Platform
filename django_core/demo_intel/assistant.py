@@ -113,8 +113,10 @@ def _improvement(ans, s, r):
     ans["rows"] = [_row(s, r)]
 
 
-def answer(query, today=None):
-    students = list(Student.objects.all())
+def answer(query, today=None, *, students):
+    """``students`` is REQUIRED: the caller passes exactly the students the user may read (``visible_students``); the
+    assistant never queries the student table itself."""
+    students = list(students)
     results = analyze_students(students, today)
     q = _norm(query)
     ans = {"query": query, "title": "", "paragraphs": [], "rows": [], "bullets": [], "label": LABEL,
