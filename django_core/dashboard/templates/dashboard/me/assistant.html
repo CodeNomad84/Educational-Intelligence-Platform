@@ -1,0 +1,10 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}دستیار مطالعه (نمایشی){% endblock %}
+{% block content %}
+<a class="btn btn-link" href="{% url 'dashboard:me_home' %}">← صفحهٔ من</a>
+<div class="alert alert-warning"><strong>DEMO STUB</strong> — {{ notice }}</div>
+<div class="card mb-3"><div class="card-body">
+  <form method="post">{% csrf_token %}{{ form.as_p }}<button class="btn btn-primary">پیشنهاد مطالعه</button></form>
+</div></div>
+{% if reply %}<div class="card border-info"><div class="card-header">پیشنهاد (نمایشی، راهنمایی صرف)</div><div class="card-body">{{ reply }}</div></div>{% endif %}
+{% endblock %}

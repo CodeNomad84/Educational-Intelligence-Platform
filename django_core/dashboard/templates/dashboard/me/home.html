@@ -1,0 +1,16 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}صفحهٔ من{% endblock %}
+{% block content %}
+<h5>{{ student.first_name }} {{ student.last_name }} — {{ student.get_grade_display }}</h5>
+<a class="btn btn-outline-primary mb-3" href="{% url 'dashboard:me_assistant' %}">دستیار مطالعه (نمایشی)</a>
+<h5>نمرات من</h5>
+{% for year, subjects, year_average in grade_years %}
+<div class="card mb-3"><div class="card-header">{{ year }} — میانگین کل: <strong>{{ year_average }}</strong></div><div class="card-body p-0">
+  <table class="table table-sm mb-0"><thead><tr><th>درس</th><th>تعداد نمره</th><th>میانگین</th></tr></thead><tbody>
+  {% for name, count, avg in subjects %}<tr><td>{{ name }}</td><td>{{ count }}</td><td>{{ avg }}</td></tr>{% endfor %}
+  </tbody></table></div></div>
+{% empty %}<p class="text-muted">نمره‌ای ثبت نشده است.</p>{% endfor %}
+<h5 class="mt-4">بازخورد معلمان</h5>
+{% for r in recommendations %}<div class="border rounded p-2 mb-2 bg-white"><small class="text-muted">{{ r.created_at|date:"Y-m-d" }}{% if r.subject %} — {{ r.get_subject_display }}{% endif %}</small><div>{{ r.text|linebreaksbr }}</div></div>
+{% empty %}<p class="text-muted">بازخوردی ثبت نشده است.</p>{% endfor %}
+{% endblock %}

@@ -1,5 +1,5 @@
 """Template context: role group names come from the constants, never from literals in templates."""
-from students.access import ADMIN, COUNSELOR, GRADE_LEAD, PARENT, TEACHER, roles_for
+from students.access import ADMIN, COUNSELOR, GRADE_LEAD, PARENT, STUDENT, TEACHER, roles_for
 
 
 def role_names(request):
@@ -7,4 +7,5 @@ def role_names(request):
     user = getattr(request, 'user', None)
     roles = roles_for(user)
     return {'ADMIN_ROLE': ADMIN, 'IS_SCHOOL_ADMIN': ADMIN in roles, 'IS_TEACHER': TEACHER in roles,
-            'IS_GRADE_LEAD': GRADE_LEAD in roles, 'IS_PARENT': PARENT in roles, 'IS_COUNSELOR': COUNSELOR in roles}
+            'IS_GRADE_LEAD': GRADE_LEAD in roles, 'IS_PARENT': PARENT in roles, 'IS_COUNSELOR': COUNSELOR in roles,
+            'IS_STUDENT': STUDENT in roles}

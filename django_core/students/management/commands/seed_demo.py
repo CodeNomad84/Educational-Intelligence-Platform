@@ -150,7 +150,7 @@ class Command(BaseCommand):
             dist[r["level"]] += 1
         self.stdout.write(self.style.SUCCESS(
             f"Seeded {len(students)} synthetic students. Risk distribution: {dist}"))
-        self.stdout.write("Demo users (all synthetic):  demo_admin / demo_counselor / demo_parent / demo_teacher / demo_gradelead")
+        self.stdout.write("Demo users (all synthetic):  demo_admin / demo_counselor / demo_parent / demo_teacher / demo_gradelead / demo_student")
         self.stdout.write(self.style.WARNING(f"Password: {password}"))
 
     # ---------------------------------------------------------------------------------------------
@@ -306,12 +306,17 @@ class Command(BaseCommand):
         User = get_user_model()
         for username, first, last, group in (("demo_teacher", "معلم", "نمایشی", "Teacher"),
                                              ("demo_gradelead", "مربی", "نمایشی", "GradeLead"),
-                                             ("demo_counselor", "مشاور", "نمایشی", "Counselor")):
+                                             ("demo_counselor", "مشاور", "نمایشی", "Counselor"),
+                                             ("demo_student", "دانش‌آموز", "نمایشی", "Student")):
             user, _ = User.objects.get_or_create(username=username, defaults=dict(first_name=first, last_name=last))
             user.set_password(password)
             user.is_staff = False
             user.save()
             user.groups.set([Group.objects.get_or_create(name=group)[0]])
+            if group == "Student":   # a student account is linked to ONE student, not school staff
+                child = next(s for s, p in students if p.get("key") == "stable_low_risk")
+                type(child).objects.filter(pk=child.pk).update(student_user=user)
+                continue
             SchoolStaff.objects.update_or_create(user=user, defaults={"school": school})
             if group == "Teacher":
                 for title in ("۹-الف", "۱۰-الف"):

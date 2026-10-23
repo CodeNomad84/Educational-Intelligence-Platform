@@ -115,7 +115,7 @@ class SeedAndViewTests(TestCase):
     def test_seed_creates_schooladmin_group_and_admin_roles(self):
         """seed_demo must use the ADMIN constant (ADR-0010): SchoolAdmin exists and the pre-rename group name does not."""
         self.assertEqual(ADMIN, "SchoolAdmin")
-        self.assertEqual(set(Group.objects.values_list("name", flat=True)), {ADMIN, "Parent", "Teacher", "GradeLead", "Counselor"})
+        self.assertEqual(set(Group.objects.values_list("name", flat=True)), {ADMIN, "Parent", "Teacher", "GradeLead", "Counselor", "Student"})
         User = get_user_model()
         self.assertIn(ADMIN, roles_for(User.objects.get(username="demo_admin")))
         self.assertEqual(roles_for(User.objects.get(username="demo_counselor")), {"Counselor"})   # Slice 4a: a real role
@@ -482,6 +482,7 @@ class DemoLoginLandingTests(TestCase):
         "demo_gradelead": ("/students/?grade=10", ["/students/"]),
         "demo_parent": ("/students/", ["/students/"]),
         "demo_counselor": ("/counselor/", ["/counselor/"]),
+        "demo_student": ("/me/", ["/me/", "/me/assistant/"]),
     }
 
     @classmethod

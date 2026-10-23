@@ -1,5 +1,5 @@
 from django.urls import path
-from . import counselor_views, school_views, student360, teacher_views, views
+from . import counselor_views, school_views, student360, student_views, teacher_views, views
 
 app_name = 'dashboard'
 
@@ -17,6 +17,11 @@ urlpatterns = [
     path('upload-document/', views.upload_document_view, name='upload_document'),
     path('delete-document/', views.delete_document_view, name='delete_document'),
     path('students/add/', views.student_create_view, name='student_add'),
+
+    # Student pages (Slice 4b)
+    path('me/', student_views.home, name='me_home'),
+    path('me/assistant/', student_views.assistant, name='me_assistant'),
+    path('students/<int:pk>/account/', student_views.create_account, name='student_account'),
 
     # Referral and Counselor pages (Slice 4a)
     path('students/<int:pk>/refer/', counselor_views.student_refer, name='student_refer'),

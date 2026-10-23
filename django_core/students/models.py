@@ -27,6 +27,10 @@ class Student(models.Model):
         related_name='children',
         verbose_name="والدین (کاربر)"
     )
+    # Slice 4b: the student's own login account (role Student). One account per student; set by the school's SchoolAdmin.
+    student_user = models.OneToOneField(
+        User, on_delete=models.SET_NULL, null=True, blank=True, editable=False, related_name='student_profile',
+        verbose_name="حساب دانش‌آموز")
 
     # School structure (ADR-0004). ``school_class`` is the source of truth for class membership;
     # ``school`` is derived from it in save() and ``class_name`` is its deprecated, read-only mirror.

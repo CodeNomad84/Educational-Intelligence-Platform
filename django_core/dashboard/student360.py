@@ -64,4 +64,8 @@ def student_360(request, pk):
     if roles & {ADMIN, GRADE_LEAD}:
         from .counselor_views import ReferralForm
         context['referral_form'] = ReferralForm(student=student)
+    if ADMIN in roles:
+        from .student_views import StudentAccountForm
+        context['account_form'] = None if student.student_user_id else StudentAccountForm(student=student)
+        context['student_account'] = student.student_user
     return render(request, 'dashboard/student_360.html', context)

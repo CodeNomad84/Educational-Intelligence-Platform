@@ -2,7 +2,7 @@
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 
-from students.access import ADMIN, COUNSELOR, GRADE_LEAD, PARENT, TEACHER, roles_for
+from students.access import ADMIN, COUNSELOR, GRADE_LEAD, PARENT, STUDENT, TEACHER, roles_for
 
 
 def home_url_for(user):
@@ -24,6 +24,8 @@ def home_url_for(user):
         return reverse('dashboard:student_list') + (f'?grade={grade}' if grade else '')
     if PARENT in roles:
         return reverse('dashboard:student_list')
+    if STUDENT in roles:
+        return reverse('dashboard:me_home')
     return reverse('dashboard:login')
 
 

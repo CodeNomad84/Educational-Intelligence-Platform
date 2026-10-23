@@ -309,6 +309,7 @@ class NotNullAtTheDatabaseTests(MigrationCase):
         super().setUp()
         self.keep = self.student(self.school()).pk
         self.migrate(AFTER)
+        call_command('migrate', verbosity=0)   # later migrations (new columns) so the real model matches the schema
         from students.models import Student
         self.Real = Student
 

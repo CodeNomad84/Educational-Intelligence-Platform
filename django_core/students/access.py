@@ -23,9 +23,10 @@ from .models import Attendance, CounselorNote, Enrollment, Grade, Recommendation
 ADMIN = 'SchoolAdmin'  # ADR-0010 (renamed by students/0010); FastAPI auth.ADMIN must match
 TEACHER = 'Teacher'  # Subject Teacher (ADR-0005)
 GRADE_LEAD = 'GradeLead'  # ADR-0005; group created by setup_staff_roles; read since C5a
-COUNSELOR = 'Counselor'  # ADR-0005; same, access arrives with referrals (2.6)
+COUNSELOR = 'Counselor'  # ADR-0005; access via referrals (Slice 4a)
+STUDENT = 'Student'  # Slice 4b: own grades and feedback only (account linked through Student.student_user)
 PARENT = 'Parent'
-ALL_ROLES = (ADMIN, TEACHER, GRADE_LEAD, PARENT, COUNSELOR)
+ALL_ROLES = (ADMIN, TEACHER, GRADE_LEAD, PARENT, COUNSELOR, STUDENT)
 # ADR-0012 / changes/0010: platform role (stage S1 creates the empty group only). Deliberately NOT in ALL_ROLES:
 # ``roles_for`` and the FastAPI token do not recognise it yet, so adding it changes nobody's access.
 PLATFORM_ADMIN = 'PlatformAdmin'
@@ -144,6 +145,13 @@ def _counselor_q(user, roles):
     return Q(pk__in=cases.values('student_id'))
 
 
+def _own_student_q(user, roles):
+    """Q on ``Student``: the student's OWN record (role Student). NOT a full-detail grant: no identity fields, no attendance."""
+    if STUDENT not in roles or not _may_hold_scoped_grants(user):
+        return None
+    return Q(student_user=user)
+
+
 def _full_tier_q(user, roles):
     """Rows where the user holds a full-detail grant: SchoolAdmin (own schools), Parent (own child) or Grade Lead
     (own grade)."""
@@ -167,7 +175,7 @@ def visible_students(user):
         _current_enrollment(school_id, school_class_id=class_id)
         for school_id, class_id, _subject in _teacher_assignments(user, roles)
     )
-    scope = _any([full, teacher])
+    scope = _any([full, teacher, _own_student_q(user, roles)])
     if scope is None:
         return Student.objects.none().annotate(full_tier=Value(False, output_field=BooleanField()))
     if full is None:
@@ -187,6 +195,9 @@ def visible_grades(user):
         Q(student__in=Student.objects.filter(_current_enrollment(school_id, school_class_id=class_id)), subject=subject)
         for school_id, class_id, subject in _teacher_assignments(user, roles)
     ]
+    own = _own_student_q(user, roles)
+    if own is not None:
+        parts.append(Q(student__in=Student.objects.filter(own)))
     scope = _any(parts)
     return Grade.objects.none() if scope is None else Grade.objects.filter(scope)
 
@@ -209,6 +220,9 @@ def visible_recommendations(user):
     parts = [Q(student__in=Student.objects.filter(full)) if full is not None else None]
     if TEACHER in roles and _may_hold_scoped_grants(user):
         parts.append(Q(author=user, student__in=visible_students(user)))
+    own = _own_student_q(user, roles)
+    if own is not None:   # a student reads the feedback written about themselves
+        parts.append(Q(student__in=Student.objects.filter(own)))
     scope = _any(parts)
     return Recommendation.objects.none() if scope is None else Recommendation.objects.filter(scope)
 
