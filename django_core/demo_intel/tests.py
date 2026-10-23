@@ -468,3 +468,53 @@ class SeedDemoResetOrderTests(TestCase):
     def test_reset_with_a_valid_school_still_rebuilds(self):
         call_command("seed_demo", "--reset", "--school", "second", "--password", "Test-pass-123", verbosity=0)
         self.assertEqual(set(Student.objects.values_list("school__code", flat=True)), {"second"})
+
+
+@override_settings(DATABASES={"default": {**copy.deepcopy(settings.DATABASES["default"]), "NAME": "/x/demo_db.sqlite3"}})
+class DemoLoginLandingTests(TestCase):
+    """Every demo user logs in with the printed password (real login, not force_login), lands on the page of the role and
+    finds the links of the role there. A safe ``next`` is honoured, an unsafe one is not."""
+    PASSWORD = "Test-pass-123"
+    # username -> (landing URL, links that must be on the landing page)
+    EXPECTED = {
+        "demo_admin": ("/school/", ["/school/years/", "/school/classes/", "/school/teachers/", "/school/gradeleads/"]),
+        "demo_teacher": ("/teacher/", ["/teacher/", "/students/"]),
+        "demo_gradelead": ("/students/", ["/students/"]),
+        "demo_parent": ("/students/", ["/students/"]),
+        "demo_counselor": ("/demo/counselor/", ["/dashboard/", "/demo/counselor/", "/school/"]),
+    }
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("seed_demo", "--password", cls.PASSWORD, verbosity=0)
+
+    def login(self, username, **extra):
+        return self.client.post("/login/", {"username": username, "password": self.PASSWORD, **extra})
+
+    def test_each_demo_user_lands_on_its_page_with_its_own_links(self):
+        for username, (landing, links) in self.EXPECTED.items():
+            with self.subTest(user=username):
+                self.client.logout()
+                resp = self.login(username)
+                self.assertEqual((resp.status_code, resp["Location"]), (302, landing))
+                page = self.client.get(landing)
+                self.assertEqual(page.status_code, 200)
+                body = page.content.decode()
+                for link in links:
+                    self.assertIn(f'href="{link}"', body)
+
+    def test_a_safe_next_is_honoured_and_unsafe_ones_are_ignored(self):
+        resp = self.client.get("/school/")
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(resp["Location"], "/login/?next=/school/")
+        self.assertEqual(self.login("demo_admin", next="/school/years/")["Location"], "/school/years/")
+        for bad in ("https://evil.example/", "//evil.example/", "javascript:alert(1)"):
+            self.client.logout()
+            self.assertEqual(self.login("demo_admin", next=bad)["Location"], "/school/", bad)
+
+    def test_login_via_the_query_string_next_of_the_redirect(self):
+        resp = self.client.post("/login/?next=/school/classes/", {"username": "demo_admin", "password": self.PASSWORD})
+        self.assertEqual(resp["Location"], "/school/classes/")
+
+    def test_the_login_form_carries_next(self):
+        self.assertContains(self.client.get("/login/?next=/school/"), 'name="next" value="/school/"')

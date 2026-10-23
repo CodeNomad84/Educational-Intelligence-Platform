@@ -15,6 +15,7 @@ from students.access import (
     visible_recommendations, visible_students,
 )
 from .decorators import role_required
+from .home import home_url_for, safe_next
 from students.enrollment_sync import ensure_current_enrollment
 
 # صفحه‌ی ورود
@@ -25,7 +26,7 @@ def login_view(request):
         user = authenticate(request, username=username, password=password)
         if user is not None:
             login(request, user)
-            return redirect('dashboard:dashboard')
+            return redirect(safe_next(request) or home_url_for(user))
         else:
             messages.error(request, 'نام کاربری یا رمز عبور اشتباه است.')
     # DEMO SCOPE begin — standalone demo login (vendored assets, DEMO banner); original template kept for non-demo runs
@@ -48,8 +49,8 @@ def dashboard_view(request):
         return redirect('/admin/')   # Slice 0: the superuser is the platform account; it has no school data here
     if ADMIN not in roles:  # school-wide aggregates: SchoolAdmin only
         if roles & {PARENT, GRADE_LEAD, TEACHER}:
-            # Aggregates are SchoolAdmin only; every other role lands on its own student list.
-            return redirect('dashboard:student_list')
+            # Aggregates are SchoolAdmin only; every other role lands on its own home.
+            return redirect(home_url_for(request.user))
         raise PermissionDenied
     # DEMO SCOPE begin — demo school dashboard (only when config.settings.demo is active)
     from django.conf import settings as _demo_settings

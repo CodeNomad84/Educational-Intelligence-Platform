@@ -110,9 +110,9 @@ class DashboardAuthzTests(TestCase):
     # -- staff ------------------------------------------------------------
     def test_teacher_denied_student_data_and_documents(self):
         # A Teacher WITHOUT an assignment sees no student data; documents and writes stay denied.
-        # (C5a: aggregates stay SchoolAdmin only, so the landing is a redirect to the student list.)
+        # (C5a: aggregates stay SchoolAdmin only, so the landing is a redirect to the teacher's own home, /teacher/.)
         self.client.force_login(self.teacher)
-        self.assertRedirects(self.client.get(self.url('dashboard')), self.url('student_list'))
+        self.assertRedirects(self.client.get(self.url('dashboard')), self.url('teacher_home'))
         self.assertEqual(self.client.get(self.url('student_detail', self.child_b.pk)).status_code, 404)
         self.assertEqual(list(self.client.get(self.url('student_list')).context['students']), [])
         self.assertEqual(self.client.get(self.url('library')).status_code, 403)

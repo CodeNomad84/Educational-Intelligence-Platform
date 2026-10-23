@@ -39,6 +39,9 @@ table.table td,table.table th{vertical-align:middle}
   <a href="{% url 'dashboard:demo_counselor' %}" class="{% if active == 'counselor' %}active{% endif %}">داشبورد مشاور</a>
   <a href="{% url 'dashboard:demo_students' %}" class="{% if active == 'students' %}active{% endif %}">دانش‌آموزان</a>
   <a href="{% url 'dashboard:demo_assistant' %}" class="{% if active == 'assistant' %}active{% endif %}">دستیار هوشمند (نمونه)</a>
+  {% if IS_SCHOOL_ADMIN %}<a href="{% url 'dashboard:school_home' %}">مدیریت مدرسه</a>{% endif %}
+  {% if IS_TEACHER %}<a href="{% url 'dashboard:teacher_home' %}">کلاس‌های من</a>{% endif %}
+  {% if IS_GRADE_LEAD or IS_PARENT %}<a href="{% url 'dashboard:student_list' %}">دانش‌آموزان من</a>{% endif %}
   <span class="me-auto"></span>
   <span class="small text-white-50 ms-3">{{ user.username }}</span>
   <a href="{% url 'dashboard:logout' %}">خروج</a>
