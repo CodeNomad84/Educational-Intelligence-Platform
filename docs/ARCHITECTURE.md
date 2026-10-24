@@ -43,6 +43,11 @@ Labels: CURRENT = verified at commit `3404a1a` (resolvable in this repository's 
 - **Privacy:** trials do not relax anything: no real student data until the security baseline exit criteria are met.
 - **Known ungated surface:** the Django admin (its module-row and cap screens are platform-admin only). Superusers/PlatformAdmin have no school, so module-gated routes refuse them.
 
+## School vocabulary (CURRENT table; nothing reads it yet)
+
+- `vocabulary.VocabularyTerm(school, domain, code, label_fa, active, effective_from, effective_to null, replaces null)`; domains: `observation_category`, `observation_sentiment`, `recommendation_tag`, `intervention_type`. A term is never edited or deleted in place (model guard); a rename = `vocabulary.terms.rename_term()` creates a new term with `replaces` and closes the old one the day before. `terms_on(school, domain, on)` reads what is in force.
+- `manage.py seed_vocabulary [--school CODE]` creates idempotent defaults that mirror today's enums (`recommendation_tag` defaults are placeholders: `DECISION REQUIRED`). The existing models (`Observation`, `StudentObservation`, `Recommendation`, ...) are unchanged and do not use it; `behavior`/`risk` stay uninstalled. New modules (exams, questionnaires, observations) must use `VocabularyTerm` from day one. `Framework` / `FrameworkNode` / `RuleParameter` / `PromptTemplate` and the framework-node link are `NOT YET IMPLEMENTED`.
+
 ## Constraints
 No new service/dependency without L3 proposal. No real student data until security baseline exit (`SECURITY.md`). Configuration over custom code (`CUSTOMIZATION.md`).
 
