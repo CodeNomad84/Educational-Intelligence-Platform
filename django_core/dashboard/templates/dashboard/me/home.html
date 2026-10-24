@@ -2,7 +2,7 @@
 {% block title %}صفحهٔ من{% endblock %}
 {% block content %}
 <h5>{{ student.first_name }} {{ student.last_name }} — {{ student.get_grade_display }}</h5>
-<a class="btn btn-outline-primary mb-3" href="{% url 'dashboard:me_assistant' %}">دستیار مطالعه (نمایشی)</a>
+{% for m in VISIBLE_MODULES %}{% if m.key == 'tutor_ai' %}<a class="btn btn-outline-primary mb-3" href="{{ m.url }}">دستیار مطالعه (نمایشی){% if not m.enabled %} <i class="bi bi-lock"></i>{% endif %}</a>{% endif %}{% endfor %}
 <h5>نمرات من</h5>
 {% for year, subjects, year_average in grade_years %}
 <div class="card mb-3"><div class="card-header">{{ year }} — میانگین کل: <strong>{{ year_average }}</strong></div><div class="card-body p-0">

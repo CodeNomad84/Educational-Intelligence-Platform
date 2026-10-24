@@ -75,37 +75,37 @@ class TutorRouteTests(ModuleBase):
         self.assertEqual(enabled_modules_for_user(self.stu_user), set())
 
 
-class PredictGateTests(ModuleBase):
-    """ML risk prediction through FastAPI is an AI call: advisor_ai is checked before the request is made."""
+class PredictIsBaseTests(ModuleBase):
+    """ML risk prediction through FastAPI is base (owner decision A.1): no module row is needed to reach the call."""
 
-    def url(self):
-        return f'/api/students/{self.s7.pk}/predict/'
-
-    def test_off_ended_not_started_and_other_school_never_reach_fastapi(self):
+    def test_predict_reaches_fastapi_without_any_row(self):
         self.client.force_login(self.admin)
-        with mock.patch('requests.post', side_effect=AssertionError('FastAPI called')) as post:
-            self.assertEqual(self.client.get(self.url()).status_code, 403)                      # no row
-            grant(self.a, 'advisor_ai')
-            SchoolModule.objects.all().update(ends_on=TODAY() - timedelta(days=1))
-            self.assertEqual(self.client.get(self.url()).status_code, 403)                      # ended
-            SchoolModule.objects.all().update(starts_on=TODAY() + timedelta(days=2), ends_on=None)
-            self.assertEqual(self.client.get(self.url()).status_code, 403)                      # not started
-            SchoolModule.objects.all().delete()
-            grant(self.b, 'advisor_ai')
-            self.assertEqual(self.client.get(self.url()).status_code, 403)                      # other school only
-            self.assertEqual(post.call_count, 0)
-        SchoolModule.objects.all().delete()
-        grant(self.a, 'advisor_ai')
-        with mock.patch('requests.post', side_effect=requests.exceptions.ConnectionError):
-            self.assertEqual(self.client.get(self.url()).status_code, 503)                      # allowed; service unreachable
+        with mock.patch('students.views.service_headers', return_value={}), \
+                mock.patch('requests.post', side_effect=requests.exceptions.ConnectionError) as post:
+            self.assertEqual(self.client.get(f'/api/students/{self.s7.pk}/predict/').status_code, 503)   # service unreachable
+            self.assertEqual(post.call_count, 1)
 
-    def test_admin_of_two_schools_is_blocked_per_object(self):
-        SchoolMembership.objects.create(user=self.admin, school=self.b)
-        grant(self.a, 'advisor_ai')                                                             # school B has no module
-        self.client.force_login(self.admin)
-        with mock.patch('requests.post', side_effect=requests.exceptions.ConnectionError):
-            self.assertEqual(self.client.get(self.url()).status_code, 503)
-            self.assertEqual(self.client.get(f'/api/students/{self.sb.pk}/predict/').status_code, 403)
+
+class ModuleRequiredPermissionTests(ModuleBase):
+    """The DRF class for viewsets of a sellable module (none yet): refuses at request and object level."""
+
+    def check(self, user, school_id=None, key='exams'):
+        from rest_framework.test import APIRequestFactory
+
+        from students.permissions import ModuleRequired
+
+        view = type('V', (), {'action': 'list', 'module_by_action': {'list': key}})()
+        request = APIRequestFactory().get('/')
+        request.user = user
+        obj = type('O', (), {'school_id': school_id})()
+        perm = ModuleRequired()
+        return perm.has_permission(request, view), perm.has_object_permission(request, view, obj)
+
+    def test_off_on_and_other_school(self):
+        self.assertEqual(self.check(self.admin, self.a.pk), (False, False))
+        grant(self.a, 'exams')
+        self.assertEqual(self.check(self.admin, self.a.pk), (True, True))
+        self.assertEqual(self.check(self.admin, self.b.pk), (True, False))      # object in a school without it
 
 
 class EntitlementHelperTests(ModuleBase):

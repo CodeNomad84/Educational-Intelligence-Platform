@@ -9,7 +9,15 @@ from django.contrib import admin, messages
 from django.contrib.auth import get_user_model
 
 from .models import (
-    AcademicYear, AuditEvent, GradeLeadAssignment, School, SchoolClass, SchoolMembership, SchoolStaff, TeacherAssignment)
+    AcademicYear, AuditEvent, GradeLeadAssignment, School, SchoolClass, SchoolMembership, SchoolModule, SchoolStaff,
+    TeacherAssignment)
+
+
+def _is_platform_operator(user):
+    """Superuser or PlatformAdmin (active staff). A SchoolAdmin is never one: module rows and AI caps are theirs to see, not to set."""
+    from students.access import PLATFORM_ADMIN
+
+    return bool(user.is_active and user.is_staff and (user.is_superuser or user.groups.filter(name=PLATFORM_ADMIN).exists()))
 
 
 @admin.register(School)
@@ -28,6 +36,8 @@ class SchoolAdmin(admin.ModelAdmin):
         fields = super().get_readonly_fields(request, obj)
         if obj is not None and not request.user.is_superuser:
             fields = tuple(fields) + ("code",)
+        if not _is_platform_operator(request.user):
+            fields = tuple(fields) + ("ai_daily_cap", "ai_monthly_cap")   # call caps: platform admin only
         return fields
 
 
@@ -212,3 +222,38 @@ class AuditEventAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(SchoolModule)
+class SchoolModuleAdmin(admin.ModelAdmin):
+    """Module entitlements. Only a platform admin (superuser / PlatformAdmin) may see, create or extend rows; never a
+    SchoolAdmin. No deletes (end a row with ends_on instead). Every save is audit-logged. A trial is unique per
+    (school, module): extending it means editing its ends_on."""
+
+    list_display = ("school", "module_key", "kind", "starts_on", "ends_on")
+    list_filter = ("kind", "module_key", "school")
+
+    def has_module_permission(self, request):
+        return _is_platform_operator(request.user)
+
+    has_view_permission = has_add_permission = has_change_permission = lambda self, request, obj=None: _is_platform_operator(request.user)
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        from .entitlements import MODULES
+
+        if db_field.name == "module_key":
+            return forms.ChoiceField(choices=[(k, k) for k in MODULES], label=db_field.verbose_name)
+        return super().formfield_for_dbfield(db_field, request, **kwargs)
+
+    def get_readonly_fields(self, request, obj=None):
+        return ("school", "module_key", "kind", "starts_on") if obj is not None else ()
+
+    def save_model(self, request, obj, form, change):
+        from . import audit
+        from .entitlements import module_change_detail
+
+        super().save_model(request, obj, form, change)
+        audit.record(request.user, audit.MODULE_CHANGE, obj, school=obj.school, detail=module_change_detail(obj))

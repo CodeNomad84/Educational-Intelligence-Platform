@@ -85,3 +85,6 @@ REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 10,
 }
+# AI trial guard defaults (schools/ai_guard.py); a School can override both. Not billing.
+AI_DEFAULT_DAILY_CAP = 100
+AI_DEFAULT_MONTHLY_CAP = 1000

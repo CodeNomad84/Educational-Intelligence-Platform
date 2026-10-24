@@ -14,6 +14,7 @@
    <button class="btn btn-sm btn-outline-secondary">{{ s }}</button></form>{% endfor %}
  </div>
 </div></div>
+{% if cap_message %}<div class="alert alert-warning">{{ cap_message }}</div>{% endif %}
 {% if result %}
 <div class="card"><div class="card-header">{{ result.title|fa }}</div><div class="card-body">
  <p class="text-muted small mb-2">سؤال: «{{ result.query }}»</p>

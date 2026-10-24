@@ -41,7 +41,7 @@
                 {% endif %}
                 {% if IS_STUDENT %}
                 <a href="{% url 'dashboard:me_home' %}"><i class="bi bi-person"></i> صفحهٔ من</a>
-                {% if 'tutor_ai' in ENABLED_MODULES %}<a href="{% url 'dashboard:me_assistant' %}"><i class="bi bi-lightbulb"></i> دستیار مطالعه (نمایشی)</a>{% endif %}
+                {% for m in VISIBLE_MODULES %}{% if m.key == 'tutor_ai' %}<a href="{{ m.url }}"><i class="bi bi-lightbulb"></i> دستیار مطالعه (نمایشی){% if not m.enabled %} <i class="bi bi-lock"></i>{% endif %}</a>{% endif %}{% endfor %}
                 {% endif %}
                 {% if IS_COUNSELOR %}
                 <a href="{% url 'dashboard:counselor_home' %}"><i class="bi bi-heart-pulse"></i> پرونده‌های ارجاعی</a>
@@ -49,6 +49,7 @@
                 {% if IS_SCHOOL_ADMIN %}
                 <a href="{% url 'dashboard:upload_students' %}"><i class="bi bi-upload"></i> آپلود فایل</a>
                 <a href="{% url 'dashboard:school_home' %}"><i class="bi bi-building"></i> مدیریت مدرسه</a>
+                {% for m in VISIBLE_MODULES %}<a href="{{ m.url }}"><i class="bi bi-puzzle"></i> {{ m.label }}{% if not m.enabled %} <i class="bi bi-lock"></i>{% endif %}</a>{% endfor %}
                 {% endif %}
                 <hr class="bg-light">
                 <a href="{% url 'dashboard:profile' %}"><i class="bi bi-person-gear"></i> حساب من</a>
@@ -61,6 +62,12 @@
                     <h2>{% block title %}پنل مدیریت{% endblock %}</h2>
                     <span class="badge bg-secondary">{{ user.username }}</span>
                 </div>
+                {% for n in TRIAL_NOTICES %}
+                    <div class="alert alert-warning" role="alert">
+                        {% if n.kind == 'expiring' %}دورهٔ آزمایشی «{{ n.label }}» {{ n.days }} روز دیگر پایان می‌یابد.{% else %}دورهٔ آزمایشی «{{ n.label }}» پایان یافته است ({{ n.days }} روز پیش).{% endif %}
+                        برای ادامه با پشتیبانی پلتفرم تماس بگیرید.
+                    </div>
+                {% endfor %}
                 {% if messages %}
                     {% for message in messages %}
                         <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">

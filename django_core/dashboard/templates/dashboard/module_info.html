@@ -1,0 +1,13 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="card"><div class="card-body">
+  <h5 class="card-title"><i class="bi bi-lock"></i> {{ title }}</h5>
+  <p>{{ text }}</p>
+  {% if built %}
+  <p class="mb-0">این ماژول برای مدرسهٔ شما فعال نیست. برای فعال‌سازی یا دورهٔ آزمایشی با پشتیبانی پلتفرم تماس بگیرید.</p>
+  {% else %}
+  <p class="mb-0 text-muted">به‌زودی.</p>
+  {% endif %}
+</div></div>
+{% endblock %}

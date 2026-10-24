@@ -552,6 +552,27 @@ class DemoPagesAreSchoolScopedTests(TestCase):
         with self.assertRaises(TypeError):
             assistant.answer("x")          # the student set is mandatory: no hidden global query
 
+    def test_rule_based_risk_pages_are_base_and_only_the_assistant_needs_advisor_ai(self):
+        from schools.models import SchoolModule
+        SchoolModule.objects.all().delete()
+        for url in ("/dashboard/", "/demo/counselor/", "/demo/students/"):
+            self.assertEqual(self.client.get(url).status_code, 200, url)
+        self.assertEqual(self.client.get("/demo/assistant/?q=Alpha").status_code, 403)
+        from schools.testing import grant
+        grant(self.a, "advisor_ai")
+        self.assertEqual(self.client.get("/demo/assistant/?q=Alpha").status_code, 200)
+        grant(self.b, "advisor_ai")
+        SchoolModule.objects.filter(school=self.a).delete()          # only the other school has it
+        self.assertEqual(self.client.get("/demo/assistant/?q=Alpha").status_code, 403)
+
+    def test_the_assistant_call_cap_blocks_with_a_message(self):
+        self.a.ai_daily_cap = 1
+        self.a.save()
+        self.assertEqual(self.client.get("/demo/assistant/?q=Alpha").status_code, 200)
+        capped = self.client.get("/demo/assistant/?q=Alpha")
+        self.assertEqual(capped.status_code, 429)
+        self.assertContains(capped, "سقف روزانه", status_code=429)
+
     def test_the_platform_superuser_sees_no_students_on_the_demo_pages(self):
         root = get_user_model().objects.create_superuser("scoped-root", password="x")
         self.client.force_login(root)

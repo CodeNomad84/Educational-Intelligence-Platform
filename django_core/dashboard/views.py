@@ -15,7 +15,6 @@ from students.access import (
     visible_recommendations, visible_students,
 )
 from schools import audit
-from schools.entitlements import module_enabled, module_enabled_for_user
 
 from . import throttle
 from .decorators import role_required
@@ -65,7 +64,7 @@ def dashboard_view(request):
         raise PermissionDenied
     # DEMO SCOPE begin — demo school dashboard (only when config.settings.demo is active)
     from django.conf import settings as _demo_settings
-    if getattr(_demo_settings, 'DEMO_MODE', False) and module_enabled_for_user(request.user, 'advisor_ai'):
+    if getattr(_demo_settings, 'DEMO_MODE', False):
         from demo_intel.views import school_dashboard
         return school_dashboard(request)
     # DEMO SCOPE end
@@ -106,8 +105,7 @@ def student_detail_view(request, pk):
     audit.record(request.user, audit.VIEW_DETAIL, student)
     # DEMO SCOPE begin — demo intelligence profile for staff (parents keep the original page)
     from django.conf import settings as _demo_settings
-    if (getattr(_demo_settings, 'DEMO_MODE', False) and ADMIN in roles_for(request.user)
-            and module_enabled(student.school_id, 'advisor_ai')):
+    if getattr(_demo_settings, 'DEMO_MODE', False) and ADMIN in roles_for(request.user):
         from demo_intel.views import student_profile
         return student_profile(request, student)
     # DEMO SCOPE end

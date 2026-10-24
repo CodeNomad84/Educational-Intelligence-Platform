@@ -1,5 +1,5 @@
 from django.urls import path
-from . import account_views, bulk_views, password_reset, counselor_views, grade_dashboard, school_views, student360, student_views, teacher_views, views
+from . import module_info, account_views, bulk_views, password_reset, counselor_views, grade_dashboard, school_views, student360, student_views, teacher_views, views
 
 app_name = 'dashboard'
 
@@ -21,6 +21,7 @@ urlpatterns = [
     path('grade/', grade_dashboard.grade_dashboard, name='grade_dashboard'),
 
     # Student pages (Slice 4b)
+    path('modules/<str:key>/', module_info.module_info, name='module_info'),
     path('me/', student_views.home, name='me_home'),
     path('me/assistant/', student_views.assistant, name='me_assistant'),
     path('students/<int:pk>/account/', student_views.create_account, name='student_account'),

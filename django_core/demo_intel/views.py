@@ -4,6 +4,8 @@ from django.shortcuts import render
 from django.utils import timezone
 
 from dashboard.decorators import role_required
+from schools import ai_guard
+from schools.entitlements import module_enabled, user_school_ids
 from students.access import ADMIN, visible_students
 from students.models import Student
 
@@ -28,7 +30,7 @@ def school_dashboard(request):
     return render(request, "demo_intel/school_dashboard.html", {"o": overview, "top": top, "active": "dashboard"})
 
 
-@role_required(ADMIN, module="advisor_ai")
+@role_required(ADMIN)
 def counselor_view(request):
     today, students, results = _all(request.user)
     cases = []
@@ -44,7 +46,7 @@ def counselor_view(request):
     return render(request, "demo_intel/counselor.html", {"cases": cases, "active": "counselor"})
 
 
-@role_required(ADMIN, module="advisor_ai")
+@role_required(ADMIN)
 def demo_student_list(request):
     today, students, results = _all(request.user)
     level = request.GET.get("level", "")
@@ -87,6 +89,15 @@ def student_profile(request, student):
 @role_required(ADMIN, module="advisor_ai")
 def assistant_view(request):
     query = request.POST.get("query", "").strip() if request.method == "POST" else request.GET.get("q", "").strip()
-    result = assistant_mod.answer(query, students=visible_students(request.user)) if query else None
+    result, cap_message, status = None, "", 200
+    if query:
+        # the user's schools where advisor_ai is on; the first one carries the call cap (checked before answering)
+        school_id = min((sid for sid in user_school_ids(request.user) if module_enabled(sid, "advisor_ai")), default=None)
+        try:
+            ai_guard.consume(school_id, "advisor_ai")
+            result = assistant_mod.answer(query, students=visible_students(request.user))
+        except ai_guard.AICapReached as cap:
+            cap_message, status = cap.message_fa, 429
     return render(request, "demo_intel/assistant.html", {
-        "result": result, "query": query, "suggestions": assistant_mod.SUGGESTIONS, "active": "assistant"})
+        "result": result, "query": query, "suggestions": assistant_mod.SUGGESTIONS, "active": "assistant",
+        "cap_message": cap_message}, status=status)

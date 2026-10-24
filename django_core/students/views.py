@@ -20,7 +20,7 @@ from .class_resolution import (
 import requests
 from .serializers import StudentSerializer, FileUploadSerializer
 from .student_school import StudentSchoolError, resolve_student_school
-from .permissions import IsAdminUser, ModuleRequired  # فقط ادمین بتواند آپلود کند
+from .permissions import IsAdminUser  # فقط ادمین بتواند آپلود کند
 from django.core.exceptions import ImproperlyConfigured
 from config.service_auth import service_headers
 from . import import_store
@@ -194,7 +194,6 @@ class TierAwareSearchFilter(filters.SearchFilter):
 class StudentViewSet(viewsets.ModelViewSet):
     serializer_class = StudentSerializer
     permission_classes = [IsAuthenticated]  # پیش‌فرض
-    module_by_action = {'predict_status': 'advisor_ai'}  # the FastAPI risk call is an AI call: needs the module (Django-side only)
     filter_backends = [DjangoFilterBackend, TierAwareSearchFilter, filters.OrderingFilter]
     filterset_fields = ['grade', 'first_name', 'last_name', 'class_name']
     ordering_fields = ['first_name', 'last_name', 'grade', 'created_at']
@@ -206,8 +205,6 @@ class StudentViewSet(viewsets.ModelViewSet):
             return [IsAdminUser()]  # فقط ادمین اجازه‌ی آپلود دارد
         if self.action in ['list', 'retrieve']:
             return [IsAuthenticated()]
-        if self.action in self.module_by_action:
-            return [IsAdminUser(), ModuleRequired()]
         return [IsAdminUser()]
 
     def get_queryset(self):

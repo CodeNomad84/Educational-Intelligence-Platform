@@ -22,6 +22,10 @@ class School(models.Model):
     # Set only by the SchoolAdmin of this school (audit-logged). OFF: only the SchoolAdmin resets passwords.
     grade_leads_may_reset_passwords = models.BooleanField(default=False, db_default=False, verbose_name="مربی پایه می‌تواند رمز را بازنشانی کند")
     created_at = models.DateTimeField(auto_now_add=True)
+    # AI trial guard (a config value, not billing): max AI-assistant calls per module per day / calendar month.
+    # NULL = use settings.AI_DEFAULT_DAILY_CAP / AI_DEFAULT_MONTHLY_CAP. Set by the platform admin.
+    ai_daily_cap = models.PositiveIntegerField(null=True, blank=True, verbose_name="سقف روزانهٔ فراخوانی هوش مصنوعی")
+    ai_monthly_cap = models.PositiveIntegerField(null=True, blank=True, verbose_name="سقف ماهانهٔ فراخوانی هوش مصنوعی")
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -407,8 +411,12 @@ class SchoolModule(models.Model):
     Disabled = data retained, reads and writes blocked. Read through ``schools.entitlements.module_enabled`` only.
     """
 
+    TRIAL, LICENSED = "trial", "licensed"
+    KIND_CHOICES = [(TRIAL, "آزمایشی"), (LICENSED, "دارای مجوز")]
+
     school = models.ForeignKey(School, on_delete=models.PROTECT, related_name="modules", verbose_name="مدرسه")
     module_key = models.CharField(max_length=30, verbose_name="ماژول")
+    kind = models.CharField(max_length=10, choices=KIND_CHOICES, default=LICENSED, db_default=LICENSED, verbose_name="نوع")
     starts_on = models.DateField(verbose_name="از تاریخ")
     ends_on = models.DateField(null=True, blank=True, verbose_name="تا تاریخ (شامل)")
 
@@ -420,7 +428,24 @@ class SchoolModule(models.Model):
             models.UniqueConstraint(fields=["school", "module_key", "starts_on"], name="uniq_schoolmodule_school_key_start"),
             models.CheckConstraint(condition=models.Q(ends_on__isnull=True) | models.Q(ends_on__gte=models.F("starts_on")),
                                    name="schoolmodule_ends_not_before_start"),
+            # at most one trial per (school, module); extending it means editing ends_on (platform admin, audited)
+            models.UniqueConstraint(fields=["school", "module_key"], condition=models.Q(kind="trial"),
+                                    name="uniq_schoolmodule_one_trial"),
+            models.CheckConstraint(condition=~models.Q(kind="trial") | models.Q(ends_on__isnull=False),
+                                   name="schoolmodule_trial_has_end"),
         ]
 
     def __str__(self):
         return f"{self.school} / {self.module_key}"
+
+
+class AICallUsage(models.Model):
+    """Counter for the AI trial guard: calls made for one module in one school on one day. Counts only; no content."""
+
+    school = models.ForeignKey(School, on_delete=models.PROTECT, related_name="ai_usage")
+    module_key = models.CharField(max_length=30)
+    day = models.DateField()
+    count = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["school", "module_key", "day"], name="uniq_aicallusage_day")]

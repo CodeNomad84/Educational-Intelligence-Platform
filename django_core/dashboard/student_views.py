@@ -12,6 +12,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from schools import audit
+from schools import ai_guard
 from students import study_assistant
 from students.access import ADMIN, STUDENT, visible_grades, visible_recommendations, visible_students
 
@@ -48,11 +49,18 @@ def assistant(request):
     student = _me(request)
     form = QuestionForm(request.POST or None)
     reply = None
+    status = 200
     if request.method == 'POST' and form.is_valid():
-        summary = study_assistant.subject_summary(visible_grades(request.user).filter(student=student))
-        reply = study_assistant.answer(form.cleaned_data['question'], summary)   # in memory only: nothing stored or sent
+        try:
+            ai_guard.consume(student.school_id, 'tutor_ai')   # per-school cap, checked before any answer/LLM call
+        except ai_guard.AICapReached as cap:
+            messages.error(request, cap.message_fa)
+            status = 429
+        else:
+            summary = study_assistant.subject_summary(visible_grades(request.user).filter(student=student))
+            reply = study_assistant.answer(form.cleaned_data['question'], summary)   # in memory only: nothing stored or sent
     return render(request, 'dashboard/me/assistant.html', {
-        'form': form, 'reply': reply, 'notice': study_assistant.STUB_NOTICE})
+        'form': form, 'reply': reply, 'notice': study_assistant.STUB_NOTICE}, status=status)
 
 
 class StudentAccountForm(UserCreationForm):
