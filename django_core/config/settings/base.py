@@ -21,6 +21,7 @@ INSTALLED_APPS = [
     'dashboard',
     'schools',
     'vocabulary',
+    'missions',
 ]
 
 MIDDLEWARE = [

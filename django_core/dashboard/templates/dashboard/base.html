@@ -39,6 +39,9 @@
                 {% if IS_TEACHER %}
                 <a href="{% url 'dashboard:teacher_home' %}"><i class="bi bi-journal-check"></i> کلاس‌های من</a>
                 {% endif %}
+                {% if IS_TEACHER or IS_GRADE_LEAD %}{% if 'mission' in ENABLED_MODULES %}
+                <a href="{% url 'missions:activities' %}"><i class="bi bi-compass"></i> مشاهدهٔ توانمندی‌ها</a>
+                {% endif %}{% endif %}
                 {% if IS_STUDENT %}
                 <a href="{% url 'dashboard:me_home' %}"><i class="bi bi-person"></i> صفحهٔ من</a>
                 {% for m in VISIBLE_MODULES %}{% if m.key == 'tutor_ai' %}<a href="{{ m.url }}"><i class="bi bi-lightbulb"></i> دستیار مطالعه (نمایشی){% if not m.enabled %} <i class="bi bi-lock"></i>{% endif %}</a>{% endif %}{% endfor %}

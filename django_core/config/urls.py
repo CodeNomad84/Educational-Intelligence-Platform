@@ -16,6 +16,7 @@ urlpatterns = [
     # ✅ مسیرهای احراز هویت JWT
     path('api/token/', ThrottledTokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('mission/', include('missions.urls')),
     path('', include('dashboard.urls')),  
     path('api/', include(router.urls)),  # همه APIها زیر api/ قرار می‌گیرند
 ]

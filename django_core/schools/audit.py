@@ -19,6 +19,9 @@ PASSWORD_RESET = 'password_reset'          # detail = who reset: gradelead | adm
 PASSWORD_RESET_CAPPED = 'password_reset_capped'   # a grade lead hit the hourly cap (flag for the SchoolAdmin)
 RESET_SETTING_CHANGE = 'reset_setting_change'     # detail = on | off
 MODULE_CHANGE = 'module_change'              # detail = <module_key>:on|off|<end date>; object = the SchoolModule row
+MISSION_ACTIVITY_CREATE = 'mission_activity_create'
+MISSION_GRID_VIEW = 'mission_grid_view'
+MISSION_GRID_SAVE = 'mission_grid_save'   # detail = counts only, e.g. s12o30d2
 STAFF_ROLES_CHANGE = 'staff_roles_change'  # detail = resulting roles, e.g. T,G
 
 

@@ -15,7 +15,9 @@ OBSERVATION_CATEGORY = 'observation_category'
 OBSERVATION_SENTIMENT = 'observation_sentiment'
 RECOMMENDATION_TAG = 'recommendation_tag'
 INTERVENTION_TYPE = 'intervention_type'
-DOMAINS = (OBSERVATION_CATEGORY, OBSERVATION_SENTIMENT, RECOMMENDATION_TAG, INTERVENTION_TYPE)
+MISSION_ACTIVITY_TYPE = 'mission_activity_type'   # mission module: kind of observed activity
+MISSION_CONDITION = 'mission_condition'           # mission module: condition under which a behaviour was observed
+DOMAINS = (OBSERVATION_CATEGORY, OBSERVATION_SENTIMENT, RECOMMENDATION_TAG, INTERVENTION_TYPE, MISSION_ACTIVITY_TYPE, MISSION_CONDITION)
 DOMAIN_CHOICES = [(d, d) for d in DOMAINS]
 
 _RETIRE_FIELDS = {'effective_to', 'active'}      # the only fields that may change after creation
