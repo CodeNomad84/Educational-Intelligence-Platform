@@ -37,7 +37,7 @@ Labels per CLAUDE.md §2. Evidence = commands actually run in this session.
 | Ollama | Daemon is running but has **zero models pulled** | `curl :11434/api/tags` → `{"models":[]}` |
 | Risk "prediction" button | Needs FastAPI (broken above); Admin only; the model is a PROTOTYPE trained on a synthetic label (A-01) and the 8 inputs include **hard-coded constants** (`avg_completion_rate=0.8`, `completed_homework=12`, `total_communications=3`) | `dashboard/views.py:~95-110` |
 | Docker stack | Not run (8 services, needs Postgres/Redis/MinIO). Not needed for the demo. | NOT VERIFIED |
-| Upload students page | Template `dashboard/upload.html` does not exist; view only flashes a fake success | `dashboard/views.py` upload_students_view |
+| Upload students page | RESOLVED 2026-10-25: the dead `/upload/` stub was removed; the menu entry "ثبت گروهی از اکسل" opens `/school/accounts/` (dry-run preview, then confirm) | `dashboard/bulk_views.py` |
 | `Homework`, `TeacherParentCommunication` models | Defined, now have a migration, but unused by any view | `dashboard/models.py` |
 
 ## 4. Data state
