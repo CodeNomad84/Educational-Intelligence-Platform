@@ -104,7 +104,7 @@ class Command(BaseCommand):
     def handle(self, *args, **opts):
         self._guard()
         school = self._school(opts["school"])  # validated BEFORE anything is deleted (--reset)
-        from schools.testing import grant   # demo school: optional modules on (new schools start with none)
+        from schools.module_grants import grant   # demo school: optional modules on (new schools start with none)
         grant(school, "advisor_ai", "tutor_ai")
         from demo_intel.engine import analyze_students
         from demo_intel.models import CounselingNote, InterventionRecord, StudentObservation

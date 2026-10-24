@@ -21,7 +21,7 @@ Never claim something works without evidence (file, test output, command result)
 - School-ready, not enterprise multi-tenant: design so a school key can be added; do not hard-code one school.
 - Configuration over custom code (`docs/CUSTOMIZATION.md`).
 
-- **Modules & licensing:** four sellable keys (`advisor_ai`, `tutor_ai`, `exams`, `mission`); everything else incl. Student 360 and counseling is base. Every new route/AI call must be gated by `schools/entitlements.py` or explicitly base. Details: `docs/ARCHITECTURE.md`.
+- **Modules & licensing:** four sellable keys (`advisor_ai`, `tutor_ai`, `exams`, `mission`); everything else is base, incl. Student 360, counseling and rule-based/ML risk (no LLM). Rows carry `kind` trial|licensed; a locked module stays visible in the menu (static info page); AI assistants have per-school call caps. Every new route/AI call must be gated by `schools/entitlements.py` or explicitly base. Details: `docs/ARCHITECTURE.md`.
 
 ## 4. Where truth lives
 Intent: `docs/REQUIREMENTS.md` > accepted ADR (`docs/adr/`) > `docs/ARCHITECTURE.md`; the authorization matrix in `docs/SECURITY.md` is normative for permissions.

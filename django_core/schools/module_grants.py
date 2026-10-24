@@ -1,4 +1,4 @@
-"""Test helper: switch optional modules on for schools created inside a test (new schools have no entitlement rows)."""
+"""Grant optional modules to a school (no audit event): used by the demo seed and by tests. Operators use set_school_module."""
 from datetime import date
 
 from .entitlements import MODULES

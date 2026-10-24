@@ -9,7 +9,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.test import TestCase
 
-from schools.testing import grant
+from schools.module_grants import grant
 from schools.models import School, SchoolMembership
 
 from .access import (

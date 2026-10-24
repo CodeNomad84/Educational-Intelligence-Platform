@@ -10,7 +10,7 @@ from django.contrib.auth.models import Group
 from django.test import TestCase
 from django.urls import reverse
 
-from schools.testing import grant
+from schools.module_grants import grant
 from schools.models import AcademicYear, School, SchoolClass, SchoolMembership, TeacherAssignment
 from students import study_assistant
 from students.access import visible_grades, visible_recommendations, visible_students

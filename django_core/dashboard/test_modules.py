@@ -13,7 +13,7 @@ from django.utils import timezone
 from schools import audit
 from schools.entitlements import MODULES, enabled_modules_for_user, module_enabled
 from schools.models import AuditEvent, SchoolMembership, SchoolModule
-from schools.testing import grant
+from schools.module_grants import grant
 
 from .test_counselor import Base, make_user
 

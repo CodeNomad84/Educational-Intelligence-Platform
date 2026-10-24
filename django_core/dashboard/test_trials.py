@@ -12,7 +12,7 @@ from schools import ai_guard, audit
 from schools.entitlements import (
     ACTIVE_LICENSED, ACTIVE_TRIAL, LOCKED, module_enabled, module_state, trial_days_left, trial_notices)
 from schools.models import AICallUsage, AuditEvent, SchoolModule
-from schools.testing import grant
+from schools.module_grants import grant
 
 from .test_modules import ModuleBase
 

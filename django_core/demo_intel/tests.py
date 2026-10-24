@@ -529,7 +529,7 @@ class DemoPagesAreSchoolScopedTests(TestCase):
         User = get_user_model()
         self.a = School.objects.create(name="A", code="a")
         self.b = School.objects.create(name="B", code="b")
-        from schools.testing import grant
+        from schools.module_grants import grant
         grant(self.a, "advisor_ai")
         grant(self.b, "advisor_ai")
         for code, school in (("alpha", self.a), ("bravo", self.b)):
@@ -558,7 +558,7 @@ class DemoPagesAreSchoolScopedTests(TestCase):
         for url in ("/dashboard/", "/demo/counselor/", "/demo/students/"):
             self.assertEqual(self.client.get(url).status_code, 200, url)
         self.assertEqual(self.client.get("/demo/assistant/?q=Alpha").status_code, 403)
-        from schools.testing import grant
+        from schools.module_grants import grant
         grant(self.a, "advisor_ai")
         self.assertEqual(self.client.get("/demo/assistant/?q=Alpha").status_code, 200)
         grant(self.b, "advisor_ai")
