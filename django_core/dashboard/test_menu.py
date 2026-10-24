@@ -80,3 +80,19 @@ class SidebarTests(Base):
         self.assertIn(reverse('dashboard:school_accounts'), links)
         self.assertEqual(self.client.get(reverse('dashboard:school_accounts')).status_code, 200)
         self.assertEqual(self.client.get('/upload/').status_code, 404)             # the dead stub route is gone
+
+    def test_quickstart_page_is_static_for_the_school_admin_only(self):
+        from django.urls import reverse
+        url = reverse('dashboard:quickstart')
+        self.client.force_login(self.admin)
+        self.assertIn(url, self.sidebar_links(self.admin))
+        page = self.client.get(url)
+        self.assertEqual(page.status_code, 200)
+        for text in ('ساخت گروهی حساب‌ها', 'نقش‌ها', 'بازنشانی رمز', 'ماژول‌ها', reverse('dashboard:school_accounts')):
+            self.assertContains(page, text)
+        self.assertNotContains(page, self.s7.first_name)                      # no school or student data
+        for user in (self.lead, self.counselor, self.teacher, self.parent, self.stu):
+            self.client.force_login(user)
+            self.assertEqual(self.client.get(url).status_code, 403, user.username)
+        self.client.logout()
+        self.assertEqual(self.client.get(url).status_code, 302)

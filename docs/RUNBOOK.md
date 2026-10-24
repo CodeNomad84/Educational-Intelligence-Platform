@@ -27,6 +27,25 @@ Do not create a second real school before the open risks below are accepted (rul
 * **Rehearse it (synthetic demo data only):** `scripts/backup_restore_check.sh` backs up the demo DB (read-only, sha256 checked before/after), restores the SQL dump into a separate EMPTY database, runs `manage.py check` and `migrate --check` on the restored copy, and compares row counts of students, grades, recommendations and audit events (any difference fails). `scripts/backup_restore_check.sh sqlite` runs only the SQLite path; `scripts/backup_restore_check.sh pg` runs only the PostgreSQL path (disposable PostgreSQL 16 container on an internal network, `pg_dump` then `psql` into an empty database; needs Docker and the local images `pgvector/pgvector:pg16` and `eip-test-django:local`, exit 3 if missing). Without an argument it runs SQLite, then PostgreSQL if Docker is available, otherwise it prints "SKIPPED (not verified)". Another SQLite file: `SOURCE_DB=/path/copy.sqlite3 scripts/backup_restore_check.sh sqlite`. It never touches `db.sqlite3`, `data/postgres` or `.env`. Last run: see the change report (`docs/changes/`).
 * Before applying any migration to a real database, back it up. Never `--fake` migration `students.0015`.
 
+## 3a. Demo walkthrough per role
+Start: `DEMO_PASSWORD='choose-a-password' scripts/start_demo.sh --reseed`, open http://127.0.0.1:8000/login/ . All data is synthetic. The demo school has all four sellable modules licensed and a small mission dataset (grade 10: one period, three activities, observations by `demo_teacher` and `demo_gradelead`, one student choice row, one parent meeting). Do not reseed the demo while tests run.
+
+| User | Lands on | Mission module pages (exact URLs) |
+|---|---|---|
+| `demo_admin` (SchoolAdmin) | `/school/` | `/mission/aggregate/` (counts per grade and branch status; groups under 5 hidden), `/mission/weights/` (active weight table, column sums, `params_version`, read only); `/school/quickstart/` (Persian quick start); `/school/accounts/` (bulk accounts from Excel) |
+| `demo_gradelead` (grade 10) | `/grade/` | `/mission/` (activities) → open an activity → `/mission/activities/<id>/grid/` (observation grid); `/mission/students/` → `/mission/students/<id>/report/` (full report; who gave which score); forms: `/mission/students/<id>/choices/` (activity choices), `/mission/students/<id>/meetings/` (parent meetings); the plan form is at the bottom of the report |
+| `demo_teacher` (math, classes ۹-الف and ۱۰-الف) | `/teacher/` | `/mission/` and `/mission/activities/<id>/grid/` (own observations only); `/mission/students/<id>/report/` shows a status-only view of the own observations, with the indicators still to observe per branch |
+| `demo_counselor` | `/counselor/` | `/mission/students/` lists only the student with an open referral; `/mission/students/<id>/report/` (read only, observers anonymous) |
+| `demo_parent`, `demo_student` | `/students/`, `/me/` | none (no direct view of mission results by design) |
+
+Enable the mission module on any other school (platform operator, from `django_core`):
+```
+python manage.py set_school_module <school_code> mission --kind licensed [--starts YYYY-MM-DD] [--ends YYYY-MM-DD]
+python manage.py set_school_module <school_code> mission --kind trial --ends YYYY-MM-DD   # trial: end date required
+python manage.py seed_mission --school <school_code>   # once: vocabulary terms, default weight set (version 1, active), one period in the current year
+```
+Without `seed_mission` the grid has no activity types and the report says there is no active weight set.
+
 ## 4. What is NOT done
 * **No real LLM.** FastAPI chat / RAG / ingestion are disabled (HTTP 403 in Phase 1). The student "study assistant" and the risk views are rule-based demo stubs; no student data leaves Django.
 * **No real student data** until you approve it: the audit log exists (`/school/audit/`), but the security exit criteria (`docs/SECURITY.md`) are not signed off.

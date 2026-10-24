@@ -1,5 +1,5 @@
 from django.urls import path
-from . import module_info, account_views, bulk_views, password_reset, counselor_views, grade_dashboard, school_views, student360, student_views, teacher_views, views
+from . import module_info, quickstart, account_views, bulk_views, password_reset, counselor_views, grade_dashboard, school_views, student360, student_views, teacher_views, views
 
 app_name = 'dashboard'
 
@@ -42,6 +42,7 @@ urlpatterns = [
     path('account/password/', account_views.password_change, name='password_change'),
 
     # SchoolAdmin: bulk accounts from Excel and staff roles (before the generic 'school/<kind>/' routes)
+    path('school/quickstart/', quickstart.quickstart, name='quickstart'),
     path('school/accounts/', bulk_views.accounts, name='school_accounts'),
     path('school/accounts/template/', bulk_views.accounts_template, name='school_accounts_template'),
     path('school/accounts/preview/', bulk_views.accounts_preview, name='school_accounts_preview'),

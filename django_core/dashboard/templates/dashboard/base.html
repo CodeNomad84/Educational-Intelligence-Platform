@@ -60,6 +60,7 @@
                 {% if IS_SCHOOL_ADMIN %}
                 <a href="{% url 'dashboard:school_accounts' %}"><i class="bi bi-upload"></i> ثبت گروهی از اکسل</a>
                 <a href="{% url 'dashboard:school_home' %}"><i class="bi bi-building"></i> مدیریت مدرسه</a>
+                <a href="{% url 'dashboard:quickstart' %}"><i class="bi bi-lightbulb"></i> راهنمای شروع سریع</a>
                 {% for m in VISIBLE_MODULES %}<a href="{{ m.url }}"><i class="bi bi-puzzle"></i> {{ m.label }}{% if not m.enabled %} <i class="bi bi-lock"></i>{% endif %}</a>{% endfor %}
                 {% endif %}
                 <hr class="bg-light">
