@@ -9,6 +9,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.test import TestCase
 
+from schools.testing import grant
 from schools.models import School, SchoolMembership
 
 from .access import (
@@ -23,6 +24,8 @@ class Base(TestCase):
     def setUpTestData(cls):
         cls.a = School.objects.create(name='A', code='a')
         cls.b = School.objects.create(name='B', code='b')
+        grant(cls.a, 'advisor_ai')
+        grant(cls.b, 'advisor_ai')
         cls.group = Group.objects.get_or_create(name=ADMIN)[0]
         cls.platform = Group.objects.get_or_create(name=PLATFORM_ADMIN)[0]
         cls.students = {}

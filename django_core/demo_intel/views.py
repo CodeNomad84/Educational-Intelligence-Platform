@@ -28,7 +28,7 @@ def school_dashboard(request):
     return render(request, "demo_intel/school_dashboard.html", {"o": overview, "top": top, "active": "dashboard"})
 
 
-@role_required(ADMIN)
+@role_required(ADMIN, module="advisor_ai")
 def counselor_view(request):
     today, students, results = _all(request.user)
     cases = []
@@ -44,7 +44,7 @@ def counselor_view(request):
     return render(request, "demo_intel/counselor.html", {"cases": cases, "active": "counselor"})
 
 
-@role_required(ADMIN)
+@role_required(ADMIN, module="advisor_ai")
 def demo_student_list(request):
     today, students, results = _all(request.user)
     level = request.GET.get("level", "")
@@ -84,7 +84,7 @@ def student_profile(request, student):
     return render(request, "demo_intel/student_profile.html", ctx)
 
 
-@role_required(ADMIN)
+@role_required(ADMIN, module="advisor_ai")
 def assistant_view(request):
     query = request.POST.get("query", "").strip() if request.method == "POST" else request.GET.get("q", "").strip()
     result = assistant_mod.answer(query, students=visible_students(request.user)) if query else None

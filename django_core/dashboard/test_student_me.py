@@ -10,6 +10,7 @@ from django.contrib.auth.models import Group
 from django.test import TestCase
 from django.urls import reverse
 
+from schools.testing import grant
 from schools.models import AcademicYear, School, SchoolClass, SchoolMembership, TeacherAssignment
 from students import study_assistant
 from students.access import visible_grades, visible_recommendations, visible_students
@@ -31,6 +32,7 @@ class Base(TestCase):
     def setUp(self):
         self.a = School.objects.create(name='A', code='a')
         self.b = School.objects.create(name='B', code='b')
+        grant(self.a, 'tutor_ai')
         for school in (self.a, self.b):
             AcademicYear.objects.create(school=school, code='1404-1405', start_date=date(2025, 9, 23),
                                         end_date=date(2026, 6, 21), is_current=True)

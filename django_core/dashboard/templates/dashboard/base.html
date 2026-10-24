@@ -41,7 +41,7 @@
                 {% endif %}
                 {% if IS_STUDENT %}
                 <a href="{% url 'dashboard:me_home' %}"><i class="bi bi-person"></i> صفحهٔ من</a>
-                <a href="{% url 'dashboard:me_assistant' %}"><i class="bi bi-lightbulb"></i> دستیار مطالعه (نمایشی)</a>
+                {% if 'tutor_ai' in ENABLED_MODULES %}<a href="{% url 'dashboard:me_assistant' %}"><i class="bi bi-lightbulb"></i> دستیار مطالعه (نمایشی)</a>{% endif %}
                 {% endif %}
                 {% if IS_COUNSELOR %}
                 <a href="{% url 'dashboard:counselor_home' %}"><i class="bi bi-heart-pulse"></i> پرونده‌های ارجاعی</a>

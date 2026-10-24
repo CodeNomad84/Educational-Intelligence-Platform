@@ -29,6 +29,15 @@ Labels: CURRENT = verified at commit `3404a1a` (resolvable in this repository's 
 - Data layers Raw → Extracted → Validated → Canonical → Derived → Predictions with provenance — future decision, to be proposed in Phase 4 (ADR-0009 reserved, no file yet; renumbered from 0005 on 2026-10-16).
 - Rules/Risk/Alert/Intervention pipeline; RAG with ACL before retrieval; Study vs School assistants (`AI_GOVERNANCE.md`).
 
+## Modules & licensing (CURRENT, Django side only)
+
+- **Sellable keys (exactly four):** `advisor_ai` (staff-facing School Assistant, LLM/RAG), `tutor_ai` (student-facing study assistant), `exams`, `mission`. `exams` and `mission` are declared but not built.
+- **Always on (base, no rows):** auth/roles, school structure, bulk accounts, grades, attendance, teacher recommendations, the simple student views, **Student 360 and counseling** (referrals, counselor notes, refer form, counselor pages), rule-based risk / early warning and ML `/predict` without an LLM, audit. Any future analytic section is base unless it calls an LLM or is one of the four sellable modules.
+- **Table:** `schools.SchoolModule(school, module_key, starts_on, ends_on null)`; no row, expired or not-yet-started = OFF. One check only: `schools/entitlements.module_enabled(school, key, on=today)`. Changes are audit-logged (`module_change`, via `set_school_module`).
+- **Disabled** = data retained, reads and writes blocked at the route (403). Gates: `role_required(..., module=)` (user has it in one of their schools), `require_module(school, key)` (object's school), `ModuleRequired` on DRF viewsets, `ENABLED_MODULES` for menu hiding only.
+- **Rule:** every new route or AI call is either gated by one of the four keys or explicitly base. AI features check entitlement for **each data source** (e.g. `mission`, `exams`) before retrieval/generation; data from a non-licensed module is never passed to a model. Django-side only; the FastAPI token carries no module claim yet.
+- **Known ungated surface:** the Django admin. Superusers/PlatformAdmin have no school, so module-gated routes refuse them.
+
 ## Constraints
 No new service/dependency without L3 proposal. No real student data until security baseline exit (`SECURITY.md`). Configuration over custom code (`CUSTOMIZATION.md`).
 

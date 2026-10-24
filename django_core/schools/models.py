@@ -397,3 +397,30 @@ class AccountProfile(models.Model):
 
     def __str__(self):
         return f"{self.user} (must_change_password={self.must_change_password})"
+
+
+class SchoolModule(models.Model):
+    """Which optional module a school may use, and when (entitlement; no billing, plans or keys).
+
+    Core features (auth/roles, school structure, bulk accounts, grades, attendance, recommendations, the simple student
+    views, audit) are always on and have no rows. No row, or a row outside its dates, means the module is OFF.
+    Disabled = data retained, reads and writes blocked. Read through ``schools.entitlements.module_enabled`` only.
+    """
+
+    school = models.ForeignKey(School, on_delete=models.PROTECT, related_name="modules", verbose_name="مدرسه")
+    module_key = models.CharField(max_length=30, verbose_name="ماژول")
+    starts_on = models.DateField(verbose_name="از تاریخ")
+    ends_on = models.DateField(null=True, blank=True, verbose_name="تا تاریخ (شامل)")
+
+    class Meta:
+        verbose_name = "ماژول مدرسه"
+        verbose_name_plural = "ماژول‌های مدرسه"
+        ordering = ["school", "module_key", "starts_on"]
+        constraints = [
+            models.UniqueConstraint(fields=["school", "module_key", "starts_on"], name="uniq_schoolmodule_school_key_start"),
+            models.CheckConstraint(condition=models.Q(ends_on__isnull=True) | models.Q(ends_on__gte=models.F("starts_on")),
+                                   name="schoolmodule_ends_not_before_start"),
+        ]
+
+    def __str__(self):
+        return f"{self.school} / {self.module_key}"

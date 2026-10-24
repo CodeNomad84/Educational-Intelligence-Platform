@@ -1,4 +1,5 @@
 """Template context: role group names come from the constants, never from literals in templates."""
+from schools.entitlements import enabled_modules_for_user
 from students.access import ADMIN, COUNSELOR, GRADE_LEAD, PARENT, STUDENT, TEACHER, roles_for
 
 
@@ -8,4 +9,6 @@ def role_names(request):
     roles = roles_for(user)
     return {'ADMIN_ROLE': ADMIN, 'IS_SCHOOL_ADMIN': ADMIN in roles, 'IS_TEACHER': TEACHER in roles,
             'IS_GRADE_LEAD': GRADE_LEAD in roles, 'IS_PARENT': PARENT in roles, 'IS_COUNSELOR': COUNSELOR in roles,
-            'IS_STUDENT': STUDENT in roles}
+            'IS_STUDENT': STUDENT in roles,
+            # menu hiding only; the server-side gates are role_required(module=...) and require_module
+            'ENABLED_MODULES': enabled_modules_for_user(user)}

@@ -529,6 +529,9 @@ class DemoPagesAreSchoolScopedTests(TestCase):
         User = get_user_model()
         self.a = School.objects.create(name="A", code="a")
         self.b = School.objects.create(name="B", code="b")
+        from schools.testing import grant
+        grant(self.a, "advisor_ai")
+        grant(self.b, "advisor_ai")
         for code, school in (("alpha", self.a), ("bravo", self.b)):
             Student.objects.create(first_name=code.title(), last_name=code.title() + "son", national_id=f"93{ord(code[0])}00000", grade=9,
                                    phone_number="1", school=school, class_name="9-A")

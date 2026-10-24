@@ -43,7 +43,7 @@ class QuestionForm(forms.Form):
                                widget=forms.TextInput(attrs={'class': 'form-control'}))
 
 
-@role_required(STUDENT)
+@role_required(STUDENT, module='tutor_ai')
 def assistant(request):
     student = _me(request)
     form = QuestionForm(request.POST or None)
