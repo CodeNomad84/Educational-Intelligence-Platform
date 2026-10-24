@@ -8,6 +8,10 @@
 <table class="table table-sm bg-white"><thead><tr><th>شاخص</th><th>مشاهده‌های معتبر من</th><th>فعالیت‌ها</th><th>وضعیت</th></tr></thead><tbody>
 {% for i in indicators %}<tr><td>{{ i.code }}. {{ i.name }}</td><td>{{ i.evidences }}</td><td>{{ i.activities }}</td><td>{{ i.status }}</td></tr>{% endfor %}
 </tbody></table>
+<h5 class="mt-4">شاخه‌ها: چه چیزی هنوز باید مشاهده شود؟</h5>
+<table class="table table-sm bg-white"><thead><tr><th>شاخه</th><th>وضعیت</th><th>شاخص‌هایی که هنوز مشاهده نشده‌اند</th></tr></thead><tbody>
+{% for b in branches %}<tr><td>{{ b.name }}</td><td>{{ b.status }}</td><td class="small">{% if b.missing %}{{ b.missing|join:'، ' }}{% else %}—{% endif %}</td></tr>{% endfor %}
+</tbody></table>
 {% endif %}
 {% include 'missions/_footer.html' %}
 {% endblock %}

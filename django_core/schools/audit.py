@@ -27,6 +27,7 @@ MISSION_PLAN_SAVE = 'mission_plan_save'           # detail = number of paths
 MISSION_CHOICES_SAVE = 'mission_choices_save'     # detail = number of rows
 MISSION_MEETING_ADD = 'mission_meeting_add'
 MISSION_AGGREGATE_VIEW = 'mission_aggregate_view'
+MISSION_WEIGHTS_VIEW = 'mission_weights_view'
 STAFF_ROLES_CHANGE = 'staff_roles_change'  # detail = resulting roles, e.g. T,G
 
 

@@ -48,6 +48,7 @@
                 {% endif %}{% endif %}
                 {% if IS_SCHOOL_ADMIN %}{% if 'mission' in ENABLED_MODULES %}
                 <a href="{% url 'missions:aggregate' %}"><i class="bi bi-pie-chart"></i> آمار مأموریت‌محور</a>
+                <a href="{% url 'missions:weights' %}"><i class="bi bi-sliders"></i> وزن‌های مأموریت‌محور</a>
                 {% endif %}{% endif %}
                 {% if IS_STUDENT %}
                 <a href="{% url 'dashboard:me_home' %}"><i class="bi bi-person"></i> صفحهٔ من</a>

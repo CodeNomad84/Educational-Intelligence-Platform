@@ -311,3 +311,53 @@ class AggregateTests(ReportBase):
         self.fill_students(4)
         blocks = self.get(self.admin_b, reverse('missions:aggregate')).context['blocks']
         self.assertEqual([(b['school_id'], b['groups']) for b in blocks], [(self.b.pk, [])])        # own school only, no data
+
+
+class WeightsPageAndHelpTests(ReportBase):
+    def url(self):
+        return reverse('missions:weights')
+
+    def test_school_admin_sees_the_active_set_with_column_sums_and_lifecycle(self):
+        page = self.get(self.admin, self.url())
+        self.assertEqual(page.status_code, 200)
+        block = page.context['blocks'][0]
+        ws = WeightSet.objects.get(school=self.a, status='active')
+        self.assertEqual((block['school_id'], block['active'].pk, block['sums']), (self.a.pk, ws.pk, [100] * 8))
+        self.assertEqual(len(block['table']), 12)
+        self.assertContains(page, f'params_version): {ws.pk}')
+        self.assertContains(page, 'فعال')
+        self.assertContains(page, FOOTER_TEXT)
+        self.assertNotContains(page, 'Seven')                                    # parameters only, no student data
+        self.assertFalse(any(tag in page.content.decode() for tag in ('<form', 'type="submit"')))   # read only
+
+    def test_other_roles_and_other_schools_are_refused_and_it_is_gated(self):
+        for user in (self.lead, self.t1, self.counselor, self.parent):
+            self.assertEqual(self.get(user, self.url()).status_code, 403, user.username)
+        self.assertEqual([b['school_id'] for b in self.get(self.admin_b, self.url()).context['blocks']], [self.b.pk])
+        SchoolModule.objects.filter(school=self.a).delete()
+        self.assertEqual(self.get(self.admin, self.url()).status_code, 403)
+        grant(self.a, 'mission', starts_on=TODAY() - timedelta(days=9), ends_on=TODAY() - timedelta(days=1))
+        self.assertEqual(self.get(self.admin, self.url()).status_code, 403)
+
+    def test_a_non_active_version_is_listed_but_the_table_is_the_active_one(self):
+        ws = WeightSet.objects.get(school=self.a, status='active')
+        WeightSet.objects.create(school=self.a, version=2, note='draft v2')
+        block = self.get(self.admin, self.url()).context['blocks'][0]
+        self.assertEqual([(v.version, v.status) for v in block['versions']], [(2, 'draft'), (1, 'active')])
+        self.assertEqual(block['active'].pk, ws.pk)
+        self.assertTrue(AuditEvent.objects.filter(action='mission_weights_view', school=self.a).exists())
+
+    def test_teacher_status_page_lists_the_exact_missing_indicators_without_scores(self):
+        page = self.get(self.t1, self.report_url)
+        self.assertContains(page, 'شاخه‌ها: چه چیزی هنوز باید مشاهده شود؟')
+        self.assertContains(page, 'تحلیل و استدلال')                              # missing for 'تولید دانش'
+        branch = next(b for b in page.context['branches'] if b['name'] == 'تولید دانش')
+        self.assertNotIn('کاوشگری و فهم عمیق', branch['missing'])                  # t1 did observe indicator 1
+        self.assertNotIn('score', branch)
+
+    def test_grid_explains_not_observed_and_the_minimums_from_the_active_set(self):
+        page = self.get(self.t1, self.grid_url())
+        for text in ('«مشاهده نشد»', 'نمرهٔ ۱', '3 مشاهدهٔ معتبر در 2 فعالیت'):
+            self.assertContains(page, text)
+        WeightSet.objects.filter(school=self.a).update(min_observations=4, min_activities=3)
+        self.assertContains(self.get(self.t1, self.grid_url()), '4 مشاهدهٔ معتبر در 3 فعالیت')

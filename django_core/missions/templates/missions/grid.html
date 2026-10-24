@@ -3,6 +3,14 @@
 {% block content %}
 <a class="btn btn-link" href="{% url 'missions:activities' %}">← فعالیت‌ها</a>
 <div class="alert alert-warning">اولیه و اعتبارسنجی‌نشده؛ تصمیم نیست. فقط رفتار دیده‌شده را نمره بدهید. اگر فرصت مشاهده نبود، «مشاهده نشد» را انتخاب کنید (با نمرهٔ ۱ فرق دارد). فقط مشاهدات خودتان در این صفحه دیده و ویرایش می‌شود.</div>
+<details class="mb-3" open><summary class="fw-bold">راهنمای نمره‌گذاری</summary>
+  <ul class="small mb-0 mt-2">
+    <li><strong>نمرهٔ ۱ تا ۵</strong> فقط وقتی است که رفتار را دیده‌اید؛ ملاک هر نمره با نگه‌داشتن اشاره‌گر روی عنوان شاخص دیده می‌شود.</li>
+    <li><strong>«مشاهده نشد»</strong> یعنی در این فعالیت فرصت یا شاهد کافی نبود. این با نمرهٔ ۱ (عملکرد ضعیف دیده‌شده) فرق دارد و در هیچ محاسبه‌ای وارد نمی‌شود.</li>
+    <li>خانهٔ خالی یعنی هنوز چیزی ثبت نشده است.</li>
+    <li>برای هر شاخص دست‌کم <strong>{{ min_obs }} مشاهدهٔ معتبر در {{ min_acts }} فعالیت متفاوت</strong> لازم است؛ تا آن زمان نتیجهٔ شاخص «موقت» می‌ماند و «نیازمند تکمیل مشاهده» نشان داده می‌شود.</li>
+    <li>برای هر دانش‌آموزِ نمره‌دار، یک شاهد کوتاه از رفتار واقعی بنویسید.</li>
+  </ul></details>
 {% if read_only %}<div class="alert alert-secondary">این دوره بسته است؛ ثبت یا ویرایش ممکن نیست.</div>{% endif %}
 <form method="post">{% csrf_token %}
 <div class="table-responsive"><table class="table table-sm bg-white align-middle">

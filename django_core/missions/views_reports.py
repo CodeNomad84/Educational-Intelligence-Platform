@@ -25,7 +25,7 @@ from students.models import Enrollment
 from .access import LEAD, MODULE, enabled_school_ids, report_kind, report_students
 from .defaults import CHOICE_CATEGORIES
 from .engine import NEEDS_DIFF, NEEDS_MORE, STATUS_LABELS, USABLE, active_weight_set, period_profiles
-from .models import ActivityChoice, Branch, Observation, ParentMeeting, PathSuggestion
+from .models import ActivityChoice, Branch, Indicator, Observation, ParentMeeting, PathSuggestion, Weight, WeightSet
 from .report import FOOTER, build_report, pick_period
 
 READ_ROLES = (TEACHER, GRADE_LEAD, COUNSELOR)
@@ -219,3 +219,23 @@ def aggregate(request):
         audit.record(request.user, audit.MISSION_AGGREGATE_VIEW, school=school_id, detail=str(len(groups)))
     return render(request, 'missions/aggregate.html', {
         'blocks': blocks, 'statuses': [STATUS_LABELS[s] for s in (NEEDS_MORE, NEEDS_DIFF, USABLE)], 'min_group': MIN_GROUP, 'footer': FOOTER})
+
+
+@role_required(ADMIN, module=MODULE)
+@never_cache
+def weights(request):
+    """Admin, read only: the weight sets of the own schools (the active one as a table with column sums, every version with its
+    lifecycle state). Parameters only: no student data. Editing and approval are NOT here (slice 2b)."""
+    indicators, branches = list(Indicator.objects.all()), list(Branch.objects.all())
+    blocks = []
+    for school_id in sorted(school_ids_for_admin(request.user) & enabled_school_ids(request.user)):
+        versions = list(WeightSet.objects.filter(school_id=school_id).order_by('-version'))
+        active = next((v for v in versions if v.status == WeightSet.ACTIVE), None)
+        table = sums = None
+        if active:
+            cells = {(i, b): p for i, b, p in Weight.objects.filter(weight_set=active).values_list('indicator_id', 'branch_id', 'percent')}
+            table = [{'indicator': ind, 'cells': [cells.get((ind.pk, br.pk), 0) for br in branches]} for ind in indicators]
+            sums = [sum(row['cells'][n] for row in table) for n in range(len(branches))]
+        blocks.append({'school_id': school_id, 'versions': versions, 'active': active, 'table': table, 'sums': sums})
+        audit.record(request.user, audit.MISSION_WEIGHTS_VIEW, school=school_id)
+    return render(request, 'missions/weights.html', {'blocks': blocks, 'branches': branches, 'footer': FOOTER})

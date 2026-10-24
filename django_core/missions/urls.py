@@ -12,4 +12,5 @@ urlpatterns = [
     path('students/<int:pk>/choices/', views_reports.choices, name='choices'),
     path('students/<int:pk>/meetings/', views_reports.meetings, name='meetings'),
     path('aggregate/', views_reports.aggregate, name='aggregate'),
+    path('weights/', views_reports.weights, name='weights'),
 ]

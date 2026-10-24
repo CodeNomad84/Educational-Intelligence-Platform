@@ -20,7 +20,8 @@ from vocabulary.models import MISSION_ACTIVITY_TYPE, MISSION_CONDITION
 from vocabulary.terms import terms_on
 
 from .access import MODULE, entry_scopes, grid_students, usable_activities
-from .models import Activity, Indicator, Observation, ObservationSession, Period
+from .defaults import MIN_ACTIVITIES, MIN_OBSERVATIONS
+from .models import Activity, Indicator, Observation, ObservationSession, Period, WeightSet
 
 NOT_OBSERVED = 'n'
 CELL_CHOICES = [('', '—'), (NOT_OBSERVED, 'مشاهده نشد'), *[(str(i), str(i)) for i in range(1, 6)]]
@@ -152,6 +153,8 @@ def grid(request, pk):
              'cells': [{'indicator': ind, 'value': values.get(st.pk, {}).get('cells', {}).get(ind.code, '')} for ind in indicators],
              'evidence': values.get(st.pk, {}).get('evidence', ''), 'condition': values.get(st.pk, {}).get('condition', '')}
             for st in students]
+    ws = WeightSet.objects.filter(school_id=activity.school_id, status=WeightSet.ACTIVE).first()
     return render(request, 'missions/grid.html', {
+        'min_obs': ws.min_observations if ws else MIN_OBSERVATIONS, 'min_acts': ws.min_activities if ws else MIN_ACTIVITIES,
         'activity': activity, 'rows': rows, 'indicators': indicators, 'cell_choices': CELL_CHOICES,
         'conditions': conditions.items(), 'read_only': activity.period.closed, 'max_evidence': MAX_EVIDENCE})
