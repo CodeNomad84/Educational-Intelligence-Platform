@@ -74,3 +74,39 @@ def visible_observations(user):
         parts.append(Q(student__in=Student.objects.filter(counselor).values('pk')))
     q = _any(parts)
     return base.filter(q) if q is not None and schools else Observation.objects.none()
+
+
+# --- Slice 3: reports, forms, aggregates -------------------------------------------------------------------------------
+LEAD, COUNSELLOR, TEACHER_KIND = 'lead', 'counselor', 'teacher'
+
+
+def lead_students(user):
+    """Students of the user's own grade (Grade Lead), in schools with the module on. The only scope that may write the
+    forms and the plan and that may see who gave which score."""
+    q = _grade_lead_q(user, roles_for(user))
+    return Student.objects.filter(q, school_id__in=enabled_school_ids(user)) if q is not None else Student.objects.none()
+
+
+def counselor_students(user):
+    q = _counselor_q(user, roles_for(user)) if COUNSELOR in roles_for(user) else None
+    return Student.objects.filter(q, school_id__in=enabled_school_ids(user)) if q is not None else Student.objects.none()
+
+
+def report_kind(user, student):
+    """How this user may read this student's report: ``lead`` (full, with who-gave-what), ``counselor`` (full, observers
+    anonymous; only through an OPEN referral), ``teacher`` (status only, own observations) or None (no access)."""
+    if lead_students(user).filter(pk=student.pk).exists():
+        return LEAD
+    if counselor_students(user).filter(pk=student.pk).exists():
+        return COUNSELLOR
+    if visible_observations(user).filter(student=student).exists() and TEACHER in roles_for(user):
+        return TEACHER_KIND
+    return None
+
+
+def report_students(user):
+    """Students whose report the user may open, in a fixed (name) order. Never ordered by any score."""
+    q = Q(pk__in=lead_students(user).values('pk')) | Q(pk__in=counselor_students(user).values('pk'))
+    if TEACHER in roles_for(user):
+        q |= Q(pk__in=visible_observations(user).values('student'))
+    return Student.objects.filter(q).order_by('last_name', 'first_name', 'pk') if enabled_school_ids(user) else Student.objects.none()

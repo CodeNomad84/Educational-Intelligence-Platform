@@ -11,7 +11,7 @@ from django.db import models
 
 from schools.vocabulary import GRADE_CHOICES
 
-from .defaults import FIELD_CHOICES
+from .defaults import CHOICE_CATEGORIES, FIELD_CHOICES
 
 
 class Indicator(models.Model):
@@ -65,6 +65,8 @@ class WeightSet(models.Model):
     min_activities = models.PositiveSmallIntegerField(default=2)
     diff_threshold = models.DecimalField(max_digits=3, decimal_places=1, default='1.5')
     show_x20 = models.BooleanField(default=False)
+    strong_at = models.DecimalField(max_digits=2, decimal_places=1, default='4.0')    # report: indicator score >= this is listed as a strength
+    growth_at = models.DecimalField(max_digits=2, decimal_places=1, default='2.5')    # report: indicator score <= this is listed as a growth area
     note = models.CharField(max_length=200, blank=True)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
     approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
@@ -215,4 +217,68 @@ class Observation(models.Model):
     def save(self, *args, **kwargs):
         if self._state.adding and self.student.school_id != self.session.activity.school_id:
             raise ValidationError('the student belongs to another school')
+        super().save(*args, **kwargs)
+
+
+class ActivityChoice(models.Model):
+    """The student's own choice in one activity category with the reason they give (form "activity choices"). A plain record
+    of what the student said; it is NOT a score and never enters a capability calculation (report: "observed concerns")."""
+    student = models.ForeignKey('students.Student', on_delete=models.CASCADE, related_name='mission_choices')
+    period = models.ForeignKey(Period, on_delete=models.PROTECT, related_name='choices')
+    category = models.CharField(max_length=20, choices=CHOICE_CATEGORIES)
+    choice = models.CharField(max_length=150, blank=True, verbose_name="انتخاب نوجوان")
+    reason = models.CharField(max_length=300, blank=True, verbose_name="منطق انتخاب نوجوان")
+    recorded_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['student', 'period', 'category'], name='uniq_mission_choice')]
+
+    def save(self, *args, **kwargs):
+        if self._state.adding and self.student.school_id != self.period.school_id:
+            raise ValidationError('the period belongs to another school')
+        super().save(*args, **kwargs)
+
+
+class ParentMeeting(models.Model):
+    """One individual parent meeting (form "parent meetings log"): date, who attended, the agreements, how well they were kept."""
+    PRESENT = [('both', 'هر دو'), ('one', 'یکی از والدین'), ('none', 'حضور نداشتند')]
+    QUALITY = [('', 'هنوز بررسی نشده'), ('done', 'انجام شد'), ('partial', 'تا حدی'), ('not_done', 'انجام نشد')]
+    student = models.ForeignKey('students.Student', on_delete=models.CASCADE, related_name='mission_meetings')
+    held_on = models.DateField()
+    parents_present = models.CharField(max_length=4, choices=PRESENT)
+    agreements = models.CharField(max_length=500, blank=True)
+    quality = models.CharField(max_length=8, choices=QUALITY, blank=True)
+    recorded_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-held_on', '-pk']
+
+
+class PathSuggestion(models.Model):
+    """A suggested path to try, written by the grade lead after reading the report: a branch, one practical experience, a growth
+    goal and a review date. A shared snapshot, so it stores the ``params_version`` it was written under. At most three per
+    student and period. It is a suggestion to review, never a stored label."""
+    MAX_PER_PERIOD = 3
+    student = models.ForeignKey('students.Student', on_delete=models.CASCADE, related_name='mission_paths')
+    period = models.ForeignKey(Period, on_delete=models.PROTECT, related_name='paths')
+    branch = models.ForeignKey(Branch, on_delete=models.PROTECT, related_name='+')
+    experience = models.CharField(max_length=300)
+    growth_goal = models.CharField(max_length=300)
+    review_date = models.DateField()
+    params_version = models.PositiveIntegerField()
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['branch__order']
+        constraints = [models.UniqueConstraint(fields=['student', 'period', 'branch'], name='uniq_mission_path')]
+
+    def save(self, *args, **kwargs):
+        if self._state.adding:
+            if self.student.school_id != self.period.school_id:
+                raise ValidationError('the period belongs to another school')
+            if PathSuggestion.objects.filter(student=self.student, period=self.period).count() >= self.MAX_PER_PERIOD:
+                raise ValidationError('at most three suggested paths per student and period')
         super().save(*args, **kwargs)

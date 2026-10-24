@@ -22,6 +22,11 @@ MODULE_CHANGE = 'module_change'              # detail = <module_key>:on|off|<end
 MISSION_ACTIVITY_CREATE = 'mission_activity_create'
 MISSION_GRID_VIEW = 'mission_grid_view'
 MISSION_GRID_SAVE = 'mission_grid_save'   # detail = counts only, e.g. s12o30d2
+MISSION_REPORT_VIEW = 'mission_report_view'
+MISSION_PLAN_SAVE = 'mission_plan_save'           # detail = number of paths
+MISSION_CHOICES_SAVE = 'mission_choices_save'     # detail = number of rows
+MISSION_MEETING_ADD = 'mission_meeting_add'
+MISSION_AGGREGATE_VIEW = 'mission_aggregate_view'
 STAFF_ROLES_CHANGE = 'staff_roles_change'  # detail = resulting roles, e.g. T,G
 
 

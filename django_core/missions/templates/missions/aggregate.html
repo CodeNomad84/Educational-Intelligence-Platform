@@ -1,0 +1,14 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}آمار تجمیعی مأموریت‌محور{% endblock %}
+{% block content %}
+<div class="alert alert-warning">فقط شمار دانش‌آموزان به تفکیک وضعیت شواهد (بدون نام، نمره یا رتبه). گروه‌های کمتر از {{ min_group }} نفر نمایش داده نمی‌شوند.</div>
+{% for b in blocks %}<h5>دوره: {{ b.period.label }}</h5>
+  {% for g in b.groups %}<h6>پایهٔ {{ g.grade }}</h6>
+    {% if g.suppressed %}<p class="text-muted">گروه کمتر از {{ min_group }} نفر؛ نمایش داده نمی‌شود.</p>
+    {% else %}<p class="small">{{ g.n }} دانش‌آموز با مشاهده</p>
+    <table class="table table-sm bg-white"><thead><tr><th>شاخه</th>{% for s in statuses %}<th>{{ s }}</th>{% endfor %}</tr></thead><tbody>
+    {% for r in g.rows %}<tr><td>{{ r.branch }}</td>{% for c in r.cells %}<td>{{ c }}</td>{% endfor %}</tr>{% endfor %}</tbody></table>{% endif %}
+  {% endfor %}
+{% empty %}<p class="text-muted">دادهای نیست.</p>{% endfor %}
+{% include 'missions/_footer.html' %}
+{% endblock %}

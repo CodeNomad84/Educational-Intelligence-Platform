@@ -37,3 +37,9 @@ WEIGHTS = [
 
 # First-version thresholds (owner decisions 2026-10-24: minimum 3 valid observations in 2 activities; notable difference 1.5).
 MIN_OBSERVATIONS, MIN_ACTIVITIES, DIFF_THRESHOLD = 3, 2, '1.5'
+
+# Fixed rows of the "activity choices" form (the owner's form); codes are stored, labels are shown.
+CHOICE_CATEGORIES = [
+    ('research', 'پژوهش علمی'), ('art', 'مهارت هنری'), ('digital', 'مهارت دیجیتال'), ('duty', 'مسئولیت کلاسی'), ('book', 'کتاب'),
+    ('hobby', 'سرگرمی'), ('music', 'موسیقی'), ('sport', 'ورزش'), ('role_model', 'الگوی زندگی'),
+]
