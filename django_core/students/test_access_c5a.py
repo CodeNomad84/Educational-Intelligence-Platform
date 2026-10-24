@@ -368,7 +368,7 @@ class DashboardHtmlTests(Base):
         for user in users[:-1]:
             self.client.force_login(user)
             self.assertEqual(self.client.get(reverse("dashboard:student_add")).status_code, 403, user.username)
-            self.assertEqual(self.client.get(reverse("dashboard:upload_students")).status_code, 403, user.username)
+            self.assertEqual(self.client.get(reverse("dashboard:school_accounts")).status_code, 403, user.username)
         # no role at all: the list is denied, not empty
         self.client.force_login(make_user("none"))
         self.assertEqual(self.client.get(reverse("dashboard:student_list")).status_code, 403)
@@ -378,7 +378,7 @@ class DashboardHtmlTests(Base):
         user.groups.add(Group.objects.get_or_create(name=ADMIN)[0])  # GradeLead is the first group
         self.client.force_login(user)
         html = self.client.get(reverse("dashboard:student_list")).content.decode()
-        self.assertIn(reverse("dashboard:upload_students"), html)
+        self.assertIn(reverse("dashboard:school_accounts"), html)
 
 
 class QuerysetChokePointTests(TestCase):

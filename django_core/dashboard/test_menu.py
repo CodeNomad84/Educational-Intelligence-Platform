@@ -61,3 +61,22 @@ class SidebarTests(Base):
         for user, home in homes.items():
             with self.subTest(user=user.username):
                 self.assertIn(home, self.sidebar_links(user))
+
+    def test_no_sidebar_link_ends_in_a_server_error(self):
+        """Guards the class of bug where a menu entry points at a broken page (the old /upload/ stub)."""
+        self.client.raise_request_exception = False
+        for user in (self.admin, self.lead, self.counselor, self.teacher, self.parent, self.stu):
+            self.client.force_login(user)
+            for link in self.sidebar_links(user):
+                if link.endswith('/logout/'):
+                    continue
+                with self.subTest(user=user.username, link=link):
+                    self.assertLess(self.client.get(link, follow=True).status_code, 500)
+
+    def test_the_school_admin_upload_entry_opens_the_bulk_accounts_page(self):
+        from django.urls import reverse
+        self.client.force_login(self.admin)
+        links = self.sidebar_links(self.admin)
+        self.assertIn(reverse('dashboard:school_accounts'), links)
+        self.assertEqual(self.client.get(reverse('dashboard:school_accounts')).status_code, 200)
+        self.assertEqual(self.client.get('/upload/').status_code, 404)             # the dead stub route is gone

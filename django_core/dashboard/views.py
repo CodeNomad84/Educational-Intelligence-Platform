@@ -187,18 +187,6 @@ def student_detail_view(request, pk):
     }
     return render(request, 'dashboard/student_detail.html', context)
 
-# آپلود فایل (فقط ادمین)
-@role_required(ADMIN)
-def upload_students_view(request):
-    if request.method == 'POST' and request.FILES.get('file'):
-        # اینجا همان منطق import_students که قبلاً در API نوشته‌ایم را می‌توانیم صدا بزنیم
-        # اما برای جلوگیری از تکرار کد، بهتر است از خود API استفاده کنیم (یا کد را کپی کنیم)
-        # فعلاً برای سادگی، یک پیام موفقیت نمایش می‌دهیم:
-        messages.success(request, 'فایل با موفقیت آپلود شد! (منطق پردازش اضافه خواهد شد)')
-        return redirect('dashboard:upload_students')
-    
-    return render(request, 'dashboard/upload.html')
-
 @role_required()  # RAG chat is disabled for every role in Phase 1 (nobody holds an empty role set)
 def chat_view(request):
     if request.method == 'POST':

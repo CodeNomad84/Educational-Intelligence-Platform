@@ -57,7 +57,7 @@
                 <a href="{% url 'dashboard:counselor_home' %}"><i class="bi bi-heart-pulse"></i> پرونده‌های ارجاعی</a>
                 {% endif %}
                 {% if IS_SCHOOL_ADMIN %}
-                <a href="{% url 'dashboard:upload_students' %}"><i class="bi bi-upload"></i> آپلود فایل</a>
+                <a href="{% url 'dashboard:school_accounts' %}"><i class="bi bi-upload"></i> ثبت گروهی از اکسل</a>
                 <a href="{% url 'dashboard:school_home' %}"><i class="bi bi-building"></i> مدیریت مدرسه</a>
                 {% for m in VISIBLE_MODULES %}<a href="{{ m.url }}"><i class="bi bi-puzzle"></i> {{ m.label }}{% if not m.enabled %} <i class="bi bi-lock"></i>{% endif %}</a>{% endfor %}
                 {% endif %}

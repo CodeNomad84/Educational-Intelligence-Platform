@@ -33,7 +33,7 @@ class DashboardAuthzTests(TestCase):
     # -- unauthenticated --------------------------------------------------
     def test_anonymous_redirected_to_login_everywhere(self):
         for name, args in [('dashboard', ()), ('student_list', ()), ('student_detail', (self.child_a.pk,)),
-                           ('chat', ()), ('library', ()), ('student_add', ()), ('upload_students', ())]:
+                           ('chat', ()), ('library', ()), ('student_add', ()), ('school_accounts', ())]:
             resp = self.client.get(self.url(name, *args))
             self.assertEqual(resp.status_code, 302, name)
             self.assertTrue(resp['Location'].startswith(reverse('dashboard:login')), name)
@@ -71,7 +71,7 @@ class DashboardAuthzTests(TestCase):
 
     def test_parent_denied_staff_and_admin_pages(self):
         self.client.force_login(self.parent_a)
-        for name in ('chat', 'library', 'student_add', 'upload_students'):
+        for name in ('chat', 'library', 'student_add', 'school_accounts'):
             self.assertEqual(self.client.get(self.url(name)).status_code, 403, name)
         self.assertEqual(self.client.post(self.url('upload_document')).status_code, 403)
         self.assertEqual(self.client.post(self.url('delete_document'), {'parent_id': 'x'}).status_code, 403)
@@ -285,6 +285,6 @@ class AdminRoleContextTests(TestCase):
         return render_to_string('dashboard/base.html', {'user': user}, request=request)
 
     def test_only_admin_group_sees_upload_link(self):
-        upload = reverse('dashboard:upload_students')
+        upload = reverse('dashboard:school_accounts')
         self.assertIn(upload, self.render_base(ADMIN))
         self.assertNotIn(upload, self.render_base(PARENT))
