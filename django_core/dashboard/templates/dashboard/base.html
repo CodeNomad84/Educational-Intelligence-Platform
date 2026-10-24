@@ -22,7 +22,8 @@
             <nav class="col-md-2 d-none d-md-block sidebar">
                 <h4 class="mt-3 text-center">🏫 مدرسه</h4>
                 <hr class="bg-light">
-                <a href="{% url 'dashboard:dashboard' %}"><i class="bi bi-speedometer2"></i> داشبورد</a>
+                {# one home entry per role: /dashboard/ redirects every role but SchoolAdmin to its own home, so only SchoolAdmin gets it #}
+                {% if IS_SCHOOL_ADMIN %}<a href="{% url 'dashboard:dashboard' %}"><i class="bi bi-speedometer2"></i> داشبورد</a>{% endif %}
                 {% if IS_SCHOOL_ADMIN or IS_TEACHER or IS_GRADE_LEAD or IS_PARENT %}
                 <a href="{% url 'dashboard:student_list' %}"><i class="bi bi-people"></i> {% if IS_GRADE_LEAD %}دانش‌آموزان پایه{% elif IS_PARENT %}فرزندان من{% else %}دانش‌آموزان{% endif %}</a>
                 {% endif %}

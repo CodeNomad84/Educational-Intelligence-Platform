@@ -104,8 +104,9 @@ class Command(BaseCommand):
     def handle(self, *args, **opts):
         self._guard()
         school = self._school(opts["school"])  # validated BEFORE anything is deleted (--reset)
-        from schools.module_grants import grant   # demo school: optional modules on (new schools start with none)
-        grant(school, "advisor_ai", "tutor_ai")
+        from schools.entitlements import MODULES
+        from schools.module_grants import grant   # demo school: every sellable module licensed (real schools start with none)
+        grant(school, *MODULES)
         from demo_intel.engine import analyze_students
         from demo_intel.models import CounselingNote, InterventionRecord, StudentObservation
 
@@ -146,6 +147,7 @@ class Command(BaseCommand):
                         counselor_name="مشاور نمایشی", summary=summary)
             password = opts["password"] or secrets.token_urlsafe(9)
             self._users(password, students, school, year, classes)
+            self._mission(school, year, students)
 
         results = analyze_students(Student.objects.all(), self.today)
         dist = {"HIGH": 0, "MEDIUM": 0, "LOW": 0}
@@ -181,6 +183,8 @@ class Command(BaseCommand):
     def _reset(self):
         from demo_intel.models import CounselingNote, InterventionRecord, StudentObservation
         from students.models import Enrollment
+        from missions.models import Activity
+        Activity.objects.all().delete()   # sessions and observations go with it; they would otherwise protect the demo users
         for model in (StudentObservation, CounselingNote, InterventionRecord, Attendance, Grade, Enrollment, Student):
             model.objects.all().delete()
         get_user_model().objects.filter(username__startswith="demo_").delete()
@@ -327,6 +331,46 @@ class Command(BaseCommand):
             else:
                 GradeLeadAssignment.objects.get_or_create(user=user, school=school, grade=10, academic_year=year.code)
         self._referral(school, students)
+
+    def _mission(self, school, year, students):
+        """Mission module demo data (synthetic): one period, three grade-10 activities scored by the demo teacher (own class) and
+        the demo grade lead, one student choice row and one parent meeting, so the grid, the report and both forms show something."""
+        from django.core.management import call_command
+        from io import StringIO
+
+        from missions.models import ActivityChoice, Activity, Indicator, Observation, ObservationSession, ParentMeeting, Period
+        from vocabulary.models import MISSION_ACTIVITY_TYPE
+        from vocabulary.terms import terms_on
+
+        call_command("seed_mission", school=school.code, stdout=StringIO(), verbosity=0)
+        User = get_user_model()
+        teacher, lead = User.objects.get(username="demo_teacher"), User.objects.get(username="demo_gradelead")
+        period = Period.objects.get(school=school, academic_year=year)
+        kinds = list(terms_on(school, MISSION_ACTIVITY_TYPE))
+        indicators = {i.code: i for i in Indicator.objects.all()}
+        referred = next(s for s, p in students if p.get("key") == "attendance_ali")      # the counselor's open referral
+        cohort = [referred] + [s for s, p in students if s.grade == 10 and s is not referred][:7]
+        plans = [("ساخت سازه", [1, 2, 3, 5, 6, 9, 11, 12]), ("طراحی پوستر", [1, 2, 3, 6, 7, 8, 10, 12]),
+                 ("ارائهٔ گروهی", [1, 2, 3, 5, 9, 10, 11, 12])]
+        for n, (title, codes) in enumerate(plans):
+            act = Activity.objects.create(school=school, grade=10, period=period, title=title, activity_type=kinds[n % len(kinds)],
+                                          held_on=self.today - timedelta(days=30 - 10 * n), created_by=lead)
+            for observer in (teacher, lead):
+                session = ObservationSession.objects.create(activity=act, observer=observer)
+                for st in cohort:
+                    if observer is teacher and st.school_class.title != "۱۰-الف":
+                        continue                      # a subject teacher scores only the students of the own class
+                    base = 2 + (st.pk + n) % 3
+                    for code in codes:
+                        score = max(1, min(5, base + self.rng.choice((-1, 0, 0, 1))))
+                        if st is cohort[0] and code == 6:
+                            score = 5 if observer is teacher else 3        # the two observers differ: shows the review flag
+                        Observation.objects.create(session=session, student=st, indicator=indicators[code], score=score,
+                                                   evidence="مشاهدهٔ نمایشی (داده‌ٔ مصنوعی)")
+        ActivityChoice.objects.create(student=cohort[0], period=period, category="book", choice="رمان علمی-تخیلی",
+                                      reason="دوست دارم ببینم ایده‌ها چطور به ساخت می‌رسند.", recorded_by=lead)
+        ParentMeeting.objects.create(student=cohort[0], held_on=self.today - timedelta(days=14), parents_present="both",
+                                     agreements="مطالعهٔ روزانه و گفت‌وگوی هفتگی دربارهٔ پروژه", quality="partial", recorded_by=lead)
 
     def _referral(self, school, students):
         """Slice 4a: one open demo referral (SchoolAdmin -> counselor) so the counselor pages have a case to show."""

@@ -521,6 +521,78 @@ class DemoLoginLandingTests(TestCase):
         self.assertContains(self.client.get("/login/?next=/school/"), 'name="next" value="/school/"')
 
 
+@override_settings(DATABASES={"default": {**copy.deepcopy(settings.DATABASES["default"]), "NAME": "/x/demo_db.sqlite3"}})
+class DemoMissionTests(TestCase):
+    """The demo school has every sellable module licensed and a small synthetic mission dataset, so each role can reach the
+    observation grid, the report and both forms; a school created later stays locked."""
+    PASSWORD = "Test-pass-123"
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("seed_demo", "--password", cls.PASSWORD, verbosity=0)
+
+    def as_user(self, username):
+        self.client.logout()
+        self.assertEqual(self.client.post("/login/", {"username": username, "password": self.PASSWORD}).status_code, 302)
+
+    def test_all_modules_are_licensed_for_the_demo_school_only(self):
+        from schools.entitlements import ACTIVE_LICENSED, LOCKED, MODULES, module_state
+        from schools.models import School
+        demo = School.objects.get()
+        self.assertEqual({k: module_state(demo, k) for k in MODULES}, {k: ACTIVE_LICENSED for k in MODULES})
+        other = School.objects.create(name="Real", code="real")                 # a school added later: everything locked
+        self.assertEqual({module_state(other, k) for k in MODULES}, {LOCKED})
+
+    def test_every_role_reaches_its_mission_pages(self):
+        from missions.models import ActivityChoice, Observation, ParentMeeting
+        self.assertTrue(Observation.objects.exists() and ActivityChoice.objects.exists() and ParentMeeting.objects.exists())
+        student = ActivityChoice.objects.get().student
+        grid = reverse_("missions:grid", Activity_pk())
+        pages = {
+            "demo_gradelead": [grid, reverse_("missions:students"), reverse_("missions:report", student.pk),
+                               reverse_("missions:choices", student.pk), reverse_("missions:meetings", student.pk)],
+            "demo_teacher": [reverse_("missions:activities"), grid, reverse_("missions:students")],
+            "demo_admin": [reverse_("missions:aggregate")],
+        }
+        for username, urls in pages.items():
+            self.as_user(username)
+            for url in urls:
+                with self.subTest(user=username, url=url):
+                    self.assertEqual(self.client.get(url).status_code, 200)
+        self.as_user("demo_counselor")                                            # only through the open referral
+        self.assertEqual(self.client.get(reverse_("missions:students")).status_code, 200)
+        self.assertEqual(self.client.get(reverse_("missions:report", student.pk)).status_code, 200)    # the referred student
+        other = Observation.objects.exclude(student=student).first().student
+        self.assertEqual(self.client.get(reverse_("missions:report", other.pk)).status_code, 404)
+
+    def test_the_demo_report_shows_data_and_the_aggregate_is_not_suppressed(self):
+        from missions.models import ActivityChoice
+        student = ActivityChoice.objects.get().student
+        self.as_user("demo_gradelead")
+        page = self.client.get(reverse_("missions:report", student.pk))
+        self.assertContains(page, "مشاهدهٔ نمایشی")
+        self.assertTrue(any(b["scored"] for b in page.context["branches"]))
+        self.assertFalse(page.context["situations"] == [])                        # the two observers differ on one indicator
+        self.as_user("demo_admin")
+        group = self.client.get(reverse_("missions:aggregate")).context["blocks"][0]["groups"][0]
+        self.assertFalse(group["suppressed"])
+
+    def test_reset_removes_mission_data_without_a_protected_error(self):
+        from missions.models import Observation
+        call_command("seed_demo", "--reset", "--password", self.PASSWORD, verbosity=0)
+        self.assertTrue(Observation.objects.exists())
+
+
+def reverse_(name, *args):
+    from django.urls import reverse
+    return reverse(name, args=list(args))
+
+
+def Activity_pk():
+    from missions.models import Activity
+    return Activity.objects.first().pk
+
+
 class DemoPagesAreSchoolScopedTests(TestCase):
     """Stabilisation B2: the demo pages show only the students the user may read (no more ``Student.objects.all()``)."""
 
