@@ -28,11 +28,15 @@ MISSION_CHOICES_SAVE = 'mission_choices_save'     # detail = number of rows
 MISSION_MEETING_ADD = 'mission_meeting_add'
 MISSION_AGGREGATE_VIEW = 'mission_aggregate_view'
 MISSION_WEIGHTS_VIEW = 'mission_weights_view'
+MISSION_WEIGHTS_SAVE = 'mission_weights_save'          # detail = v<version>
+MISSION_WEIGHTS_SIMULATE = 'mission_weights_simulate'  # detail = n<students>
+MISSION_WEIGHTS_STATUS = 'mission_weights_status'      # detail = <action>:v<version>
 EXAM_TOPIC_ADD = 'exam_topic_add'
 EXAM_QUESTION_SAVE = 'exam_question_save'      # detail = number of options
 EXAM_QUESTION_STATUS = 'exam_question_status'  # detail = new status
 EXAM_CREATE = 'exam_create'                    # detail = counts only, e.g. q5c2
 EXAM_UNPUBLISH = 'exam_unpublish'
+PLATFORM_OVERVIEW_VIEW = 'platform_overview_view'   # operator page; one event per school shown; detail a (all) | x (expiring filter)
 EXAM_EDIT = 'exam_edit'                        # detail = counts only
 EXAM_CSV_IMPORT = 'exam_csv_import'            # detail = counts only, e.g. c12e3
 EXAM_RESULTS_VIEW = 'exam_results_view'        # teacher results of one exam

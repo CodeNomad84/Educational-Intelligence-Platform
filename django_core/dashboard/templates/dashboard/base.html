@@ -74,6 +74,7 @@
                 {% for m in VISIBLE_MODULES %}<a href="{{ m.url }}"><i class="bi bi-puzzle"></i> {{ m.label }}{% if not m.enabled %} <i class="bi bi-lock"></i>{% endif %}</a>{% endfor %}
                 {% endif %}
                 <hr class="bg-light">
+                {% if IS_PLATFORM_OPERATOR %}<a href="{% url 'dashboard:operator_overview' %}"><i class="bi bi-diagram-3"></i> نمای کلی پلتفرم</a>{% endif %}
                 <a href="{% url 'dashboard:profile' %}"><i class="bi bi-person-gear"></i> حساب من</a>
                 <a href="{% url 'dashboard:logout' %}" class="text-danger"><i class="bi bi-box-arrow-right"></i> خروج</a>
             </nav>
