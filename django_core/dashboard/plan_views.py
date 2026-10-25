@@ -7,6 +7,7 @@ from datetime import date
 
 from django import forms
 from django.contrib import messages
+from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
@@ -76,9 +77,11 @@ def plan_list(request):
 def plan_new(request, pk):
     student = get_object_or_404(plan_students(request.user).select_related('school'), pk=pk)
     alert = None
-    if request.GET.get('alert') or request.POST.get('alert'):
-        alert = get_object_or_404(reviewable_alerts(request.user).filter(student=student),
-                                  pk=request.GET.get('alert') or request.POST.get('alert'))
+    raw = request.GET.get('alert') or request.POST.get('alert')
+    if raw:
+        if not raw.isdigit():
+            raise Http404
+        alert = get_object_or_404(reviewable_alerts(request.user).filter(student=student), pk=int(raw))
     is_admin = ADMIN in roles_for(request.user)
     form = PlanForm(request.POST or None)
     if request.method == 'POST' and form.is_valid():

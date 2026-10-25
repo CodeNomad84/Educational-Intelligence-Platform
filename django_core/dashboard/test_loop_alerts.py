@@ -119,3 +119,23 @@ class AlertPageTests(LoopBase):
         for user in (self.parent, self.student_user):
             self.client.force_login(user)
             self.assertNotIn(f'href="{url}"', self.client.get('/account/').content.decode())
+
+    def test_a_teacher_sees_the_status_and_reason_code_but_never_the_reviewers_note(self):
+        alert = self.alert(by=self.teacher)
+        self.client.force_login(self.lead)
+        self.client.post(reverse('dashboard:alert_review', args=[alert.pk]),
+                         {'decision': 'dismiss', 'reason': 'other', 'note': 'PRIVATE-NOTE-xyz'})
+        self.client.force_login(self.teacher)
+        html = self.client.get(reverse('dashboard:alert_list') + '?status=dismissed').content.decode()
+        self.assertIn('ردشده', html)
+        self.assertIn('سایر', html)                      # the reason code label
+        self.assertNotIn('PRIVATE-NOTE-xyz', html)
+        self.client.force_login(self.admin)
+        self.assertIn('PRIVATE-NOTE-xyz', self.client.get(reverse('dashboard:alert_list') + '?status=dismissed').content.decode())
+
+    def test_garbage_alert_parameter_is_a_404_not_a_500(self):
+        self.client.force_login(self.admin)
+        for raw in ('abc', '1.5', '-1', '%00', ''):
+            response = self.client.get(reverse('dashboard:plan_new', args=[self.s7.pk]) + f'?alert={raw}')
+            self.assertIn(response.status_code, (200, 404), raw)      # empty means "no alert"
+        self.assertEqual(self.client.get(reverse('dashboard:plan_new', args=[self.s7.pk]) + '?alert=abc').status_code, 404)
