@@ -5,6 +5,11 @@
 <div class="alert alert-warning">وزن‌ها و آستانه‌ها <strong>پیشنهاد اولیه و اعتبارسنجی‌نشده</strong> هستند. مسیر تغییر: پیش‌نویس ← شبیه‌سازی‌شده ← منتظر تأیید ← فعال. نسخهٔ فعال یا بازنشسته هرگز ویرایش نمی‌شود؛ از آن کپی بگیرید.</div>
 <h5>نسخهٔ {{ ws.version }} — شناسهٔ پارامترها (params_version): {{ ws.pk }} — وضعیت: <span class="badge bg-secondary">{{ ws.get_status_display }}</span></h5>
 {% if ws.note %}<p class="small text-muted">{{ ws.note }}</p>{% endif %}
+<table class="table table-sm w-auto small"><tbody>
+  <tr><th>ساخته‌شده توسط</th><td>{% if ws.created_by %}{{ ws.created_by.username }}{% else %}—{% endif %} <span class="text-muted">({{ ws.created_at|date:'Y-m-d H:i' }})</span></td></tr>
+  <tr><th>تأییدکننده</th><td>{% if ws.approved_by %}{{ ws.approved_by.username }}{% else %}—{% endif %}</td></tr>
+  <tr><th>زمان تأیید</th><td>{% if ws.approved_at %}{{ ws.approved_at|date:'Y-m-d H:i' }}{% else %}—{% endif %}</td></tr>
+</tbody></table>
 {% for e in errors %}<div class="alert alert-danger">{{ e }}</div>{% endfor %}
 
 <form method="post" action="{% url 'missions:weight_detail' ws.pk %}">{% csrf_token %}

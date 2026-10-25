@@ -283,3 +283,34 @@ class SimulationTests(WeightBase):
         draft.refresh_from_db()
         self.assertEqual(draft.status, 'simulated')
         self.assertEqual(AuditEvent.objects.get(action='mission_weights_simulate').detail, 'n1')
+
+
+class ApprovalTrailTests(WeightBase):
+    """Single-approver decision (2026-10-25): the approval is attributable and timed, in the audit log and on the page."""
+
+    def test_page_and_audit_show_who_created_who_approved_and_when(self):
+        draft = self.new_draft()
+        for what in ('simulate', 'submit', 'approve'):
+            self.do(self.admin, draft, what)
+        draft.refresh_from_db()
+        self.assertEqual((draft.created_by_id, draft.approved_by_id), (self.admin.pk, self.admin.pk))
+        self.assertIsNotNone(draft.approved_at)
+        page = self.get(self.admin, self.url('detail', draft))
+        self.assertContains(page, 'ساخته‌شده توسط')
+        self.assertContains(page, 'admin')
+        self.assertContains(page, draft.approved_at.astimezone().strftime('%Y-%m-%d'))
+        event = AuditEvent.objects.get(action='mission_weights_status', detail='approve:v2')
+        self.assertEqual((event.username, event.school_id, event.object_id), ('admin', self.a.pk, str(draft.pk)))
+        self.assertIsNotNone(event.created_at)
+
+    def test_a_second_administrator_can_be_the_approver_and_is_recorded(self):
+        from schools.models import SchoolMembership
+        other = make_user('admin2', 'SchoolAdmin')
+        SchoolMembership.objects.create(user=other, school=self.a)
+        draft = self.new_draft()
+        for what in ('simulate', 'submit'):
+            self.do(self.admin, draft, what)
+        self.do(other, draft, 'approve')
+        draft.refresh_from_db()
+        self.assertEqual((draft.created_by.username, draft.approved_by.username), ('admin', 'admin2'))
+        self.assertEqual(AuditEvent.objects.get(action='mission_weights_status', detail='approve:v2').username, 'admin2')

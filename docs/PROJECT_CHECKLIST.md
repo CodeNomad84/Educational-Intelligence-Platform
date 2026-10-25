@@ -59,7 +59,7 @@ Test status at `8435a0e`: 1150 tests on SQLite and on PostgreSQL 16, 57 `demo_in
 - [x] Slice 3 per-student report, 2-3 suggested paths with `params_version`, activity-choice and parent-meeting forms, admin aggregate with groups under 5 hidden (`3390f08`).
 - [x] Read-only weights page for SchoolAdmin and grid help text (`dd4c03c`).
 - [x] Slice 2b weights lifecycle UI for the SchoolAdmin: draft > simulated > pending approval > active, aggregate simulation, clone, immutable active/retired, `params_version` kept (`missions/lifecycle.py`, `views_weights.py`).
-- [!] Mission weights approval: any SchoolAdmin may approve; a separate approver (four-eyes) is not required yet (owner decision).
+- [x] Mission weights approval decided 2026-10-25: single approver for now; creator, approver and approval time are shown on the weight-set page and the approval is audit-logged. Optional per-school "require second approver" switch (default OFF) to revisit before the first real multi-admin school.
 - [ ] Real-teacher pilot of the rubric and weights; the weights are an unvalidated first proposal.
 - [!] Whether subject teachers may enter the two forms (owner said Grade Lead only; revisit after the pilot).
 ### Exams
@@ -88,7 +88,7 @@ Test status at `8435a0e`: 1150 tests on SQLite and on PostgreSQL 16, 57 `demo_in
 - [x] `/admin/` login throttled with the same limits and counters as `/login/` (`dashboard/throttle.py` `throttled_admin_login`, tests in `dashboard/test_login_throttle.py`).
 - [ ] Reverse proxy and trusted real-IP handling for the throttle; no HTTPS configuration (RUNBOOK).
 - [ ] Password strength beyond length 8, 2FA for SchoolAdmin, email/SMS self-service reset (RUNBOOK).
-- [ ] Migration-order fragility between `schools.0010` and `students.0009` (RUNBOOK open risk; needs an owner decision because it touches applied migrations).
+- [~] Migration-order fragility between `schools.0010` and `students.0009`: guarded by `schools/test_fresh_migrate.py` (fresh-DB module rows and plan order; `docs/changes/0018-migration-order-guard.md`); an explicit dependency is unsafe for databases behind on migrations, so the order is protected, not enforced.
 - [ ] PostgreSQL thread test for the concurrent import race is skipped (RUNBOOK).
 - [~] R-a batch-file provenance: signed batch files exist (`067571b`), no per-row provenance (RUNBOOK).
 - [ ] FastAPI module claim in the service token (RUNBOOK).
