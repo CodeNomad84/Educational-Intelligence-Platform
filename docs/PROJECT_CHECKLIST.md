@@ -21,7 +21,7 @@ Test status at `8435a0e`: 1150 tests on SQLite and on PostgreSQL 16, 57 `demo_in
 - [x] Audit log: who viewed or changed what, no content stored (`ac7be60`, `schools/audit.py`).
 - [~] Backup and restore: rehearsal script for the demo DB and a documented path (`501f2d1`, `RUNBOOK.md` §3), but no scheduled backups and no encrypted off-site copy.
 - [x] Test tooling: `scripts/run_tests.sh sqlite|pg|all`, disposable PostgreSQL container, isolation traps (`fde42b0`, `cb2b44f`; fast test-only hasher `0c0430e`).
-- [~] CI (T-01): `.github/workflows/ci.yml` runs Django check, migrations check, SQLite and PostgreSQL tests and `demo_intel`, but it has not run on GitHub yet and FastAPI is not in it.
+- [~] CI (T-01): `.github/workflows/ci.yml` runs Django check, migrations check, SQLite and PostgreSQL tests and `demo_intel`, green on GitHub since 2026-10-25; the FastAPI suite is a separate job (`fastapi_core/requirements-test.txt`).
 
 ## 2. Core school features
 - [x] Slice 1 SchoolAdmin manages years, classes, teachers, grade leads in the dashboard (`e9b3ee4`).
