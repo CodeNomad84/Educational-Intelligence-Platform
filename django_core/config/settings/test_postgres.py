@@ -24,6 +24,9 @@ def _required(name):
     return value
 
 
+# Fast hasher for disposable test databases only (see config/settings/test_sqlite.py): these settings cannot reach real data.
+PASSWORD_HASHERS = ['django.contrib.auth.hashers.MD5PasswordHasher']
+
 _name = os.environ.get('TEST_PG_NAME', 'eip_test')
 if not _name.startswith('eip_test'):
     raise ImproperlyConfigured('TEST_PG_NAME must start with "eip_test": these settings are for disposable test databases only.')

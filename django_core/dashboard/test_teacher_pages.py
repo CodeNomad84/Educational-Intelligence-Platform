@@ -1,5 +1,6 @@
 """Slice 2: the Subject Teacher enters grades and recommendations. Happy path, other class / school / teacher is 404,
 wrong role 403, inactive account refused, and who can read the recommendations. Synthetic data only."""
+import re
 from datetime import date
 
 from django.contrib.auth import get_user_model
@@ -63,6 +64,7 @@ class GradeTests(Base):
     def test_pages_render_and_show_only_the_own_class(self):
         self.assertContains(self.client.get(reverse('dashboard:teacher_home')), '7-A')
         body = self.client.get(self.grades_url()).content.decode()
+        body = re.sub(r'value="[A-Za-z0-9]{32,}"', 'value=""', body)    # a random CSRF token can contain 'S2' or 'SB' by chance
         self.assertIn('S1', body)
         self.assertNotIn('S2', body)
         self.assertNotIn('SB', body)
