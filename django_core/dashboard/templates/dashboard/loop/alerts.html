@@ -1,0 +1,32 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}هشدارها و نگرانی‌ها{% endblock %}
+{% block content %}
+<p class="text-muted small">هشدارها فقط ثبت‌شدهٔ کارکنان‌اند و تصمیم نیستند؛ هر مورد باید توسط یک فرد بررسی شود.</p>
+<div class="mb-3">
+  {% for code, label in statuses %}<a class="btn btn-sm {% if code == status %}btn-primary{% else %}btn-outline-primary{% endif %}" href="?status={{ code }}">{{ label }}</a> {% endfor %}
+</div>
+<table class="table table-sm bg-white">
+  <thead><tr><th>دانش‌آموز</th><th>نوع</th><th>شدت</th><th>توضیح</th><th>ثبت‌کننده</th><th>تاریخ</th><th>وضعیت</th><th></th></tr></thead>
+  <tbody>
+  {% for a in alerts %}
+    <tr>
+      <td>{{ a.student.first_name }} {{ a.student.last_name }}</td>
+      <td>{{ a.risk_event.get_risk_type_display }}</td><td>{{ a.risk_event.get_severity_display }}</td>
+      <td>{{ a.message }}</td><td>{{ a.raised_by.username|default:"سامانه" }}</td><td>{{ a.created_at|date:"Y-m-d" }}</td>
+      <td>{{ a.get_status_display }}{% if a.dismiss_reason %} ({{ a.get_dismiss_reason_display }}){% endif %}{% if a.review_note %}<div class="small text-muted">{{ a.review_note }}</div>{% endif %}</td>
+      <td>
+        {% if a.pk in reviewable and a.status == 'new' %}
+          <form method="post" action="{% url 'dashboard:alert_review' a.pk %}" class="d-inline">{% csrf_token %}<input type="hidden" name="decision" value="accept"><button class="btn btn-sm btn-success">پذیرش</button></form>
+          <form method="post" action="{% url 'dashboard:alert_review' a.pk %}" class="mt-1">{% csrf_token %}<input type="hidden" name="decision" value="dismiss">
+            <select name="reason" class="form-select form-select-sm d-inline w-auto">{% for code, label in reasons %}<option value="{{ code }}">{{ label }}</option>{% endfor %}</select>
+            <input name="note" maxlength="300" class="form-control form-control-sm d-inline w-auto" placeholder="یادداشت">
+            <button class="btn btn-sm btn-outline-danger">رد</button></form>
+        {% endif %}
+        {% if a.status == 'dismissed' and can_reopen %}<form method="post" action="{% url 'dashboard:alert_reopen' a.pk %}">{% csrf_token %}<button class="btn btn-sm btn-outline-secondary">بازکردن مجدد</button></form>{% endif %}
+      </td>
+    </tr>
+  {% empty %}<tr><td colspan="8" class="text-muted">مورد جدیدی وجود ندارد.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

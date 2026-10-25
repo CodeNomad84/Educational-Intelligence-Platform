@@ -2,6 +2,7 @@
 {% block title %}پرونده ۳۶۰: {{ student.first_name }} {{ student.last_name }}{% endblock %}
 {% block content %}
 <a class="btn btn-link" href="{% url 'dashboard:student_list' %}">← فهرست دانش‌آموزان</a>
+{% if IS_SCHOOL_ADMIN or IS_GRADE_LEAD %}<a class="btn btn-sm btn-outline-primary mb-2" href="{% url 'dashboard:alert_new' student.pk %}">ثبت نگرانی</a>{% endif %}
 {% include 'dashboard/_student_summary.html' %}
 {% if referrals %}
 <h5 class="mt-4">ارجاع به مشاور</h5>
