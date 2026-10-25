@@ -220,6 +220,24 @@ class AdminResetTests(Base):
         self.assertEqual(page.status_code, 200)
         self.assertIn(self.stu7, list(page.context['people']))
 
+    def test_lost_login_sheet_is_reissued_from_the_accounts_list(self):
+        """A student who already changed the first password loses access: the SchoolAdmin reissues a one-time password from the
+        list; the old password stops working, the new one works once and must be changed; the event names who and whom, no password."""
+        AccountProfile.objects.update_or_create(user=self.stu7, defaults={'must_change_password': False})
+        page = self.client.get(reverse('dashboard:school_resets'))
+        self.assertIn(self.stu7, list(page.context['people']))
+        self.assertContains(self.client.get(reverse('dashboard:school_accounts')), reverse('dashboard:school_resets'))   # linked from the accounts page
+        response = self.reset_admin(self.stu7)
+        new = response.context['password']
+        self.assertNotEqual(new, OLD)
+        client = Client()
+        self.assertEqual(client.post(reverse('dashboard:login'), {'username': self.stu7.username, 'password': OLD}).status_code, 200)   # old one is dead
+        self.assertEqual(client.post(reverse('dashboard:login'), {'username': self.stu7.username, 'password': new}).status_code, 302)
+        self.assertTrue(AccountProfile.objects.get(user=self.stu7).must_change_password)
+        event = AuditEvent.objects.get(action='password_reset', object_id=str(self.stu7.pk))
+        self.assertEqual((event.username, event.detail, event.school_id), ('admin-a', 'admin', self.a.pk))
+        self.assertNotIn(new, f'{event.detail}{event.object_type}{event.username}')
+
     def test_admin_refusals(self):
         other_admin = make_user('admin-a2', 'SchoolAdmin'); SchoolMembership.objects.create(user=other_admin, school=self.a)
         SchoolStaff.objects.create(user=other_admin, school=self.a)

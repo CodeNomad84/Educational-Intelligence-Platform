@@ -8,6 +8,7 @@
   رمز اولیهٔ هر کاربر تصادفی است و فقط یک بار در برگهٔ ورود (xlsx) به شما داده می‌شود؛ کاربر در اولین ورود باید رمز خود را عوض کند.
   حداکثر {{ max_new }} حساب جدید در هر بار؛ فایل‌های بزرگ‌تر را (مثلاً بر اساس پایه) تقسیم کنید.</p>
   <a href="{% url 'dashboard:school_accounts_template' %}" class="btn btn-outline-secondary btn-sm">دانلود قالب خالی</a>
+  <p class="small mt-2 mb-0">برگهٔ ورود گم شد؟ رمز تازه‌ای که فقط یک بار نمایش داده می‌شود از صفحهٔ <a href="{% url 'dashboard:school_resets' %}">بازنشانی رمز</a> صادر کنید (همان قواعد؛ کاربر باید در ورود بعدی آن را عوض کند).</p>
 </div></div>
 <div class="card"><div class="card-header">بارگذاری فایل (پیش‌نمایش، بدون ثبت)</div><div class="card-body">
   <form method="post" enctype="multipart/form-data">{% csrf_token %}
