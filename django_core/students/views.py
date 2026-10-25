@@ -10,6 +10,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters
 from collections import defaultdict, namedtuple
 from django.db import transaction
+from django.db.models import ProtectedError
 from .models import Student
 from django.db.models import Avg
 from schools.models import School, SchoolClass
@@ -198,6 +199,14 @@ class StudentViewSet(viewsets.ModelViewSet):
     filterset_fields = ['grade', 'first_name', 'last_name', 'class_name']
     ordering_fields = ['first_name', 'last_name', 'grade', 'created_at']
     ordering = ['first_name']
+
+    def destroy(self, request, *args, **kwargs):
+        # Students with alerts, plans or risk events are archived, never deleted (change 0022: those rows PROTECT the student).
+        try:
+            return super().destroy(request, *args, **kwargs)
+        except ProtectedError:
+            return Response({'detail': 'This student has linked records and cannot be deleted; deactivate instead.'},
+                            status=status.HTTP_409_CONFLICT)
 
     def get_permissions(self):
         # همان قوانین قبلی

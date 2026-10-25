@@ -130,7 +130,7 @@ class SeedTests(VocabularyBase):
 
 
 class NothingElseChangedTests(TestCase):
-    def test_the_behavior_and_risk_apps_are_still_not_installed(self):
+    def test_the_unbuilt_shell_apps_are_still_not_installed(self):
         from django.apps import apps
-        for name in ('behavior', 'risk', 'interventions', 'academics', 'governance'):
+        for name in ('behavior', 'academics', 'governance'):   # risk and interventions are installed since change 0022
             self.assertFalse(apps.is_installed(name), name)

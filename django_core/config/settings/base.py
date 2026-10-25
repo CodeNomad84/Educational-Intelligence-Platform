@@ -23,6 +23,8 @@ INSTALLED_APPS = [
     'vocabulary',
     'missions',
     'exams',
+    'risk',
+    'interventions',
 ]
 
 MIDDLEWARE = [

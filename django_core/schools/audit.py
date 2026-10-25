@@ -42,6 +42,15 @@ EXAM_CSV_IMPORT = 'exam_csv_import'            # detail = counts only, e.g. c12e
 EXAM_RESULTS_VIEW = 'exam_results_view'        # teacher results of one exam
 EXAM_GRADELEAD_VIEW = 'exam_gradelead_view'
 EXAM_ADMIN_VIEW = 'exam_admin_view'
+ALERT_RAISE = 'alert_raise'                    # detail = risk type
+ALERT_REVIEW = 'alert_review'                  # detail = accepted | dismissed:<reason code>
+ALERT_REOPEN = 'alert_reopen'
+INTERVENTION_CREATE = 'intervention_create'    # detail = plan type
+INTERVENTION_STATUS = 'intervention_status'    # detail = new status
+INTERVENTION_OUTCOME = 'intervention_outcome'  # detail = outcome code
+INTERVENTION_OWNER = 'intervention_owner'      # reassigned; no detail
+FOLLOWUP_ADD = 'followup_add'                  # detail = assessment code
+INTERVENTION_VIEW = 'intervention_view'        # detail = text | meta (whether the text was shown)
 STAFF_ROLES_CHANGE = 'staff_roles_change'  # detail = resulting roles, e.g. T,G
 
 

@@ -278,3 +278,145 @@ def search_students(queryset, term):
             | (Q(full_tier=True) & Q(national_id__icontains=word))
         )
     return queryset
+
+
+# --- Intervention loop (change 0022): alerts, plans, follow-ups --------------------------------------------------------
+# Reviewers/owners: SchoolAdmin (own schools), Grade Lead (own grade), Counselor (OPEN referral only). A Subject Teacher may
+# only RAISE an alert and sees the alerts they raised. Parents and students see nothing. The text of an ``emotional`` plan and
+# of its follow-ups is readable ONLY by the plan owner (who must still see the student through a Grade Lead or Counselor
+# grant) and by a Counselor with an open referral; SchoolAdmin and Grade Lead otherwise get metadata only.
+
+def _teacher_q(user, roles):
+    """Q on ``Student``: students of the classes the Subject Teacher is assigned to (any subject)."""
+    return _any(_current_enrollment(school_id, school_class_id=class_id)
+                for school_id, class_id, _subject in _teacher_assignments(user, roles))
+
+
+def _review_q(user, roles):
+    """Q on ``Student``: students for whom the user may review alerts and create/own plans (never Teacher, Parent, Student)."""
+    return _any([_school_admin_q(user, roles), _grade_lead_q(user, roles), _counselor_q(user, roles)])
+
+
+def raisable_students(user):
+    """Students an alert may be raised about: the review scope plus a Subject Teacher's own classes."""
+    roles = roles_for(user)
+    scope = _any([_review_q(user, roles), _teacher_q(user, roles)])
+    return Student.objects.none() if scope is None else Student.objects.filter(scope)
+
+
+def plan_students(user):
+    """Students a plan may be created for (SchoolAdmin, Grade Lead, Counselor with an open referral)."""
+    scope = _review_q(user, roles_for(user))
+    return Student.objects.none() if scope is None else Student.objects.filter(scope)
+
+
+def visible_alerts(user):
+    """Alerts: reviewers see those of their students; a Subject Teacher only the ones they raised (for a student still in
+    their classes). Fail closed: no grant, no rows."""
+    from risk.models import Alert
+
+    roles = roles_for(user)
+    parts = []
+    review = _review_q(user, roles)
+    if review is not None:
+        parts.append(Q(student__in=Student.objects.filter(review)))
+    teacher = _teacher_q(user, roles)
+    if teacher is not None:
+        parts.append(Q(raised_by=user, student__in=Student.objects.filter(teacher)))
+    scope = _any(parts)
+    return Alert.objects.none() if scope is None else Alert.objects.filter(scope)
+
+
+def reviewable_alerts(user):
+    """Alerts the user may accept or dismiss: the review scope only (a teacher only raises)."""
+    from risk.models import Alert
+
+    review = _review_q(user, roles_for(user))
+    return Alert.objects.none() if review is None else Alert.objects.filter(student__in=Student.objects.filter(review))
+
+
+def visible_plans(user):
+    """Plans (METADATA level: existence, type, status, dates, owner, outcome code) for the review scope. The text is gated
+    separately: see ``visible_plan_texts`` / ``may_read_plan_text``."""
+    from interventions.models import InterventionPlan
+
+    review = _review_q(user, roles_for(user))
+    if review is None:
+        return InterventionPlan.objects.none()
+    return InterventionPlan.objects.filter(student__in=Student.objects.filter(review))
+
+
+def _text_scope(user, roles):
+    """Q on ``InterventionPlan`` for plans whose text the user may read."""
+    from interventions.models import InterventionPlan
+
+    review = _review_q(user, roles)
+    if review is None:
+        return None
+    students = Student.objects.filter(review)
+    owner_grants = _any([_grade_lead_q(user, roles), _counselor_q(user, roles)])   # never the SchoolAdmin grant
+    counselor = _counselor_q(user, roles)
+    emotional = InterventionPlan.EMOTIONAL
+    parts = [~Q(intervention_type=emotional) & Q(student__in=students)]
+    if owner_grants is not None:
+        parts.append(Q(intervention_type=emotional, owner=user, student__in=Student.objects.filter(owner_grants)))
+    if counselor is not None:
+        parts.append(Q(intervention_type=emotional, student__in=Student.objects.filter(counselor)))
+    return _any(parts)
+
+
+def visible_plan_texts(user):
+    """Plans whose goal/action text the user may read (``emotional`` plans: owner or open-referral Counselor only)."""
+    from interventions.models import InterventionPlan
+
+    scope = _text_scope(user, roles_for(user))
+    return InterventionPlan.objects.none() if scope is None else InterventionPlan.objects.filter(scope)
+
+
+def may_read_plan_text(user, plan):
+    return visible_plan_texts(user).filter(pk=plan.pk).exists()
+
+
+def visible_followups(user):
+    """Follow-ups whose text the user may read (same gate as the plan text)."""
+    from interventions.models import InterventionFollowUp
+
+    return InterventionFollowUp.objects.filter(plan__in=visible_plan_texts(user))
+
+
+def may_edit_plan(user, plan):
+    """Status changes and follow-ups: the plan owner (who can read it), or a SchoolAdmin on a non-emotional plan."""
+    from interventions.models import InterventionPlan
+
+    if not visible_plan_texts(user).filter(pk=plan.pk).exists():
+        return False
+    if plan.owner_id == user.pk:
+        return True
+    roles = roles_for(user)
+    admin = _school_admin_q(user, roles)
+    return (admin is not None and plan.intervention_type != InterventionPlan.EMOTIONAL
+            and Student.objects.filter(admin, pk=plan.student_id).exists())
+
+
+def may_cancel_or_reassign_plan(user, plan):
+    """Metadata operations: the plan owner or the SchoolAdmin of the plan's school (emotional plans included; no text needed)."""
+    if not visible_plans(user).filter(pk=plan.pk).exists():
+        return False
+    admin = _school_admin_q(user, roles_for(user))
+    return plan.owner_id == user.pk or (admin is not None and Student.objects.filter(admin, pk=plan.student_id).exists())
+
+
+def valid_plan_owner(owner, student, intervention_type):
+    """Whether ``owner`` may own a plan of ``intervention_type`` for ``student``. The owner must see the student through a
+    Grade Lead or Counselor grant; for an ``emotional`` plan a SchoolAdmin grant never counts, and a user who is also a
+    SchoolAdmin is refused (the admin sees metadata only)."""
+    from interventions.models import InterventionPlan
+
+    roles = roles_for(owner)
+    if intervention_type == InterventionPlan.EMOTIONAL:
+        grants = _any([_grade_lead_q(owner, roles), _counselor_q(owner, roles)])
+        if grants is None or _school_admin_q(owner, roles) is not None:
+            return False
+    else:
+        grants = _review_q(owner, roles)
+    return grants is not None and Student.objects.filter(grants, pk=student.pk).exists()
