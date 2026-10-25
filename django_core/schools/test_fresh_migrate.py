@@ -34,6 +34,12 @@ print(json.dumps({
 """
 
 
+WHY = ('Migration order regressed: schools.0010 (module backfill) must run BEFORE students.0009 (creates Default School), otherwise a fresh '
+       'database licenses tutor_ai for the default school. Do NOT add a dependency edge between them: it breaks databases that are behind '
+       'on migrations. Look at the dependencies of the newest migration instead (see docs/RUNBOOK.md, open risk "Migration-order '
+       'fragility", and docs/changes/0018-migration-order-guard.md).')
+
+
 class FreshMigrateTests(SimpleTestCase):
     def probe(self):
         env = {'PATH': os.environ.get('PATH', ''), 'DJANGO_SETTINGS_MODULE': 'config.settings.test_sqlite',
@@ -45,6 +51,6 @@ class FreshMigrateTests(SimpleTestCase):
     def test_fresh_database_has_no_module_rows_and_the_backfill_runs_before_the_default_school_exists(self):
         found = self.probe()
         self.assertEqual(found['schools'], ['default'])                  # students.0009 creates the default school ...
-        self.assertEqual(found['modules'], [])                           # ... and it must NOT be licensed anything
+        self.assertEqual(found['modules'], [], WHY)                      # ... and it must NOT be licensed anything
         order = found['order']
-        self.assertLess(order['schools_0010'], order['students_0009'], order)
+        self.assertLess(order['schools_0010'], order['students_0009'], WHY + f' Plan positions: {order}')
