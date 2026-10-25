@@ -1,5 +1,5 @@
 from django.urls import path
-from . import module_info, operator_page, quickstart, account_views, bulk_views, password_reset, counselor_views, loop_views, grade_dashboard, school_views, student360, student_views, teacher_views, views
+from . import module_info, operator_page, quickstart, account_views, bulk_views, password_reset, counselor_views, loop_views, plan_views, grade_dashboard, school_views, student360, student_views, teacher_views, views
 
 app_name = 'dashboard'
 
@@ -32,6 +32,14 @@ urlpatterns = [
     path('students/<int:pk>/alert/', loop_views.alert_new, name='alert_new'),
     path('alerts/<int:pk>/review/', loop_views.alert_review, name='alert_review'),
     path('alerts/<int:pk>/reopen/', loop_views.alert_reopen, name='alert_reopen'),
+    path('interventions/', plan_views.plan_list, name='plan_list'),
+    path('students/<int:pk>/plan/new/', plan_views.plan_new, name='plan_new'),
+    path('interventions/<int:pk>/', plan_views.plan_detail, name='plan_detail'),
+    path('interventions/<int:pk>/start/', plan_views.plan_start, name='plan_start'),
+    path('interventions/<int:pk>/cancel/', plan_views.plan_cancel, name='plan_cancel'),
+    path('interventions/<int:pk>/complete/', plan_views.plan_complete, name='plan_complete'),
+    path('interventions/<int:pk>/reassign/', plan_views.plan_reassign, name='plan_reassign'),
+    path('interventions/<int:pk>/followup/', plan_views.plan_followup, name='plan_followup'),
     path('counselor/', counselor_views.home, name='counselor_home'),
     path('counselor/case/<int:pk>/', counselor_views.case, name='counselor_case'),
     path('counselor/case/<int:pk>/close/', counselor_views.case_close, name='counselor_close'),

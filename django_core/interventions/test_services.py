@@ -122,6 +122,12 @@ class EmotionalTextTests(LoopBase):
         GradeLeadAssignment.objects.filter(user=self.lead).update(is_active=False)
         self.assertEqual(self.texts(self.lead), set())
 
+    def test_even_as_recorded_owner_a_school_admin_cannot_read_emotional_text(self):
+        # defence in depth: a row corrupted so that the admin is the owner still gives the admin no text
+        InterventionPlan.objects.filter(pk=self.lead_plan.pk).update(owner=self.admin)
+        self.assertFalse(may_read_plan_text(self.admin, self.lead_plan))
+        self.assertEqual(self.texts(self.admin), {self.open_plan.pk})
+
     def test_other_schools_and_roles_see_nothing(self):
         for user in (self.admin_b, self.lead_b, self.counselor_b, self.teacher, self.parent, self.student_user, self.lead8):
             with self.subTest(user=user.username):

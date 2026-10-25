@@ -66,6 +66,7 @@
                 {% endif %}
                 {% if IS_SCHOOL_ADMIN or IS_GRADE_LEAD or IS_COUNSELOR %}
                 <a href="{% url 'dashboard:alert_list' %}"><i class="bi bi-bell"></i> هشدارها</a>
+                <a href="{% url 'dashboard:plan_list' %}"><i class="bi bi-clipboard2-pulse"></i> برنامه‌های مداخله</a>
                 {% elif IS_TEACHER %}
                 <a href="{% url 'dashboard:alert_list' %}"><i class="bi bi-bell"></i> نگرانی‌های ثبت‌شده</a>
                 {% endif %}

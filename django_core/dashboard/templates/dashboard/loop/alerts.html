@@ -22,6 +22,7 @@
             <input name="note" maxlength="300" class="form-control form-control-sm d-inline w-auto" placeholder="یادداشت">
             <button class="btn btn-sm btn-outline-danger">رد</button></form>
         {% endif %}
+        {% if a.status == 'accepted' and a.pk in reviewable %}<a class="btn btn-sm btn-primary" href="{% url 'dashboard:plan_new' a.student_id %}?alert={{ a.pk }}">ایجاد برنامهٔ مداخله</a>{% endif %}
         {% if a.status == 'dismissed' and can_reopen %}<form method="post" action="{% url 'dashboard:alert_reopen' a.pk %}">{% csrf_token %}<button class="btn btn-sm btn-outline-secondary">بازکردن مجدد</button></form>{% endif %}
       </td>
     </tr>
