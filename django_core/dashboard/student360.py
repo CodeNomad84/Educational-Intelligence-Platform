@@ -8,7 +8,7 @@ from django.db.models import Count
 from django.shortcuts import get_object_or_404, render
 
 from students.access import (
-    ADMIN, GRADE_LEAD, PARENT, roles_for, visible_attendances, visible_counselor_notes, visible_grades,
+    ADMIN, GRADE_LEAD, PARENT, roles_for, visible_alerts, visible_plans, visible_attendances, visible_counselor_notes, visible_grades,
     visible_recommendations, visible_referrals, visible_students)
 from students.models import Enrollment
 
@@ -65,6 +65,10 @@ def student_360(request, pk):
         referral__student=student).select_related('author')
     roles = roles_for(request.user)
     if roles & {ADMIN, GRADE_LEAD}:
+        # Intervention loop tile: metadata only (counts, type, status, dates, owner, outcome code). The scoped querysets give a
+        # Parent nothing, and the tile is not rendered for them at all.
+        context['loop_alerts'] = visible_alerts(request.user).filter(student=student).select_related('risk_event')[:10]
+        context['loop_plans'] = visible_plans(request.user).filter(student=student).select_related('owner')[:10]
         from .counselor_views import ReferralForm
         context['referral_form'] = ReferralForm(student=student)
     if ADMIN in roles:

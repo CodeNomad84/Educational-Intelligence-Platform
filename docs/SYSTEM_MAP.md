@@ -29,3 +29,6 @@ Boundaries (TARGET): Django owns operational data & authorization; FastAPI is ca
 - Django→FastAPI: CURRENT interim service token (see ARCHITECTURE); host still hard-coded (B-08). TARGET: ADR-0002 ratification.
 - FastAPI→Ollama: CURRENT hard-coded host (A-04). External LLMs: DEFERRED (ADR-0008).
 - FastAPI→DB: CURRENT FastAPI connects as the least-privilege role `fastapi_user` (SELECT, DELETE on `documents`; `FASTAPI_DB_ROLE.md`); schema owned by Django (Phase 1). TARGET: ADR-0001.
+
+## Intervention loop (change 0022, 2026-10-26)
+CURRENT, base module (no `module=`): routes `/alerts/`, `/students/<id>/alert/`, `/alerts/<id>/review|reopen/`, `/interventions/`, `/students/<id>/plan/new/`, `/interventions/<id>/` and its `start|cancel|complete|reassign|followup` actions (`dashboard/urls.py`). Apps `risk` and `interventions` (new tables, `0001` migrations, not in the Django admin). All reads go through `students/access.py`; rules live in `risk/services.py` and `interventions/services.py`. Alerts are raised by hand only; a rule engine is `NOT YET IMPLEMENTED` and will call `risk.services.raise_alert`.

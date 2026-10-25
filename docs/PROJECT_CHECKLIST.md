@@ -39,7 +39,10 @@ Test status at `8435a0e`: 1150 tests on SQLite and on PostgreSQL 16, 57 `demo_in
 - [x] Demo seed with all modules licensed and synthetic mission and exam data (`4651c9a`, `8435a0e`).
 - [~] Grade entry (own class and subject) is done for teachers, but roadmap item 2.2b "grade needs academic year and class" is recorded as open (`SECURITY.md` C5a-R1).
 - [ ] Deterministic risk rules and alerts in the real core DB (roadmap 2.3/2.4; `risk/` has `RiskEvent`/`Alert` models only; the demo has its own rules).
-- [ ] Interventions with follow-up and outcome as a real workflow: stage-by-stage gap in `docs/changes/0021-mvp-gap-REPORT.md` (`risk/` and `interventions/` are model shells, not installed, no migrations); smallest slice proposed in `docs/changes/0022-intervention-loop-PROPOSAL.md` (awaiting owner decision).
+- [x] Intervention loop built 2026-10-26 (change 0022; commits `9063a1c`, `e8e367e`, `63c0715` and the Student 360/re-evaluation commit): manual alerts, human review (accept/dismiss with a coded reason), intervention plans, follow-ups, outcome, re-evaluation list and Student 360 tile; base module, no AI; emotional-plan text only for the owner and an open-referral Counselor. `NOT YET IMPLEMENTED`: the rule engine that calls `risk.services.raise_alert` (2.3), notifications, parent view, effectiveness scoring.
+- [!] Retention period for alerts, plans, follow-ups and risk events waits for the legal policy; risk events 3 years per doc 12, not enforced; nothing is deleted automatically.
+- [ ] Open item: `Referral` and `CounselorNote` still use `CASCADE` on the student, the new loop tables use `PROTECT` (students are deactivated, never deleted); decide whether to align (changes applied models, Tier C).
+- [ ] Open item: the local `.git/info/exclude` hides `django_core/{risk,interventions,behavior,governance,accounts,core}`; `risk/` and `interventions/` were force-added (new files there need `git add -f`).
 - [ ] Parent notifications, parent-teacher messaging, printable report card, behavior log UI (backlog items 3-6).
 - [!] Parent individual-record access (Parent sees `parent_user`; recorded as C5a-R3/C6 in `SECURITY.md`).
 

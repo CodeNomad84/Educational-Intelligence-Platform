@@ -23,9 +23,10 @@ Verified-at: `3404a1a` + Phase 1 branch `phase-1/boot-security`; the commit `340
 
 ## Infrastructure
 `docker-compose.yml` (8 services; env files `.env`, `.env.service`, `.env.fastapi`, `.env.minio` — see `DATA_AND_ARTIFACTS.md`; DB role runbook `FASTAPI_DB_ROLE.md`), `django_core/Dockerfile`, `fastapi_core/Dockerfile`.
+| Intervention loop (change 0022, base module) | `risk/` (`models.py` RiskEvent, Alert; `services.py` `raise_alert`, `raise_alert_as`, `review_alert`, `reopen_alert`), `interventions/` (`models.py` InterventionPlan, InterventionFollowUp; `services.py`; `reeval.py` derived re-evaluation and recurrence), `students/access.py` (`raisable_students`, `plan_students`, `visible_alerts`, `reviewable_alerts`, `visible_plans`, `visible_plan_texts`, `visible_followups`, `may_*`, `valid_plan_owner`), `dashboard/loop_views.py` (alerts), `dashboard/plan_views.py` (plans), templates `dashboard/loop/`, Student 360 tile, `seed_demo._loop` | Alert > human review > plan > follow-ups > outcome > re-evaluation; not sellable; the two apps are not in the Django admin | `risk/test_services.py`, `risk/test_choke_point.py`, `interventions/test_services.py`, `dashboard/test_loop_{alerts,plans,summary}.py`, `demo_intel/tests.py` |
 
 ## NOT YET IMPLEMENTED
-Student 360 · Rule engine · Risk events · Alerts · Interventions · Observations/Behavior · Parents/Classes entities · Audit log · Ingestion pipeline · React frontend · tests/CI.
+Rule engine (the loop's `raise_alert` is its future entry point) · Observations/Behavior · Parents/Classes entities · Audit log · Ingestion pipeline · React frontend · tests/CI.
 
 ## Per-module template (use when a module is added)
 Purpose · Responsibility · Main files · Models · Services · APIs · Frontend · Dependencies · Inputs · Outputs · Tests · Related docs.

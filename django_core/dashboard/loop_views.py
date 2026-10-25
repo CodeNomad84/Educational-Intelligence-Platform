@@ -10,8 +10,9 @@ from django.views.decorators.http import require_POST
 
 from risk.models import Alert, RiskEvent
 from risk.services import LoopError, raise_alert_as, reopen_alert, review_alert
+from interventions.reeval import recurrence
 from students.access import (
-    ADMIN, COUNSELOR, GRADE_LEAD, TEACHER, raisable_students, reviewable_alerts, roles_for, visible_alerts)
+    ADMIN, COUNSELOR, GRADE_LEAD, TEACHER, raisable_students, reviewable_alerts, roles_for, visible_alerts, visible_plans)
 
 from .decorators import role_required
 
@@ -45,8 +46,12 @@ def alert_list(request):
     if status in dict(Alert.STATUS_CHOICES):
         alerts = alerts.filter(status=status)
     reviewable = set(reviewable_alerts(request.user).values_list('pk', flat=True))
+    alerts = list(alerts[:200])
+    recurred = recurrence(alerts, visible_plans(request.user))      # only plans the user may see: nothing leaks to a teacher
+    for alert in alerts:
+        alert.recurred_plan = recurred[alert.pk].pk if alert.pk in recurred else None
     return render(request, 'dashboard/loop/alerts.html', {
-        'alerts': alerts[:200], 'status': status, 'statuses': Alert.STATUS_CHOICES, 'reviewable': reviewable,
+        'alerts': alerts, 'status': status, 'statuses': Alert.STATUS_CHOICES, 'reviewable': reviewable,
         'can_reopen': ADMIN in roles_for(request.user), 'reasons': Alert.DISMISS_REASONS})
 
 

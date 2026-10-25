@@ -149,6 +149,7 @@ class Command(BaseCommand):
             self._users(password, students, school, year, classes)
             self._mission(school, year, students)
             self._exams(school, classes)
+            self._loop(school, students)
 
         results = analyze_students(Student.objects.all(), self.today)
         dist = {"HIGH": 0, "MEDIUM": 0, "LOW": 0}
@@ -186,6 +187,10 @@ class Command(BaseCommand):
         from students.models import Enrollment
         from missions.models import Activity
         Activity.objects.all().delete()   # sessions and observations go with it; they would otherwise protect the demo users
+        from interventions.models import InterventionFollowUp, InterventionPlan
+        from risk.models import Alert, RiskEvent
+        for model in (InterventionFollowUp, InterventionPlan, Alert, RiskEvent):   # PROTECT the students: remove them first
+            model.objects.all().delete()
         from exams.models import Exam, Question
         Exam.objects.all().delete()       # attempts, sessions and exam items go with it ...
         Question.objects.all().delete()   # ... then the questions (options cascade); topics are vocabulary terms and stay
@@ -399,6 +404,51 @@ class Command(BaseCommand):
             for order, (text, why) in enumerate(options, start=1):
                 Option.objects.create(question=q, order=order, text=text, explanation=why, is_correct=order == correct)
             ExamQuestion.objects.create(exam=exam, question=q, order=n)
+
+    def _loop(self, school, students):
+        """Intervention loop (change 0022), all synthetic: a new alert from the teacher, a dismissed one, an accepted one with an
+        active plan and a follow-up, an emotional plan owned by the counselor (text visible to the owner and the counselor only),
+        and a completed plan whose re-evaluation date has passed."""
+        from datetime import timedelta
+        from interventions.models import InterventionFollowUp, InterventionPlan
+        from risk.models import Alert
+        from risk.services import raise_alert
+        User = get_user_model()
+        admin, teacher, counselor = (User.objects.get(username=u) for u in ("demo_admin", "demo_teacher", "demo_counselor"))
+        by_key = {p.get("key"): s for s, p in students}
+        in_class = next(s for s, p in students if p["cls"] == "۱۰-الف")
+        today = self.today
+
+        def alert(student, user, kind, severity, message, by="teacher", status=Alert.NEW, reason=""):
+            a = raise_alert(student, risk_type=kind, severity=severity, message=message, explanation=message,
+                            detected_by=by, raised_by=user)
+            if status != Alert.NEW:
+                Alert.objects.filter(pk=a.pk).update(status=status, reviewed_by=admin, reviewed_at=timezone.now(),
+                                                     dismiss_reason=reason)
+                a.refresh_from_db()
+            return a
+
+        alert(in_class, teacher, "academic", "yellow", "افت نمره در دو آزمون اخیر ریاضی")
+        alert(in_class, admin, "attendance", "yellow", "یک روز غیبت بدون اطلاع", by="admin", status=Alert.DISMISSED, reason="duplicate")
+        referred = by_key["attendance_ali"]
+        accepted = alert(referred, admin, "attendance", "orange", "غیبت‌های مکرر هفتهٔ اخیر", by="admin", status=Alert.ACCEPTED)
+        plan = InterventionPlan.objects.create(
+            school=school, student=referred, alert=accepted, owner=admin, created_by=admin, intervention_type="behavioral",
+            goal="کاهش غیبت", action_plan="تماس هفتگی با خانواده و بررسی حضور", status=InterventionPlan.ACTIVE,
+            start_date=today - timedelta(days=10), due_date=today + timedelta(days=20))
+        InterventionFollowUp.objects.create(plan=plan, author=admin, followup_date=today - timedelta(days=3),
+                                            progress_note="خانواده تماس گرفتند؛ حضور بهتر شد", assessment="on_track")
+        InterventionPlan.objects.create(
+            school=school, student=referred, owner=counselor, created_by=counselor, intervention_type="emotional",
+            goal="[نمایشی] هدف عاطفی", action_plan="[نمایشی] جلسات مشاورهٔ هفتگی", status=InterventionPlan.ACTIVE,
+            start_date=today - timedelta(days=5), due_date=today + timedelta(days=25))
+        done = by_key["improving_after_intervention"]
+        InterventionPlan.objects.create(
+            school=school, student=done, owner=admin, created_by=admin, intervention_type="academic",
+            goal="تقویت ریاضی", action_plan="کلاس تقویتی دو بار در هفته", status=InterventionPlan.COMPLETED,
+            start_date=today - timedelta(days=70), due_date=today - timedelta(days=45), outcome="improved",
+            outcome_note="نمرات بهتر شد", closed_at=timezone.now() - timedelta(days=40),
+            reevaluate_on=today - timedelta(days=10))
 
     def _referral(self, school, students):
         """Slice 4a: one open demo referral (SchoolAdmin -> counselor) so the counselor pages have a case to show."""

@@ -11,12 +11,13 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from interventions.models import InterventionFollowUp, InterventionPlan
+from interventions.reeval import due_for_reevaluation
 from interventions.services import (add_followup, cancel_plan, complete_plan, create_plan, reassign_plan, start_plan)
 from risk.services import LoopError
 from schools import audit
 from students.access import (
     ADMIN, COUNSELOR, GRADE_LEAD, may_cancel_or_reassign_plan, may_edit_plan, may_read_plan_text, plan_students,
-    reviewable_alerts, roles_for, valid_plan_owner, visible_followups, visible_plans)
+    reviewable_alerts, roles_for, valid_plan_owner, visible_alerts, visible_followups, visible_plans)
 
 from .decorators import role_required
 from .loop_views import ERRORS
@@ -66,8 +67,9 @@ def plan_list(request):
         plans = plans.filter(status__in=[InterventionPlan.PLANNED, InterventionPlan.ACTIVE])
     elif status in dict(InterventionPlan.STATUS_CHOICES):
         plans = plans.filter(status=status)
+    due = due_for_reevaluation(visible_plans(request.user), visible_alerts(request.user), date.today())
     return render(request, 'dashboard/loop/plans.html', {
-        'plans': plans[:200], 'status': status, 'statuses': [('open', 'باز')] + InterventionPlan.STATUS_CHOICES})
+        'due': due, 'plans': plans[:200], 'status': status, 'statuses': [('open', 'باز')] + InterventionPlan.STATUS_CHOICES})
 
 
 @role_required(*REVIEWERS)

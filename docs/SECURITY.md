@@ -71,8 +71,8 @@ Normative once approved. Legend: **CURRENT** = verified behavior; **TARGET** = i
 | Attendance entry | DECISION REQUIRED | DECISION REQUIRED | own classes (TARGET) | DECISION REQUIRED | DECISION REQUIRED | none | none |
 | Grades entry/view | DECISION REQUIRED | DECISION REQUIRED | own classes (TARGET) | DECISION REQUIRED | DECISION REQUIRED | own children view (TARGET) | own view (TARGET) |
 | Student 360 view | DECISION REQUIRED | DECISION REQUIRED | DECISION REQUIRED | DECISION REQUIRED | DECISION REQUIRED | DECISION REQUIRED | DECISION REQUIRED |
-| Risk/alert view | DECISION REQUIRED | DECISION REQUIRED | DECISION REQUIRED | DECISION REQUIRED | DECISION REQUIRED | none (TARGET) | none (TARGET) |
-| Intervention manage | DECISION REQUIRED | DECISION REQUIRED | DECISION REQUIRED | DECISION REQUIRED | DECISION REQUIRED | none | none |
+| Risk/alert view | see the intervention-loop table below (CURRENT) | — | see below | — | see below | none (CURRENT) | none (CURRENT) |
+| Intervention manage | see the intervention-loop table below (CURRENT) | — | none (CURRENT) | — | see below | none (CURRENT) | none (CURRENT) |
 | Counseling records | none (TARGET) | DECISION REQUIRED | none (TARGET) | none (TARGET) | owner of record (TARGET) | none | none |
 | Upload/delete RAG documents | DECISION REQUIRED | DECISION REQUIRED | none (TARGET); **CURRENT: any authenticated** | none | none | none | none |
 | Staff AI assistant | DECISION REQUIRED | DECISION REQUIRED | DECISION REQUIRED | DECISION REQUIRED | DECISION REQUIRED | none | none |
@@ -81,6 +81,24 @@ Normative once approved. Legend: **CURRENT** = verified behavior; **TARGET** = i
 | User/role admin | DECISION REQUIRED | none (TARGET) | none | none | none | none | none |
 
 CURRENT role mechanism: `NOT VERIFIED` beyond Django groups/permissions (S-04); roles Mentor/Counselor/Manager do not exist in code as far as verified (`NOT VERIFIED`). ADR-0003 decides the model.
+
+### Intervention loop — alerts, plans, follow-ups (CURRENT since change 0022, owner decisions 2026-10-26)
+Roles use the real groups (the generic matrix above predates them). Base module: no entitlement is required, school scope always applies. Out of scope = 404, wrong role = 403, no role (Parent, Student, superuser) = nothing. Synthetic data only until the P3 exit.
+
+| Capability | SchoolAdmin (own schools) | Grade Lead (own grade, enrollment-based) | Counselor (OPEN referral only) | Subject Teacher |
+|---|---|---|---|---|
+| Raise an alert | yes | yes | yes | yes, own classes only |
+| See alerts | all of the school | own grade | referred students | only the ones they raised |
+| Accept / dismiss (`other` needs a note) | yes | yes | yes | no |
+| Reopen a dismissed alert | yes | no | no | no |
+| Create a plan | yes (cannot create or own an `emotional` plan) | yes | yes | no |
+| See plan metadata (existence, type, status, dates, owner, outcome code) | all | own grade | referred students | no |
+| **Text of an `emotional` plan and its follow-ups** | **never** | **only as the plan owner** | **yes (open referral)**; as owner | no |
+| Text of other plan types | yes | yes | yes | no |
+| Follow-up, start, complete with outcome | non-emotional plans | own plans | own plans | no |
+| Cancel / reassign (reassign an `emotional` plan only to a Counselor or Grade Lead who sees the student) | yes | own plans | own plans | no |
+
+Rules: every read of a plan page is audit-logged (`intervention_view`, detail `text` or `meta`); audit rows hold ids and codes only. Closing a referral ends the Counselor's access at once. No export, no parent or student view, no AI. Alerts and plans protect their student (`PROTECT`): students are deactivated, never deleted (the API answers 409). Retention: no period decided, no automatic deletion; risk events 3 years per doc 12 is not enforced. `Referral` and `CounselorNote` still use `CASCADE` (open item).
 
 ## Deferred hardening and owner decisions (Phase 1, recorded 2026-10-12)
 | Item | Status |

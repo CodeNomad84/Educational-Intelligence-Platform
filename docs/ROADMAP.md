@@ -17,7 +17,7 @@ Current phase: **Phase 2 — MVP productization (compressed roadmap approved by 
 | 2.6 | Counseling referral workflow (states submitted, counselor_declined, awaiting_parent_consent, parent_declined, active, closed), parental consent (no exception path, owner D5), Admin status view, Counselor role, separate sensitive records | L3 | Counselor role and referrals built (`ca0ea93`); the consent states and workflow are NOT STARTED; requires 2.4 audit log first and policy/legal review (D24); crisis/escalation path needs its own policy document first (D18) |
 | 2.7 | Satisfaction feedback after closed referrals (family + counselor; Admin sees ratings/aggregates, minimum count 5, no free text) | L3 | NOT STARTED; after 2.6; policy/legal review |
 | 2.3 | Deterministic, config-driven rules in a separate `risk` domain | L2 | NOT STARTED |
-| 2.4 | Alert + human review (acknowledge/dismiss with note) + minimal audit entry | L2 | Audit log DONE (`ac7be60`); alerts and human review NOT STARTED |
+| 2.4 | Alert + human review (acknowledge/dismiss with note) + minimal audit entry | L2 | Audit log DONE (`ac7be60`); alerts, human review, interventions, follow-up, outcome and re-evaluation DONE 2026-10-26 as the intervention loop (change 0022, manual alerts only; the rule engine 2.3 is NOT STARTED) |
 | 2.5 | Synthetic seed for the core DB + school walk-through | L1 | NOT STARTED |
 
 | Phase | Name | Status |

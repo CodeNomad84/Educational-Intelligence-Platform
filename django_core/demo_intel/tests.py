@@ -679,3 +679,26 @@ class DemoExamsTests(TestCase):
         from exams.models import Exam
         call_command("seed_demo", "--reset", "--password", self.PASSWORD, verbosity=0)
         self.assertEqual(Exam.objects.count(), 1)
+
+
+@override_settings(DATABASES=DEMO_DB)
+class SeedDemoInterventionLoopTests(TestCase):
+    """Change 0022: the demo seed builds a synthetic intervention loop, and --reset removes it before the students (PROTECT)."""
+
+    def test_seeded_loop_and_reset(self):
+        from interventions.models import InterventionPlan
+        from risk.models import Alert
+        call_command("seed_demo", "--password", "Test-pass-123", verbosity=0)
+        self.assertEqual(set(Alert.objects.values_list("status", flat=True)), {"new", "dismissed", "accepted"})
+        self.assertEqual(set(InterventionPlan.objects.values_list("status", flat=True)), {"active", "completed"})
+        emotional = InterventionPlan.objects.get(intervention_type="emotional")
+        self.assertEqual(emotional.owner.username, "demo_counselor")
+        client = self.client_class()
+        client.login(username="demo_admin", password="Test-pass-123")
+        page = client.get("/interventions/")
+        self.assertEqual(page.status_code, 200)
+        self.assertEqual(len(page.context["due"]), 1)                     # the completed plan whose date has passed
+        self.assertNotContains(page, "[نمایشی] هدف عاطفی")
+        call_command("seed_demo", "--reset", "--password", "Test-pass-123", verbosity=0)
+        self.assertEqual(InterventionPlan.objects.count(), 3)                  # rebuilt, not doubled
+        self.assertEqual(Alert.objects.count(), 3)

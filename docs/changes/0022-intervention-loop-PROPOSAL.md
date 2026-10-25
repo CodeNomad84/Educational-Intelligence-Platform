@@ -26,17 +26,17 @@ Codes: dismiss reasons `not_relevant`, `already_handled`, `duplicate`, `data_err
 - **Plan:** `planned` → `active` → `completed`; `planned`/`active` → `cancelled`. Completing requires an outcome code and sets `closed_at`; `reevaluate_on` defaults to closing date + 30 days (editable). Completed/cancelled plans are read-only (add a new plan instead). The shell's `in_progress`, `evaluating` and `failed` are dropped: `active` covers in progress, `outcome=worse|no_change` replaces failed (Tier B, reversible before first migration).
 - **Follow-up:** append-only (no edit, no delete); only while the plan is `active`.
 
-## 5. Who may see and act (normative once approved)
+## 5. Who may see and act (normative; updated 2026-10-26 after the owner's answer to question 3)
 | Role | Alerts | Plans and follow-ups |
 |---|---|---|
-| Subject Teacher | **raise** one for a student of an own class (message only); sees only alerts they raised and their status/reason code | none |
-| Grade Lead | review alerts of own grade; raise | create/own/edit plans for own-grade students; follow-ups; sees plan type, status, dates, outcome code of counseling-tier plans, not their text |
-| SchoolAdmin | all alerts of own school(s): review, reopen, raise | all plans of own school(s): create, reassign owner, cancel, add follow-ups |
-| Counselor | alerts of students with an OPEN referral to them: review, raise | plans they own for referred students; text of `emotional` plans readable only by the owner counselor and the SchoolAdmin; **closing the referral ends access** (as for notes) |
+| Subject Teacher | **raise** one for a student of an own class; sees only alerts they raised and their status/reason code | none |
+| Grade Lead | review alerts of own grade (enrollment-based); raise | create/own plans for own-grade students; follow-ups |
+| SchoolAdmin | all alerts of own school(s): review, reopen, raise | metadata of every plan (existence, type, status, dates, owner, outcome code); text of non-emotional plans; cancel and reassign any plan. **Never the text of an `emotional` plan or its follow-ups**; cannot create or own one |
+| Counselor | alerts of students with an OPEN referral to them: review, raise | plans for referred students; **text of `emotional` plans readable by the plan owner and by a Counselor with an open referral to that student only**; closing the referral ends access |
 | Parent, Student | none (404) | none (404) |
-| Superuser/PlatformAdmin | none (platform account holds no school data) | none |
+| Superuser/PlatformAdmin | none | none |
 
-Out of scope or wrong school: 404; wrong role: 403 (as elsewhere). Owners must themselves see the student (checked on assignment).
+Emotional text: Grade Lead and SchoolAdmin see metadata only unless the Grade Lead is the plan owner. SchoolAdmin may reassign the owner to a Counselor with an active referral. Every plan page view is audit-logged (`intervention_view`, `text` or `meta`).
 
 ## 6. `students/access.py` integration (Tier C: new access rules)
 Add `visible_alerts(user)`, `visible_plans(user)`, `visible_followups(user)` built from the existing building blocks (`_school_admin_q`, `_grade_lead_q`, `_counselor_q`, `visible_students`), each ending in the school/role scope exactly as `visible_referrals` does; Teacher branch = `raised_by=user` AND still sees the student. Field policy for the counseling-tier text is a helper beside `full_tier`. Every view queries only through these helpers. The "no raw `Student.objects`" choke-point guard test is extended to the new apps. Mutation checks are mandatory (see §10).
@@ -61,7 +61,7 @@ AI suggestions or summaries; notifications of any kind (mail, SMS, push, badges)
 ## 12. Effort
 About four commits: (1) apps, models, migrations, access helpers, tests for them; (2) alert raise/review views and menu; (3) plans, follow-ups, outcome; (4) Student 360 tile, re-evaluation list, audit, docs. Roughly 70-90 new tests; 3-4 working sessions, then `/security-review`.
 
-## 13. Open questions for the owner
+## 13. Open questions for the owner (ANSWERED 2026-10-26: 1 rewrite; 2 as proposed; 3 emotional text only for owner and open-referral Counselor, SchoolAdmin metadata only; 4 manual only; 5 as listed, note mandatory for `other`; 6 no period, no auto-delete; 7 synthetic only; 8 yes; 9 PROTECT; 10 as proposed)
 1. Rewrite the shells as in §2 (recommended), or keep the shell field names exactly even if that means a UUID pk and a custom audit column?
 2. Reviewers: SchoolAdmin and Grade Lead, plus the Counselor for referred students; teachers only raise. Agreed?
 3. May the Grade Lead read the text of `emotional` plans? Proposed: no (type, status, dates, outcome code only).
