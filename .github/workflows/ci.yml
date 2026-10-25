@@ -1,0 +1,64 @@
+# CI for the Django side (docs/TESTING.md). Synthetic data only; no secrets are used or needed.
+# Mirrors scripts/run_tests.sh: check, makemigrations --check, the main suite (fast TEST-ONLY password hasher), demo_intel.
+# NOT covered here: the FastAPI suite (its image needs torch, ~2.5 GB: run `docker compose exec -T fastapi python -m unittest
+# discover -s tests -t .` locally) and the Docker-isolation tests of scripts/run_tests.sh pg (they need the local image
+# build and a private network; the 8 container-only tests skip here by design).
+name: ci
+on:
+  push:
+    branches: [phase-1/boot-security, 'overnight/**']
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  sqlite:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: django_core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: pip
+          cache-dependency-path: django_core/requirements.txt
+      - run: pip install -r requirements.txt
+      - run: python manage.py check --settings=config.settings.development
+      - run: python manage.py makemigrations --check --dry-run --settings=config.settings.development
+      - run: python manage.py test students dashboard schools vocabulary missions exams --settings=config.settings.test_sqlite
+      - run: python manage.py test demo_intel --settings=config.settings.demo
+  postgres:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: django_core
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16   # migration students.0007 runs CREATE EXTENSION vector
+        env:
+          POSTGRES_DB: eip_test
+          POSTGRES_USER: eip_test
+          POSTGRES_PASSWORD: ci-throwaway-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U eip_test -d eip_test"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      TEST_PG_HOST: localhost
+      TEST_PG_PASSWORD: ci-throwaway-password
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: pip
+          cache-dependency-path: django_core/requirements.txt
+      - run: pip install -r requirements.txt
+      - run: python manage.py test students dashboard schools vocabulary missions exams --settings=config.settings.test_postgres

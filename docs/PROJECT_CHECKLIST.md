@@ -2,7 +2,7 @@
 
 Written for the owner, 2026-10-25, from the repository at `8435a0e`. Docs only; it changes no behavior and is **derived**: code, migrations and tests win over it (see `ROADMAP.md` and `RUNBOOK.md` for detail).
 Legend: `[x]` done and verified in the repo (commit or file cited) · `[~]` partial (what is missing is stated) · `[ ]` not started · `[!]` blocked or needs an owner decision. A line marked "unverified" was not checked against code or tests for this list.
-Test status at `8435a0e`: 1150 tests on SQLite and on PostgreSQL 16, 57 `demo_intel`, all OK (`docs/TESTING.md`); FastAPI suite not re-run (unverified since 2026-10-16).
+Test status at `8435a0e`: 1150 tests on SQLite and on PostgreSQL 16, 57 `demo_intel`, all OK; FastAPI 28 OK (`docs/TESTING.md`). ROADMAP.md now points here for status.
 
 ## 1. Foundation
 - [x] Phase 1 boot and critical security containment closed (`docs/PHASE1_FINAL_STATUS.md`, `4c096de` per `ROADMAP.md`).
@@ -21,7 +21,7 @@ Test status at `8435a0e`: 1150 tests on SQLite and on PostgreSQL 16, 57 `demo_in
 - [x] Audit log: who viewed or changed what, no content stored (`ac7be60`, `schools/audit.py`).
 - [~] Backup and restore: rehearsal script for the demo DB and a documented path (`501f2d1`, `RUNBOOK.md` §3), but no scheduled backups and no encrypted off-site copy.
 - [x] Test tooling: `scripts/run_tests.sh sqlite|pg|all`, disposable PostgreSQL container, isolation traps (`fde42b0`, `cb2b44f`; fast test-only hasher `0c0430e`).
-- [ ] CI (T-01 in `docs/PHASE1_DEFERRED_ITEMS.md`; no `.github/` directory).
+- [~] CI (T-01): `.github/workflows/ci.yml` runs Django check, migrations check, SQLite and PostgreSQL tests and `demo_intel`, but it has not run on GitHub yet and FastAPI is not in it.
 
 ## 2. Core school features
 - [x] Slice 1 SchoolAdmin manages years, classes, teachers, grade leads in the dashboard (`e9b3ee4`).
@@ -94,7 +94,7 @@ Test status at `8435a0e`: 1150 tests on SQLite and on PostgreSQL 16, 57 `demo_in
 - [ ] Django admin not school-scoped and not module-gated (RUNBOOK; S9).
 - [ ] Audit log completeness review (list pages, exports, admin actions) (RUNBOOK).
 - [ ] Test-container overlay misses files replaced mid-run (RUNBOOK; avoid reseeding the demo while tests run).
-- [~] FastAPI test coverage: `fastapi_core/tests/test_security.py` exists; last recorded run was 26 tests on 2026-10-16, not re-run since (unverified).
+- [x] FastAPI suite re-run 2026-10-25: 28 tests OK in the fastapi image (`docs/TESTING.md`); still not part of CI.
 - [ ] Dependency audit and the tracked pickle/joblib model files (S-11 in `SECURITY.md`).
 - [ ] Full `/security-review` of the whole branch, not only of single changes.
 - [!] Legal, consent and retention policy for children's data (owner and legal; gates questionnaires, surveys, referral consent, real data).
@@ -121,7 +121,7 @@ Test status at `8435a0e`: 1150 tests on SQLite and on PostgreSQL 16, 57 `demo_in
 1. Exams Slice 2: CSV import first, then analytics (your order).
 2. The operator page (read-only module and AI usage view; approved in principle).
 3. Mission slice 2b: weights lifecycle UI so the weights can be tuned after a teacher pilot.
-4. A short hardening round that needs no product decision: `/admin/` throttle, the migration-order fix and a CI workflow.
+4. Hardening: the migration-order fix as its own commit once CI has run green on GitHub.
 5. Run a closed pilot with synthetic data and 2-3 real teachers on mission observations, before any real student data.
 
 ## Decisions waiting for the owner
