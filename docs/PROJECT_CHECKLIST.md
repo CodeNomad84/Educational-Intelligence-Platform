@@ -14,9 +14,9 @@ Test status at `8435a0e`: 1150 tests on SQLite and on PostgreSQL 16, 57 `demo_in
 - [x] Multi-school S2 tooling and S2b school assignment on every student-creation path (reports `0012`, `0013`; `a29b44b`..`45f541f`).
 - [x] Multi-school S6 `Student.school` NOT NULL (`4b40532`, report `0015`).
 - [x] Multi-school S3 SchoolAdmin read scope by membership, with leak checks (`e22f140`, `492e8f2`, report `0017`).
-- [~] Multi-school S4 writes and imports: import write is conditional and school-scoped (`8728231`, `82f3ccf`), but the S4 line of `0010-...PROPOSAL` was not checked item by item (unverified).
+- [x] Multi-school S4 writes, imports and commands: every write path refused across schools (`students/test_cross_school_writes.py`), real PostgreSQL import-race test (`students/test_import_race_postgres.py`), maintenance commands classified and scoped (`schools/test_command_scope.py`); see `docs/changes/0019-s4-completion-REPORT.md`.
 - [x] Multi-school S5 FastAPI document library scoped by school (`2c5dc7a`).
-- [ ] Multi-school S7 `national_id` unique per school (still globally unique: `students/models.py`; RUNBOOK open risk).
+- [!] Multi-school S7 `national_id` unique per school: proposal with options A/B/C written, owner decides (`docs/changes/0020-s7-national-id-PROPOSAL.md`); still globally unique today.
 - [ ] Multi-school S8 platform split, S9 Django admin restricted to platform operators, S10 second-school go-live gate (none started per `0010-...PROPOSAL`; admin is still ungated).
 - [x] Audit log: who viewed or changed what, no content stored (`ac7be60`, `schools/audit.py`).
 - [~] Backup and restore: rehearsal script for the demo DB and a documented path (`501f2d1`, `RUNBOOK.md` §3), but no scheduled backups and no encrypted off-site copy.
@@ -89,7 +89,7 @@ Test status at `8435a0e`: 1150 tests on SQLite and on PostgreSQL 16, 57 `demo_in
 - [~] Throttle behind a proxy: client address source is configurable (`THROTTLE_TRUSTED_PROXIES`, default OFF, tests for both modes); still no HTTPS or reverse-proxy configuration shipped (RUNBOOK).
 - [ ] Password strength beyond length 8, 2FA for SchoolAdmin, email/SMS self-service reset (RUNBOOK).
 - [~] Migration-order fragility between `schools.0010` and `students.0009`: guarded by `schools/test_fresh_migrate.py` (fresh-DB module rows and plan order; `docs/changes/0018-migration-order-guard.md`); an explicit dependency is unsafe for databases behind on migrations, so the order is protected, not enforced.
-- [ ] PostgreSQL thread test for the concurrent import race is skipped (RUNBOOK).
+- [x] Concurrent import race on PostgreSQL has a real two-connection test that runs in `pg` mode and the CI postgres job (`EIP_REQUIRE_PG=1`).
 - [~] R-a batch-file provenance: signed batch files exist (`067571b`), no per-row provenance (RUNBOOK).
 - [ ] FastAPI module claim in the service token (RUNBOOK).
 - [ ] Django admin not school-scoped and not module-gated (RUNBOOK; S9).
