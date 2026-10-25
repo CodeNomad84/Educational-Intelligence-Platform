@@ -1,5 +1,7 @@
 # 0020 — S7: what is a person across schools? (CHANGE PROPOSAL, Tier C — the owner decides; nothing is implemented)
 
+**DECISION (owner, 2026-10-26): option C now. S7 = C until a second real school or a first transfer case is planned; then A with a username rule. S8-S10 are deferred until after P3.**
+
 **Question.** `Student.national_id` is globally unique (`students/models.py`, since `0001`). When a student moves from school A to school B, is that one identity or two records?
 **What the code does today.** The id is a unique key and also the login name: a student account's username is the student's id, a parent's is the father's (else the mother's) id (`dashboard/bulk_accounts.py`). An import or a bulk-accounts row whose id belongs to another school is refused with one generic message (no disclosure). Consequence: **a transferring student cannot be enrolled in the new school while the old record exists.** A parent with children in two schools is not supported.
 

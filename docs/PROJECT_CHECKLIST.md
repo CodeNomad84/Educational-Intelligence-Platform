@@ -16,8 +16,8 @@ Test status at `8435a0e`: 1150 tests on SQLite and on PostgreSQL 16, 57 `demo_in
 - [x] Multi-school S3 SchoolAdmin read scope by membership, with leak checks (`e22f140`, `492e8f2`, report `0017`).
 - [x] Multi-school S4 writes, imports and commands: every write path refused across schools (`students/test_cross_school_writes.py`), real PostgreSQL import-race test (`students/test_import_race_postgres.py`), maintenance commands classified and scoped (`schools/test_command_scope.py`); see `docs/changes/0019-s4-completion-REPORT.md`.
 - [x] Multi-school S5 FastAPI document library scoped by school (`2c5dc7a`).
-- [!] Multi-school S7 `national_id` unique per school: proposal with options A/B/C written, owner decides (`docs/changes/0020-s7-national-id-PROPOSAL.md`); still globally unique today.
-- [ ] Multi-school S8 platform split, S9 Django admin restricted to platform operators, S10 second-school go-live gate (none started per `0010-...PROPOSAL`; admin is still ungated).
+- [x] Multi-school S7 decided 2026-10-26: **S7 = C (keep global `national_id` uniqueness) until a second real school or first transfer case is planned; then A with a username rule** (`docs/changes/0020-s7-national-id-PROPOSAL.md`). Nothing to build now.
+- [ ] Multi-school S8 platform split, S9 Django admin restricted to platform operators, S10 second-school go-live gate: **DEFERRED until after P3** (owner, 2026-10-26; only needed once a second school exists; admin is still ungated, see `0021`).
 - [x] Audit log: who viewed or changed what, no content stored (`ac7be60`, `schools/audit.py`).
 - [~] Backup and restore: rehearsal script for the demo DB and a documented path (`501f2d1`, `RUNBOOK.md` §3), but no scheduled backups and no encrypted off-site copy.
 - [x] Test tooling: `scripts/run_tests.sh sqlite|pg|all`, disposable PostgreSQL container, isolation traps (`fde42b0`, `cb2b44f`; fast test-only hasher `0c0430e`).
@@ -39,7 +39,7 @@ Test status at `8435a0e`: 1150 tests on SQLite and on PostgreSQL 16, 57 `demo_in
 - [x] Demo seed with all modules licensed and synthetic mission and exam data (`4651c9a`, `8435a0e`).
 - [~] Grade entry (own class and subject) is done for teachers, but roadmap item 2.2b "grade needs academic year and class" is recorded as open (`SECURITY.md` C5a-R1).
 - [ ] Deterministic risk rules and alerts in the real core DB (roadmap 2.3/2.4; `risk/` has `RiskEvent`/`Alert` models only; the demo has its own rules).
-- [ ] Interventions with follow-up and outcome as a real workflow (backlog item 2; `interventions/` app exists, workflow unverified).
+- [ ] Interventions with follow-up and outcome as a real workflow: stage-by-stage gap in `docs/changes/0021-mvp-gap-REPORT.md` (`risk/` and `interventions/` are model shells, not installed, no migrations); smallest slice proposed in `docs/changes/0022-intervention-loop-PROPOSAL.md` (awaiting owner decision).
 - [ ] Parent notifications, parent-teacher messaging, printable report card, behavior log UI (backlog items 3-6).
 - [!] Parent individual-record access (Parent sees `parent_user`; recorded as C5a-R3/C6 in `SECURITY.md`).
 
