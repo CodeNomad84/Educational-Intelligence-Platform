@@ -258,7 +258,7 @@ class SeededParityTests(TestCase):
 
     def setUp(self):
         call_command('seed_temporal_synthetic', '--i-know-this-is-synthetic', stdout=StringIO())
-        call_command('backfill_enrollments', '--apply', stdout=StringIO())
+        call_command('backfill_enrollments', '--apply', '--school-code', 'synthetic-temporal', stdout=StringIO())
         school = School.objects.get(code='synthetic-temporal')
         for grade in (9, 10, 11, 12):
             u = make_user(f'lead{grade}', GRADE_LEAD)

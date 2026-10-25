@@ -11,6 +11,7 @@ from datetime import date
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
+from schools.command_scope import resolve_scope
 from schools.models import School
 from vocabulary.defaults import DEFAULTS
 from vocabulary.models import VocabularyTerm
@@ -21,14 +22,12 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument('--school', default=None)
+        parser.add_argument('--all-schools', action='store_true', help='required to seed every school when more than one exists')
         parser.add_argument('--effective-from', type=date.fromisoformat, default=None)
 
     def handle(self, *args, school, effective_from, **options):
-        schools = School.objects.all()
-        if school:
-            schools = schools.filter(code=school)
-            if not schools:
-                raise CommandError('unknown school code')
+        chosen = resolve_scope(school, writes=True, all_schools=options['all_schools'], option='--school')
+        schools = School.objects.filter(pk=chosen.pk) if chosen else School.objects.all()
         created = 0
         for sch in schools:
             start = effective_from or (sch.academic_years.order_by('start_date').values_list('start_date', flat=True).first()

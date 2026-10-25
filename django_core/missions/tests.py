@@ -33,7 +33,7 @@ class MissionBase(Base):
         SchoolModule.objects.all().delete()
         grant(self.a, 'mission')
         grant(self.b, 'mission')
-        call_command('seed_mission', verbosity=0)
+        call_command('seed_mission', '--all-schools', verbosity=0)
         self.t1 = make_user('t1', 'Teacher', self.a)
         self.t1b = make_user('t1b', 'Teacher', self.a)          # second teacher of the same class
         self.t2 = make_user('t2', 'Teacher', self.a)            # grade-8 class
@@ -243,7 +243,7 @@ class WeightTests(MissionBase):
         self.assertEqual(set(ws.column_sums().values()), {100})
         self.assertEqual(len(ws.column_sums()), Branch.objects.count())
         self.assertEqual(ensure_default_weight_set(self.a), (ws, False))
-        call_command('seed_mission', verbosity=0)
+        call_command('seed_mission', '--all-schools', verbosity=0)
         self.assertEqual(WeightSet.objects.filter(school=self.a).count(), 1)
         self.assertEqual(Period.objects.filter(school=self.a).count(), 1)
 

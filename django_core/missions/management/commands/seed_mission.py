@@ -10,6 +10,7 @@ from django.core.management.base import BaseCommand, CommandError
 
 from missions.models import Period
 from missions.weights import ensure_default_weight_set
+from schools.command_scope import resolve_scope
 from schools.models import AcademicYear, School
 
 
@@ -18,12 +19,12 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument('--school', default=None)
+        parser.add_argument('--all-schools', action='store_true', help='required to seed every school when more than one exists')
         parser.add_argument('--period-label', default='دورهٔ اول')
 
     def handle(self, *args, school, period_label, **options):
-        schools = School.objects.filter(code=school) if school else School.objects.all()
-        if school and not schools:
-            raise CommandError('unknown school code')
+        chosen = resolve_scope(school, writes=True, all_schools=options['all_schools'], option='--school')
+        schools = School.objects.filter(pk=chosen.pk) if chosen else School.objects.all()
         for sch in schools:
             call_command('seed_vocabulary', school=sch.code, stdout=StringIO())
             ws, created = ensure_default_weight_set(sch)

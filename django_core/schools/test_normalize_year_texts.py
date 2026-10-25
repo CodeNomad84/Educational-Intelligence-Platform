@@ -32,6 +32,8 @@ class NormalizeTests(TestCase):
 
     def run_cmd(self, *args):
         out = StringIO()
+        if '--apply' in args and '--revert-from' not in args and '--school-code' not in args:
+            args = (*args, '--school-code', 'a')                         # S4(c): a write needs the school once several exist
         call_command('normalize_year_texts', '--json', *args, stdout=out)
         return json.loads(out.getvalue())
 

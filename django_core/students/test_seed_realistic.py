@@ -48,7 +48,7 @@ class SeedTests(TestCase):
 
     def test_tools_surface_the_dirty_data_without_fixing_it(self):
         seed()
-        call_command('backfill_enrollments', '--apply', stdout=StringIO())
+        call_command('backfill_enrollments', '--apply', '--school-code', 'synthetic-large', stdout=StringIO())
         students = list(Student.objects.order_by('pk').values())
         out = StringIO()
         with self.assertRaises(CommandError):

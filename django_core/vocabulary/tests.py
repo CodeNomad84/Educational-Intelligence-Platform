@@ -113,14 +113,14 @@ class SeedTests(VocabularyBase):
         call_command('seed_vocabulary', '--school', 'a', '--effective-from', '2020-01-01', verbosity=0)
         term = VocabularyTerm.objects.get(school=self.a, domain=OBSERVATION_CATEGORY, code='emotional')
         rename_term(term, label_fa='own', on=date(2025, 1, 1))
-        call_command('seed_vocabulary', verbosity=0)
+        call_command('seed_vocabulary', '--all-schools', verbosity=0)
         self.assertEqual(VocabularyTerm.objects.filter(school=self.a, code='emotional', domain=OBSERVATION_CATEGORY).count(), 2)
         self.assertEqual(VocabularyTerm.objects.filter(school=self.b).count(), sum(len(r) for r in DEFAULTS.values()))
 
     def test_seed_starts_at_the_earliest_academic_year_else_today(self):
         AcademicYear.objects.create(school=self.a, code='1404-1405', start_date=date(2025, 9, 23), end_date=date(2026, 6, 21),
                                     is_current=True)
-        call_command('seed_vocabulary', verbosity=0)
+        call_command('seed_vocabulary', '--all-schools', verbosity=0)
         self.assertEqual({t.effective_from for t in VocabularyTerm.objects.filter(school=self.a)}, {date(2025, 9, 23)})
         self.assertEqual({t.effective_from for t in VocabularyTerm.objects.filter(school=self.b)}, {TODAY()})
 

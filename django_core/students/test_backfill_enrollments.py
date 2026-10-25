@@ -18,6 +18,8 @@ from students.models import Attendance, Enrollment, Grade, Student
 
 def run(*args):
     out = StringIO()
+    if ('--apply' in args or '--revert-backfill' in args) and School.objects.filter(code='synthetic-temporal').exists():
+        args = (*args, '--school-code', 'synthetic-temporal')           # S4(c): a write needs the school once several exist
     call_command('backfill_enrollments', '--json', *args, stdout=out)
     return json.loads(out.getvalue())
 

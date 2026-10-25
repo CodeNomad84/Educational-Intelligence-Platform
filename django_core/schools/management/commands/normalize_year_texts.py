@@ -19,6 +19,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
 from schools.academic_years import BLANK, RESOLVED, normalize_academic_year
+from schools.command_scope import resolve_scope
 from schools.models import GradeLeadAssignment, SchoolClass
 
 MODELS = {'SchoolClass': SchoolClass, 'GradeLeadAssignment': GradeLeadAssignment}
@@ -39,6 +40,7 @@ class Command(BaseCommand):
         parser.add_argument('--log', help='JSON file that receives the previous values (required with --apply)')
         parser.add_argument('--revert-from', help='log file written by a previous --apply')
         parser.add_argument('--json', action='store_true')
+        parser.add_argument('--school-code', help='only this school; required with --apply when more than one school exists')
 
     def handle(self, *args, **opts):
         if opts['revert_from']:
@@ -55,9 +57,10 @@ class Command(BaseCommand):
     def _normalize(self, opts):
         if opts['apply'] and not opts['log']:
             raise CommandError('--apply requires --log FILE (the undo information).')
+        scope = resolve_scope(opts.get('school_code'), writes=opts['apply'])
         report, changes = {}, []
         for name, model in MODELS.items():
-            rows = list(model.objects.all())
+            rows = list(model.objects.filter(school=scope) if scope else model.objects.all())
             existing = defaultdict(set)   # (unique key) -> canonical codes already present
             for row in rows:
                 status, code = normalize_academic_year(row.academic_year)

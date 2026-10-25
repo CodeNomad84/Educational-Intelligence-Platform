@@ -26,6 +26,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
 from schools.academic_years import RESOLVED, normalize_academic_year, year_for_date
+from schools.command_scope import resolve_scope
 from schools.models import AcademicYear, SchoolClass
 from students.models import Attendance, Enrollment, Grade, Student
 
@@ -45,10 +46,13 @@ class Command(BaseCommand):
         parser.add_argument('--revert-backfill', action='store_true',
                             help='undo what a previous --apply created or linked')
         parser.add_argument('--json', action='store_true')
+        parser.add_argument('--school-code', help='only this school; required with --apply / --revert-backfill when more than one school exists')
 
     def handle(self, *args, **opts):
         apply = opts['apply']
-        report = self._revert(apply) if opts['revert_backfill'] else self._backfill(apply)
+        scope = resolve_scope(opts.get('school_code'), writes=apply)
+        school_id = scope.pk if scope else None
+        report = self._revert(apply, school_id) if opts['revert_backfill'] else self._backfill(apply, school_id)
         report['mode'] = ('revert ' if opts['revert_backfill'] else 'backfill ') + ('APPLIED' if apply else 'DRY-RUN')
         if opts['json']:
             self.stdout.write(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
@@ -62,7 +66,7 @@ class Command(BaseCommand):
                 self.stdout.write(f'{key}: {value}')
 
     # -- backfill ---------------------------------------------------------------------------------
-    def _backfill(self, apply):
+    def _backfill(self, apply, only_school=None):
         years = {}
         ranges = defaultdict(list)
         for y in AcademicYear.objects.values('pk', 'school_id', 'code', 'start_date', 'end_date', 'is_current'):
@@ -76,7 +80,8 @@ class Command(BaseCommand):
 
         skipped = Counter()
         to_create = []  # (student_id, year_pk, class_id, grade)
-        for pk, school_id, class_id, grade in Student.objects.values_list('pk', 'school_id', 'school_class_id', 'grade'):
+        students = Student.objects.filter(school_id=only_school) if only_school else Student.objects.all()
+        for pk, school_id, class_id, grade in students.values_list('pk', 'school_id', 'school_class_id', 'grade'):
             if class_id is None:
                 skipped['student_without_class'] += 1
                 continue
@@ -105,10 +110,10 @@ class Command(BaseCommand):
                         Enrollment(student_id=s, academic_year_id=y, school_class_id=c, grade=g,
                                    status='active', source='backfill')
                         for s, y, c, g in part])
-            report.update(self._link_rows(apply, ranges, years, [] if apply else to_create))
+            report.update(self._link_rows(apply, ranges, years, [] if apply else to_create, only_school=only_school))
         return report
 
-    def _link_rows(self, apply, ranges, years, planned):
+    def _link_rows(self, apply, ranges, years, planned, only_school=None):
         year_code = {y['pk']: code for (_s, code), y in years.items()}
         school_of = dict(Student.objects.values_list('pk', 'school_id'))
         per_year = defaultdict(list)  # (student_id, code) -> [enrollment pk]
@@ -121,7 +126,8 @@ class Command(BaseCommand):
         for label, model in (('grades', Grade), ('attendance', Attendance)):
             counts = Counter()
             by_enrollment = defaultdict(list)
-            for pk, student_id, day, enrollment_id in model.objects.values_list(
+            rows = model.objects.filter(student__school_id=only_school) if only_school else model.objects.all()
+            for pk, student_id, day, enrollment_id in rows.values_list(
                     'pk', 'student_id', 'date', 'enrollment_id').iterator():
                 counts['rows'] += 1
                 if enrollment_id is not None:
@@ -148,15 +154,19 @@ class Command(BaseCommand):
         return out
 
     # -- revert -----------------------------------------------------------------------------------
-    def _revert(self, apply):
+    def _revert(self, apply, only_school=None):
         report = {}
         with transaction.atomic():
             for label, model in (('grades', Grade), ('attendance', Attendance)):
                 qs = model.objects.filter(enrollment_link_source='backfill')
+                if only_school:
+                    qs = qs.filter(student__school_id=only_school)
                 report[f'{label}_unlinked' if apply else f'{label}_to_unlink'] = qs.count()
                 if apply:
                     qs.update(enrollment=None, enrollment_link_source='')
             candidates = Enrollment.objects.filter(source='backfill')
+            if only_school:
+                candidates = candidates.filter(student__school_id=only_school)
             if apply:
                 in_use = [e.pk for e in candidates if e.grades.exists() or e.attendances.exists()]
                 deletable = candidates.exclude(pk__in=in_use)
