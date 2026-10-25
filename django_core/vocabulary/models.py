@@ -17,7 +17,8 @@ RECOMMENDATION_TAG = 'recommendation_tag'
 INTERVENTION_TYPE = 'intervention_type'
 MISSION_ACTIVITY_TYPE = 'mission_activity_type'   # mission module: kind of observed activity
 MISSION_CONDITION = 'mission_condition'           # mission module: condition under which a behaviour was observed
-DOMAINS = (OBSERVATION_CATEGORY, OBSERVATION_SENTIMENT, RECOMMENDATION_TAG, INTERVENTION_TYPE, MISSION_ACTIVITY_TYPE, MISSION_CONDITION)
+EXAM_TOPIC = 'exam_topic'                         # exams module: flat topic, code <subject>.ch<N>.<concept>, e.g. math.ch3.fractions
+DOMAINS = (OBSERVATION_CATEGORY, OBSERVATION_SENTIMENT, RECOMMENDATION_TAG, INTERVENTION_TYPE, MISSION_ACTIVITY_TYPE, MISSION_CONDITION, EXAM_TOPIC)
 DOMAIN_CHOICES = [(d, d) for d in DOMAINS]
 
 _RETIRE_FIELDS = {'effective_to', 'active'}      # the only fields that may change after creation

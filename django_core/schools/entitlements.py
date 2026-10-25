@@ -11,13 +11,13 @@ from django.utils import timezone
 
 ADVISOR_AI = 'advisor_ai'    # staff-facing School Assistant (LLM/RAG). Rule-based risk and ML /predict are base
 TUTOR_AI = 'tutor_ai'        # student-facing study assistant / tutor
-EXAMS = 'exams'              # not built yet
+EXAMS = 'exams'              # teacher question bank + student practice player (Slice 1)
 MISSION = 'mission'          # mission-based selection (observations, weights, reports)
 MODULES = (ADVISOR_AI, TUTOR_AI, EXAMS, MISSION)   # the only sellable keys
 REQUIRES = {}                # module -> keys it needs; empty today (Student 360 and counseling are base)
 
 
-BUILT = (ADVISOR_AI, TUTOR_AI, MISSION)   # the others show "coming soon" instead of the unlock text
+BUILT = (ADVISOR_AI, TUTOR_AI, EXAMS, MISSION)   # the others show "coming soon" instead of the unlock text
 TRIAL, LICENSED = 'trial', 'licensed'
 ACTIVE_TRIAL, ACTIVE_LICENSED, LOCKED = 'active_trial', 'active_licensed', 'locked'
 NOTICE_DAYS = 14

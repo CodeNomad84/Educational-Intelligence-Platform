@@ -1,5 +1,6 @@
 """Slice A.2: trial vs licensed rows, locked-but-visible modules, SchoolAdmin banner, platform-admin-only rows, AI call cap."""
 from datetime import timedelta
+from unittest import mock
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
@@ -75,7 +76,11 @@ class LockedVisibleTests(ModuleBase):
         self.assertEqual(info.status_code, 200)
         self.assertContains(info, 'تماس بگیرید')
         self.assertNotContains(info, 'Seven')                  # no school data
-        soon = self.get(self.admin, reverse('dashboard:module_info', args=['exams']))
+        built = self.get(self.admin, reverse('dashboard:module_info', args=['exams']))       # exams is built since Slice 1
+        self.assertContains(built, 'تماس بگیرید')
+        self.assertNotContains(built, 'به‌زودی')
+        with mock.patch('dashboard.module_info.BUILT', ('advisor_ai', 'tutor_ai', 'mission')):   # a module not built yet
+            soon = self.get(self.admin, reverse('dashboard:module_info', args=['exams']))
         self.assertContains(soon, 'به‌زودی')
         self.assertNotContains(soon, 'تماس بگیرید')
         self.assertEqual(self.get(self.admin, reverse('dashboard:module_info', args=['nope'])).status_code, 404)

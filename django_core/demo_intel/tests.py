@@ -650,3 +650,32 @@ class DemoPagesAreSchoolScopedTests(TestCase):
         self.client.force_login(root)
         for url in ("/demo/students/", "/demo/counselor/"):
             self.assertEqual(self.client.get(url).status_code, 403, url)
+
+
+@override_settings(DATABASES={"default": {**copy.deepcopy(settings.DATABASES["default"]), "NAME": "/x/demo_db.sqlite3"}})
+class DemoExamsTests(TestCase):
+    """The demo school has a published synthetic practice exam: the teacher sees the bank, the demo student can play it."""
+    PASSWORD = "Test-pass-123"
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("seed_demo", "--password", cls.PASSWORD, verbosity=0)
+
+    def login(self, username):
+        self.client.logout()
+        self.assertEqual(self.client.post("/login/", {"username": username, "password": self.PASSWORD}).status_code, 302)
+
+    def test_teacher_bank_and_student_player(self):
+        from exams.models import Exam, Option, Question
+        exam = Exam.objects.get()
+        self.assertEqual((Question.objects.count(), Option.objects.filter(explanation="").count(), exam.published), (3, 0, True))
+        self.login("demo_teacher")
+        self.assertContains(self.client.get("/exams/teacher/"), "تمرین کسرها")
+        self.login("demo_student")
+        self.assertContains(self.client.get("/exams/"), "تمرین کسرها")
+        self.assertEqual(self.client.get(f"/exams/{exam.pk}/play/").status_code, 200)
+
+    def test_reset_clears_exam_data_without_a_protected_error(self):
+        from exams.models import Exam
+        call_command("seed_demo", "--reset", "--password", self.PASSWORD, verbosity=0)
+        self.assertEqual(Exam.objects.count(), 1)

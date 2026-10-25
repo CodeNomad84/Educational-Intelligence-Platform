@@ -1,6 +1,6 @@
 # EXAM DESIGN V2 — updates `EXAM_AND_SURVEY_DESIGN.md` §1 (exam module only)
 
-Status: `PROPOSED`, design only, no code. Still **L3** (student-facing access, new child data). Owner approval required before slice 1.
+Status: Slice 1 `CURRENT` (2026-10-25, owner-approved); slices 2-4 `PROPOSED`. Still **L3** (student-facing access, new child data). Owner approval required before slice 1.
 Synthetic data only. Questionnaires (§2 of the old document) are out of scope here and unchanged. Written 2026-10-25.
 
 ## 1. What changes versus V1
@@ -63,3 +63,10 @@ never reaches AI; audit logs counts and ids only.
 2. Separate AI caps for `exams`, or share the existing per-school caps?
 3. Still open from V1: practice-only confirmation, SchoolAdmin/parent individual analytics, retention period, question ownership when a
    teacher leaves, AI suggestions allowed at all.
+
+## 8. Owner decisions 2026-10-25 and what Slice 1 did
+
+* **Topics:** flat, with hierarchical codes in `VocabularyTerm` (`math.ch3.fractions` = subject.chapter.concept); no `parent` field; a tree stays a later Tier C decision. Note: `VocabularyTerm.code` is a `SlugField`, whose validator (no dots) only runs in forms, not in `save()`; codes are therefore validated by the topics page itself (`<subject>.ch<N>.<a-z0-9_ concept>`, at most 50 characters).
+* **AI call cap:** exams get their own counter and limits (decided). Not built in Slice 1 because nothing in Slice 1 calls an LLM; it lands with Slice 4 (school fields for the exams caps, `ai_guard` keyed on `exams`).
+* **Slice 1 scope:** gate on every route; question bank (Subject Teacher, own school and subject, per-option explanations required by a database constraint and by the editor); topics page; exam creation (approved questions, own classes, optional window, publish and unpublish); student list and player (wrong option turns red with its own explanation, retry until correct, then why the right answer is right); attempts record seconds (each step clamped to 300 s), attempt count and wrong option ids in order; practice only (no `Grade` row). **Deferred to a later slice** (Tier B, easy to add): CSV import with dry-run, exam editing, SchoolAdmin/Grade Lead views, teacher-facing results (analytics are Slice 2).
+* **Editing rule:** a question is edited only by its author and only until the first attempt; any edit returns it to draft. Retire and write a new version after that.

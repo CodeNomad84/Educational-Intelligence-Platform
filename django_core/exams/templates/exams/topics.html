@@ -1,0 +1,18 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}مبحث‌های آزمون{% endblock %}
+{% block content %}
+<a class="btn btn-link" href="{% url 'exams:teacher_home' %}">← بانک پرسش</a>
+{% for e in errors %}<div class="alert alert-danger">{{ e }}</div>{% endfor %}
+<form method="post" class="card card-body mb-3">{% csrf_token %}
+  <p class="small text-muted mb-2">کد مبحث به‌صورت <code>درس.فصل.مفهوم</code> ساخته می‌شود، مثلاً <code>math.ch3.fractions</code>. مبحث‌های ثبت‌شده ویرایش نمی‌شوند.</p>
+  <div class="row g-2">
+    <div class="col-md-3"><select name="scope" class="form-select">{% for key, label in scopes %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select></div>
+    <div class="col-md-2"><input name="chapter" class="form-control" placeholder="فصل (عدد)" inputmode="numeric"></div>
+    <div class="col-md-3"><input name="concept" class="form-control" placeholder="کد مفهوم (لاتین، مثل fractions)" dir="ltr"></div>
+    <div class="col-md-3"><input name="label_fa" class="form-control" placeholder="عنوان فارسی" maxlength="100"></div>
+    <div class="col-md-1"><button class="btn btn-success">افزودن</button></div>
+  </div></form>
+{% for label, terms in rows %}<h6>{{ label }}</h6>
+<ul>{% for t in terms %}<li>{{ t.label_fa }} <code dir="ltr">{{ t.code }}</code></li>{% empty %}<li class="text-muted">مبحثی نیست.</li>{% endfor %}</ul>{% endfor %}
+{% include 'exams/_notice.html' %}
+{% endblock %}

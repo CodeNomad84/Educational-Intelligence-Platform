@@ -34,9 +34,9 @@ Start: `DEMO_PASSWORD='choose-a-password' scripts/start_demo.sh --reseed`, open 
 |---|---|---|
 | `demo_admin` (SchoolAdmin) | `/school/` | `/mission/aggregate/` (counts per grade and branch status; groups under 5 hidden), `/mission/weights/` (active weight table, column sums, `params_version`, read only); `/school/quickstart/` (Persian quick start); `/school/accounts/` (bulk accounts from Excel) |
 | `demo_gradelead` (grade 10) | `/grade/` | `/mission/` (activities) → open an activity → `/mission/activities/<id>/grid/` (observation grid); `/mission/students/` → `/mission/students/<id>/report/` (full report; who gave which score); forms: `/mission/students/<id>/choices/` (activity choices), `/mission/students/<id>/meetings/` (parent meetings); the plan form is at the bottom of the report |
-| `demo_teacher` (math, classes ۹-الف and ۱۰-الف) | `/teacher/` | `/mission/` and `/mission/activities/<id>/grid/` (own observations only); `/mission/students/<id>/report/` shows a status-only view of the own observations, with the indicators still to observe per branch |
+| `demo_teacher` (math, classes ۹-الف and ۱۰-الف) | `/teacher/` | Exams: `/exams/teacher/` (question bank, topics, new exam; one demo exam "تمرین کسرها" with 3 questions). Mission: `/mission/` and `/mission/activities/<id>/grid/` (own observations only); `/mission/students/<id>/report/` shows a status-only view of the own observations, with the indicators still to observe per branch |
 | `demo_counselor` | `/counselor/` | `/mission/students/` lists only the student with an open referral; `/mission/students/<id>/report/` (read only, observers anonymous) |
-| `demo_parent`, `demo_student` | `/students/`, `/me/` | none (no direct view of mission results by design) |
+| `demo_parent`, `demo_student` | `/students/`, `/me/` | none for mission (no direct view of mission results by design). `demo_student` plays the practice exam at `/exams/` → `/exams/<id>/play/` |
 
 Enable the mission module on any other school (platform operator, from `django_core`):
 ```

@@ -50,8 +50,12 @@
                 <a href="{% url 'missions:aggregate' %}"><i class="bi bi-pie-chart"></i> آمار مأموریت‌محور</a>
                 <a href="{% url 'missions:weights' %}"><i class="bi bi-sliders"></i> وزن‌های مأموریت‌محور</a>
                 {% endif %}{% endif %}
+                {% if IS_TEACHER %}{% if 'exams' in ENABLED_MODULES %}
+                <a href="{% url 'exams:teacher_home' %}"><i class="bi bi-patch-question"></i> آزمون‌ها (بانک پرسش)</a>
+                {% endif %}{% endif %}
                 {% if IS_STUDENT %}
                 <a href="{% url 'dashboard:me_home' %}"><i class="bi bi-person"></i> صفحهٔ من</a>
+                {% if 'exams' in ENABLED_MODULES %}<a href="{% url 'exams:student_home' %}"><i class="bi bi-patch-check"></i> آزمون‌های من</a>{% endif %}
                 {% for m in VISIBLE_MODULES %}{% if m.key == 'tutor_ai' %}<a href="{{ m.url }}"><i class="bi bi-lightbulb"></i> دستیار مطالعه (نمایشی){% if not m.enabled %} <i class="bi bi-lock"></i>{% endif %}</a>{% endif %}{% endfor %}
                 {% endif %}
                 {% if IS_COUNSELOR %}

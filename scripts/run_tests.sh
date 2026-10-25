@@ -9,7 +9,7 @@
 # sqlite mode runs, in order, and stops at the first failure:
 #   1. manage.py check                           (config.settings.development)
 #   2. manage.py makemigrations --check --dry-run
-#   3. manage.py test students dashboard schools vocabulary missions (config.settings.test_sqlite: development + a fast TEST-ONLY password hasher)
+#   3. manage.py test students dashboard schools vocabulary missions exams (config.settings.test_sqlite: development + a fast TEST-ONLY password hasher)
 #   4. manage.py test demo_intel                 (config.settings.demo)
 # Tests use throw-away in-memory SQLite databases; no .env file is read and no seed/reset runs.
 # Environment: PYTHON (interpreter; default django_core/.venv/bin/python, else python3).
@@ -65,7 +65,7 @@ run_sqlite() {
   }
   run config.settings.development check
   run config.settings.development makemigrations --check --dry-run
-  run config.settings.test_sqlite test students dashboard schools vocabulary missions
+  run config.settings.test_sqlite test students dashboard schools vocabulary missions exams
   run config.settings.demo test demo_intel
 }
 
@@ -143,7 +143,7 @@ run_pg() {
   echo
   echo ">> [PostgreSQL 16 container] manage.py check";                    dj check
   echo ">> [PostgreSQL 16 container] manage.py makemigrations --check --dry-run"; dj makemigrations --check --dry-run
-  echo ">> [PostgreSQL 16 container] manage.py test students dashboard schools vocabulary missions"; dj test students dashboard schools vocabulary missions --noinput
+  echo ">> [PostgreSQL 16 container] manage.py test students dashboard schools vocabulary missions exams"; dj test students dashboard schools vocabulary missions exams --noinput
   cleanup_pg
   trap - EXIT INT TERM
 }

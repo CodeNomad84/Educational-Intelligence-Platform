@@ -148,6 +148,7 @@ class Command(BaseCommand):
             password = opts["password"] or secrets.token_urlsafe(9)
             self._users(password, students, school, year, classes)
             self._mission(school, year, students)
+            self._exams(school, classes)
 
         results = analyze_students(Student.objects.all(), self.today)
         dist = {"HIGH": 0, "MEDIUM": 0, "LOW": 0}
@@ -185,6 +186,9 @@ class Command(BaseCommand):
         from students.models import Enrollment
         from missions.models import Activity
         Activity.objects.all().delete()   # sessions and observations go with it; they would otherwise protect the demo users
+        from exams.models import Exam, Question
+        Exam.objects.all().delete()       # attempts, sessions and exam items go with it ...
+        Question.objects.all().delete()   # ... then the questions (options cascade); topics are vocabulary terms and stay
         for model in (StudentObservation, CounselingNote, InterventionRecord, Attendance, Grade, Enrollment, Student):
             model.objects.all().delete()
         get_user_model().objects.filter(username__startswith="demo_").delete()
@@ -371,6 +375,30 @@ class Command(BaseCommand):
                                       reason="دوست دارم ببینم ایده‌ها چطور به ساخت می‌رسند.", recorded_by=lead)
         ParentMeeting.objects.create(student=cohort[0], held_on=self.today - timedelta(days=14), parents_present="both",
                                      agreements="مطالعهٔ روزانه و گفت‌وگوی هفتگی دربارهٔ پروژه", quality="partial", recorded_by=lead)
+
+    def _exams(self, school, classes):
+        """Exams module demo data (synthetic): one flat topic, three approved math questions with an explanation for every option,
+        and one published practice exam for all demo classes, authored by the demo teacher."""
+        from exams.models import Exam, ExamQuestion, Option, Question
+        from vocabulary.models import EXAM_TOPIC, VocabularyTerm
+        User = get_user_model()
+        teacher = User.objects.get(username="demo_teacher")
+        topic = VocabularyTerm.objects.filter(school=school, domain=EXAM_TOPIC, code="math.ch3.fractions").first() or \
+            VocabularyTerm.objects.create(school=school, domain=EXAM_TOPIC, code="math.ch3.fractions", label_fa="کسرها",
+                                          effective_from=self.today - timedelta(days=400))
+        bank = [
+            ("حاصل ۱/۲ + ۱/۲ کدام است؟", [("۰", "نه: این حاصل تفریق است."), ("۱", "درست: دو نیم یک کل می‌شود."), ("۲", "نه: دو کل نمی‌شود، فقط یک کل.")], 2),
+            ("کدام کسر با ۲/۴ برابر است؟", [("۱/۲", "درست: صورت و مخرج را بر ۲ تقسیم کنید."), ("۲/۸", "نه: مخرج را دو برابر کرده‌اید ولی صورت را نه."), ("۴/۲", "نه: جای صورت و مخرج عوض شده است.")], 1),
+            ("کدام کسر بزرگ‌تر است؟", [("۱/۳", "نه: هر چه مخرج بزرگ‌تر، قطعه‌ها کوچک‌ترند."), ("۱/۲", "درست: نیم از یک‌سوم بزرگ‌تر است."), ("۱/۴", "نه: یک‌چهارم از هر دو کوچک‌تر است.")], 2),
+        ]
+        exam = Exam.objects.create(school=school, subject="math", title="تمرین کسرها (نمایشی)", published=True, created_by=teacher)
+        exam.classes.set(classes.values())
+        for n, (stem, options, correct) in enumerate(bank, start=1):
+            q = Question.objects.create(school=school, subject="math", topic=topic, stem=stem, status="approved", author=teacher,
+                                        approved_by=teacher, approved_at=timezone.now())
+            for order, (text, why) in enumerate(options, start=1):
+                Option.objects.create(question=q, order=order, text=text, explanation=why, is_correct=order == correct)
+            ExamQuestion.objects.create(exam=exam, question=q, order=n)
 
     def _referral(self, school, students):
         """Slice 4a: one open demo referral (SchoolAdmin -> counselor) so the counselor pages have a case to show."""

@@ -28,6 +28,11 @@ MISSION_CHOICES_SAVE = 'mission_choices_save'     # detail = number of rows
 MISSION_MEETING_ADD = 'mission_meeting_add'
 MISSION_AGGREGATE_VIEW = 'mission_aggregate_view'
 MISSION_WEIGHTS_VIEW = 'mission_weights_view'
+EXAM_TOPIC_ADD = 'exam_topic_add'
+EXAM_QUESTION_SAVE = 'exam_question_save'      # detail = number of options
+EXAM_QUESTION_STATUS = 'exam_question_status'  # detail = new status
+EXAM_CREATE = 'exam_create'                    # detail = counts only, e.g. q5c2
+EXAM_UNPUBLISH = 'exam_unpublish'
 STAFF_ROLES_CHANGE = 'staff_roles_change'  # detail = resulting roles, e.g. T,G
 
 
