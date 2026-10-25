@@ -1,0 +1,10 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}آزمون‌ها — پایهٔ من{% endblock %}
+{% block content %}
+<div class="alert alert-info">{{ note }} دانش‌آموزان به ترتیب نام آمده‌اند. درصد تلاش اول وقتی نمایش داده می‌شود که دست‌کم {{ floor }} پرسش حل‌شده باشد.</div>
+<div class="table-responsive"><table class="table table-sm bg-white"><thead><tr><th>دانش‌آموز</th>{% for s in subjects %}<th>{{ s }}</th>{% endfor %}</tr></thead><tbody>
+{% for r in rows %}<tr><td>{{ r.student.last_name }} {{ r.student.first_name }}</td>
+  {% for c in r.cells %}<td>{% if c.solved %}{% if c.rate is not None %}{% widthratio c.rate 1 100 %}٪ {% else %}<span class="text-muted">داده کافی نیست</span> {% endif %}<span class="small text-muted">({{ c.solved }} پرسش)</span>{% else %}—{% endif %}</td>{% endfor %}</tr>
+{% empty %}<tr><td colspan="9" class="text-muted">دانش‌آموزی نیست.</td></tr>{% endfor %}</tbody></table></div>
+{% include 'exams/_notice.html' %}
+{% endblock %}

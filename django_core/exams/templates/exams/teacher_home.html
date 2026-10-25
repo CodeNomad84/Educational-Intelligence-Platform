@@ -6,6 +6,7 @@
   <a class="btn btn-success" href="{% url 'exams:question_new' %}">پرسش جدید</a>
   <a class="btn btn-outline-primary" href="{% url 'exams:topics' %}">مبحث‌ها</a>
   <a class="btn btn-outline-primary" href="{% url 'exams:exam_new' %}">آزمون جدید</a>
+  <a class="btn btn-outline-primary" href="{% url 'exams:import_form' %}">ورود از CSV</a>
 </div>
 <h5>بانک پرسش (درس‌های من)</h5>
 <table class="table table-sm bg-white"><thead><tr><th>پرسش</th><th>درس</th><th>مبحث</th><th>وضعیت</th><th></th></tr></thead><tbody>
@@ -21,7 +22,9 @@
 <table class="table table-sm bg-white"><thead><tr><th>عنوان</th><th>درس</th><th>کلاس‌ها</th><th>بازه</th><th>وضعیت</th><th></th></tr></thead><tbody>
 {% for e in exams %}<tr><td>{{ e.title }}</td><td>{{ e.get_subject_display }}</td><td class="small">{% for c in e.classes.all %}{{ c.title }}{% if not forloop.last %}، {% endif %}{% endfor %}</td>
   <td class="small">{{ e.opens_on|default:'—' }} تا {{ e.closes_on|default:'—' }}</td><td>{% if e.published %}منتشرشده{% else %}منتشرنشده{% endif %}</td>
-  <td>{% if e.published and e.created_by_id == request.user.pk %}<form method="post" action="{% url 'exams:exam_unpublish' e.pk %}">{% csrf_token %}<button class="btn btn-sm btn-outline-danger">لغو انتشار</button></form>{% endif %}</td></tr>
+  <td class="text-nowrap"><a class="btn btn-sm btn-outline-secondary" href="{% url 'exams:exam_results' e.pk %}">نتایج</a>
+    {% if e.created_by_id == request.user.pk %}<a class="btn btn-sm btn-outline-secondary" href="{% url 'exams:exam_edit' e.pk %}">ویرایش</a>{% endif %}
+    {% if e.published and e.created_by_id == request.user.pk %}<form method="post" action="{% url 'exams:exam_unpublish' e.pk %}">{% csrf_token %}<button class="btn btn-sm btn-outline-danger">لغو انتشار</button></form>{% endif %}</td></tr>
 {% empty %}<tr><td colspan="6" class="text-muted">آزمونی نیست.</td></tr>{% endfor %}</tbody></table>
 {% endif %}
 {% include 'exams/_notice.html' %}

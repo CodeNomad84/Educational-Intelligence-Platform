@@ -53,6 +53,12 @@
                 {% if IS_TEACHER %}{% if 'exams' in ENABLED_MODULES %}
                 <a href="{% url 'exams:teacher_home' %}"><i class="bi bi-patch-question"></i> آزمون‌ها (بانک پرسش)</a>
                 {% endif %}{% endif %}
+                {% if IS_GRADE_LEAD %}{% if 'exams' in ENABLED_MODULES %}
+                <a href="{% url 'exams:lead_overview' %}"><i class="bi bi-patch-check"></i> آزمون‌های پایه</a>
+                {% endif %}{% endif %}
+                {% if IS_SCHOOL_ADMIN %}{% if 'exams' in ENABLED_MODULES %}
+                <a href="{% url 'exams:admin_overview' %}"><i class="bi bi-bar-chart-steps"></i> آمار آزمون‌ها</a>
+                {% endif %}{% endif %}
                 {% if IS_STUDENT %}
                 <a href="{% url 'dashboard:me_home' %}"><i class="bi bi-person"></i> صفحهٔ من</a>
                 {% if 'exams' in ENABLED_MODULES %}<a href="{% url 'exams:student_home' %}"><i class="bi bi-patch-check"></i> آزمون‌های من</a>{% endif %}

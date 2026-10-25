@@ -1,6 +1,6 @@
 # EXAM DESIGN V2 — updates `EXAM_AND_SURVEY_DESIGN.md` §1 (exam module only)
 
-Status: Slice 1 `CURRENT` (2026-10-25, owner-approved); slices 2-4 `PROPOSED`. Still **L3** (student-facing access, new child data). Owner approval required before slice 1.
+Status: Slices 1 and 2 `CURRENT` (2026-10-25, owner-approved); slices 3-4 `PROPOSED`. Still **L3** (student-facing access, new child data). Owner approval required before slice 1.
 Synthetic data only. Questionnaires (§2 of the old document) are out of scope here and unchanged. Written 2026-10-25.
 
 ## 1. What changes versus V1
@@ -70,3 +70,12 @@ never reaches AI; audit logs counts and ids only.
 * **AI call cap:** exams get their own counter and limits (decided). Not built in Slice 1 because nothing in Slice 1 calls an LLM; it lands with Slice 4 (school fields for the exams caps, `ai_guard` keyed on `exams`).
 * **Slice 1 scope:** gate on every route; question bank (Subject Teacher, own school and subject, per-option explanations required by a database constraint and by the editor); topics page; exam creation (approved questions, own classes, optional window, publish and unpublish); student list and player (wrong option turns red with its own explanation, retry until correct, then why the right answer is right); attempts record seconds (each step clamped to 300 s), attempt count and wrong option ids in order; practice only (no `Grade` row). **Deferred to a later slice** (Tier B, easy to add): CSV import with dry-run, exam editing, SchoolAdmin/Grade Lead views, teacher-facing results (analytics are Slice 2).
 * **Editing rule:** a question is edited only by its author and only until the first attempt; any edit returns it to draft. Retire and write a new version after that.
+
+## 9. Slice 2 (built 2026-10-25; owner decisions: subject teachers stay out of the mission forms, topics stay flat)
+
+* **CSV import** (`exams/csv_import.py`, `views_import.py`): upload, dry-run preview that writes nothing, confirm. Columns `topic, stem, correct, o1_text..o5_expl`; at most 200 rows and 200 KB; UTF-8; the parsed rows live in the session for 30 minutes, are bound to the user, the scope is re-checked and every row is re-validated against the database at confirm time. Rows become DRAFT questions (`source='csv'`) of the importing teacher; approval stays a separate step. Duplicate stems, unknown or other-subject topics and options without an explanation are row errors.
+* **Exam editing** (creator only): title, window, classes and publication always; the question set only while no student has a session.
+* **Teacher results** (`/exams/teacher/exams/<id>/results/`): students of the teacher's own classes in name order with solved, first-try count and a first-try percentage only from 5 solved questions; per-question first-try rate, mean tries and class-median seconds only from 5 students; the most chosen wrong option. Time is never compared between students.
+* **Grade Lead** (`/exams/lead/`): students of the own grade in name order, per subject, same floor. **SchoolAdmin** (`/exams/admin/`): per exam, started/finished counts and first-try rate per topic, no names, groups under 5 withheld.
+* No ranking, no export, nothing stored beyond Slice 1's tables (all figures are derived on read). Audit: `exam_csv_import`, `exam_edit`, `exam_results_view`, `exam_gradelead_view`, `exam_admin_view` (ids and counts only).
+* **Deferred:** the repeated-error rule (same wrong option in 3 sessions), weekly trend, per-student baseline-relative time, study recommendations (Slice 3).

@@ -1,0 +1,11 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}پیش‌نمایش ورود پرسش‌ها{% endblock %}
+{% block content %}
+<div class="alert alert-warning">هنوز چیزی ذخیره نشده است. ردیف‌های درست: {{ good }}، ردیف‌های خطادار: {{ bad }} (ردیف خطادار وارد نمی‌شود).</div>
+<table class="table table-sm bg-white"><thead><tr><th>ردیف</th><th>مبحث</th><th>پرسش</th><th>گزینه‌ها</th><th>وضعیت</th></tr></thead><tbody>
+{% for r in rows %}<tr class="{% if not r.ok %}table-danger{% endif %}"><td>{{ r.line }}</td><td class="small" dir="ltr">{{ r.topic_code }}</td><td>{{ r.stem|truncatechars:70 }}</td><td>{{ r.options|length }}</td>
+  <td class="small">{% if r.ok %}آماده{% else %}{{ r.errors|join:' · ' }}{% endif %}</td></tr>{% endfor %}</tbody></table>
+<form method="post" action="{% url 'exams:import_confirm' %}" class="d-inline">{% csrf_token %}<button class="btn btn-success" {% if not good %}disabled{% endif %}>تأیید و افزودن {{ good }} پیش‌نویس</button></form>
+<form method="post" action="{% url 'exams:import_cancel' %}" class="d-inline">{% csrf_token %}<button class="btn btn-outline-secondary">انصراف</button></form>
+{% include 'exams/_notice.html' %}
+{% endblock %}

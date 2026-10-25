@@ -212,10 +212,11 @@ def _parse_date(raw):
         return False
 
 
-@role_required(TEACHER, module=MODULE)
-@require_http_methods(['GET', 'POST'])
-def exam_new(request):
+def _exam_form(request, exam=None):
+    """Create (exam is None) or edit an exam. Only the creator edits; once students have a session the question set is locked
+    (title, window, classes and publication stay editable)."""
     scopes = _scope_choices(request.user)
+    locked = exam is not None and exam.sessions.exists()
     approved = bank_questions(request.user).filter(status=Question.APPROVED).select_related('topic')
     class_rows = []
     for key, label in scopes:
@@ -224,7 +225,7 @@ def exam_new(request):
             class_rows.append((key, c))
     errors = []
     if request.method == 'POST':
-        pair = _parse_scope(request.user, request.POST.get('scope', ''))
+        pair = (exam.school_id, exam.subject) if exam is not None else _parse_scope(request.user, request.POST.get('scope', ''))
         title = (request.POST.get('title') or '').strip()
         opens, closes = _parse_date(request.POST.get('opens_on')), _parse_date(request.POST.get('closes_on'))
         picked_q = [int(x) for x in request.POST.getlist('questions') if x.isdigit()]
@@ -235,26 +236,61 @@ def exam_new(request):
             errors.append('عنوان لازم است.')
         if opens is False or closes is False or (opens and closes and closes < opens):
             errors.append('بازهٔ تاریخ نامعتبر است.')
+        questions = classes = []
         if pair is not None:
-            questions = list(approved.filter(school_id=pair[0], subject=pair[1], pk__in=picked_q))
             classes = list(SchoolClass.objects.filter(pk__in=set(picked_c) & teacher_class_ids(request.user, *pair)))
-            if not questions or len(questions) != len(set(picked_q)):
-                errors.append('دست‌کم یک پرسش تأییدشدهٔ همین درس انتخاب کنید.')
             if not classes or len(classes) != len(set(picked_c)):
                 errors.append('دست‌کم یک کلاس از کلاس‌های خودتان (همین درس) انتخاب کنید.')
+            if not locked:
+                questions = list(approved.filter(school_id=pair[0], subject=pair[1], pk__in=picked_q))
+                if not questions or len(questions) != len(set(picked_q)):
+                    errors.append('دست‌کم یک پرسش تأییدشدهٔ همین درس انتخاب کنید.')
         if not errors:
             with transaction.atomic():
-                exam = Exam.objects.create(school_id=pair[0], subject=pair[1], title=title, opens_on=opens or None,
-                                           closes_on=closes or None, published=bool(request.POST.get('published')),
-                                           created_by=request.user)
+                if exam is None:
+                    exam = Exam.objects.create(school_id=pair[0], subject=pair[1], title=title, opens_on=opens or None,
+                                               closes_on=closes or None, published=bool(request.POST.get('published')),
+                                               created_by=request.user)
+                    action = audit.EXAM_CREATE
+                else:
+                    exam.title, exam.opens_on, exam.closes_on = title, opens or None, closes or None
+                    exam.published = bool(request.POST.get('published'))
+                    exam.save(update_fields=['title', 'opens_on', 'closes_on', 'published'])
+                    action = audit.EXAM_EDIT
                 exam.classes.set(classes)
-                by_pk = {q.pk: q for q in questions}
-                for order, qpk in enumerate(dict.fromkeys(picked_q), start=1):
-                    ExamQuestion.objects.create(exam=exam, question=by_pk[qpk], order=order)
-            audit.record(request.user, audit.EXAM_CREATE, exam, school=exam.school_id, detail=f'q{len(questions)}c{len(classes)}')
-            messages.success(request, 'آزمون ساخته شد.')
+                if not locked:
+                    exam.items.all().delete()
+                    by_pk = {q.pk: q for q in questions}
+                    for order, qpk in enumerate(dict.fromkeys(picked_q), start=1):
+                        ExamQuestion.objects.create(exam=exam, question=by_pk[qpk], order=order)
+            audit.record(request.user, action, exam, school=exam.school_id, detail=f'q{exam.items.count()}c{len(classes)}')
+            messages.success(request, 'آزمون ذخیره شد.')
             return redirect('exams:teacher_home')
-    return render(request, 'exams/exam_form.html', {'scopes': scopes, 'questions': approved, 'class_rows': class_rows, 'errors': errors})
+    state = None
+    if exam is not None:
+        state = {'title': exam.title, 'opens_on': exam.opens_on or '', 'closes_on': exam.closes_on or '', 'published': exam.published,
+                 'classes': set(exam.classes.values_list('pk', flat=True)), 'questions': set(exam.items.values_list('question_id', flat=True))}
+    return render(request, 'exams/exam_form.html', {'scopes': scopes, 'questions': approved, 'class_rows': class_rows, 'errors': errors,
+                                                    'exam': exam, 'state': state, 'locked': locked,
+                                                    'scope_key': f'{exam.school_id}:{exam.subject}' if exam else ''})
+
+
+@role_required(TEACHER, module=MODULE)
+@require_http_methods(['GET', 'POST'])
+def exam_new(request):
+    return _exam_form(request)
+
+
+@role_required(TEACHER, module=MODULE)
+@require_http_methods(['GET', 'POST'])
+def exam_edit(request, pk):
+    exam = get_object_or_404(Exam, pk=pk)
+    if (exam.school_id, exam.subject) not in teacher_scopes(request.user):
+        raise Http404
+    require_module(exam.school_id, MODULE)
+    if exam.created_by_id != request.user.pk:
+        raise PermissionDenied
+    return _exam_form(request, exam)
 
 
 @role_required(TEACHER, module=MODULE)

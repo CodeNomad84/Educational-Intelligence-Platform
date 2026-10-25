@@ -33,6 +33,11 @@ EXAM_QUESTION_SAVE = 'exam_question_save'      # detail = number of options
 EXAM_QUESTION_STATUS = 'exam_question_status'  # detail = new status
 EXAM_CREATE = 'exam_create'                    # detail = counts only, e.g. q5c2
 EXAM_UNPUBLISH = 'exam_unpublish'
+EXAM_EDIT = 'exam_edit'                        # detail = counts only
+EXAM_CSV_IMPORT = 'exam_csv_import'            # detail = counts only, e.g. c12e3
+EXAM_RESULTS_VIEW = 'exam_results_view'        # teacher results of one exam
+EXAM_GRADELEAD_VIEW = 'exam_gradelead_view'
+EXAM_ADMIN_VIEW = 'exam_admin_view'
 STAFF_ROLES_CHANGE = 'staff_roles_change'  # detail = resulting roles, e.g. T,G
 
 

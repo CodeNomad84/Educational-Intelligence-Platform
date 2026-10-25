@@ -63,7 +63,7 @@ Test status at `8435a0e`: 1150 tests on SQLite and on PostgreSQL 16, 57 `demo_in
 - [!] Whether subject teachers may enter the two forms (owner said Grade Lead only; revisit after the pilot).
 ### Exams
 - [x] Slice 1 question bank with an explanation per option, flat topics, exams for classes, practice player, module gate (`8435a0e`).
-- [ ] Slice 2 CSV import with dry run, then analytics (first-try accuracy, baseline-relative time, repeated-error rule).
+- [~] Slice 2 built 2026-10-25 (CSV import with dry run, exam editing, teacher/Grade Lead/SchoolAdmin results with group floors); still missing: repeated-error rule, weekly trend, per-student baseline-relative time.
 - [ ] Slice 3 study recommendations, Student 360 tile, retention cleanup command.
 - [ ] Slice 4 AI question suggestions behind a separate exams AI cap and the external-LLM switch.
 - [!] Exam retention period, SchoolAdmin and parent access to individual analytics, question ownership when a teacher leaves (`docs/EXAM_DESIGN_V2.md` §7).

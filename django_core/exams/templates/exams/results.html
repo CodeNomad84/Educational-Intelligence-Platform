@@ -1,0 +1,20 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}نتایج: {{ exam.title }}{% endblock %}
+{% block content %}
+<a class="btn btn-link" href="{% url 'exams:teacher_home' %}">← بانک پرسش</a>
+<div class="alert alert-info">{{ note }} دانش‌آموزان به ترتیب نام آمده‌اند، نه نمره. درصد وقتی نمایش داده می‌شود که دست‌کم {{ floor }} پرسش حل‌شده باشد؛ زمان فقط به‌صورت میانهٔ کلاس برای هر پرسش آمده است.</div>
+<h5>دانش‌آموزان کلاس‌های من</h5>
+<table class="table table-sm bg-white"><thead><tr><th>دانش‌آموز</th><th>حل‌شده</th><th>درست در تلاش اول</th><th>درصد تلاش اول</th></tr></thead><tbody>
+{% for r in rows %}<tr><td>{{ r.student.last_name }} {{ r.student.first_name }}</td><td>{% if r.started %}{{ r.solved }} از {{ r.total }}{% else %}شروع نکرده{% endif %}</td><td>{{ r.first_try }}</td>
+  <td>{% if r.rate is not None %}{% widthratio r.rate 1 100 %}٪ <span class="small text-muted">(بر پایهٔ {{ r.solved }} پرسش)</span>{% else %}<span class="text-muted">داده کافی نیست</span>{% endif %}</td></tr>
+{% empty %}<tr><td colspan="4" class="text-muted">دانش‌آموزی نیست.</td></tr>{% endfor %}</tbody></table>
+<h5 class="mt-4">هر پرسش (کلاس‌های من)</h5>
+<table class="table table-sm bg-white"><thead><tr><th>پرسش</th><th>مبحث</th><th>تلاش‌ها</th><th>درصد تلاش اول</th><th>میانگین تلاش</th><th>میانهٔ ثانیه</th><th>گزینهٔ غلط پرتکرار</th></tr></thead><tbody>
+{% for q in questions %}<tr><td>{{ q.question.stem|truncatechars:60 }}</td><td class="small" dir="ltr">{{ q.question.topic.code }}</td><td>{{ q.attempts }}</td>
+  <td>{% if q.first_try_rate is not None %}{% widthratio q.first_try_rate 1 100 %}٪{% else %}—{% endif %}</td>
+  <td>{% if q.mean_tries is not None %}{{ q.mean_tries|floatformat:1 }}{% else %}—{% endif %}</td>
+  <td>{% if q.median_seconds is not None %}{{ q.median_seconds|floatformat:0 }}{% else %}—{% endif %}</td>
+  <td class="small">{% if q.top_wrong %}{{ q.top_wrong.text }}{% else %}—{% endif %}</td></tr>{% endfor %}</tbody></table>
+<p class="small text-muted">«—» یعنی کمتر از {{ group_floor }} دانش‌آموز؛ عدد نمایش داده نمی‌شود.</p>
+{% include 'exams/_notice.html' %}
+{% endblock %}
