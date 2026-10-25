@@ -66,6 +66,10 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Dashboard login page (namespaced URL). Without this, login_required redirects
 # to Django's default /accounts/login/, which does not exist.
 LOGIN_URL = 'dashboard:login'
+# Login throttle client address (dashboard/throttle.py). OFF by default: the address is REMOTE_ADDR and X-Forwarded-For is NEVER read.
+# Behind a reverse proxy set THROTTLE_TRUSTED_PROXIES to the proxy address(es)/networks (comma separated, e.g. "10.0.0.5,172.18.0.0/16");
+# only then, and only for a request that really comes from one of them, the real client is taken from X-Forwarded-For.
+THROTTLE_TRUSTED_PROXIES = [x.strip() for x in os.environ.get('THROTTLE_TRUSTED_PROXIES', '').split(',') if x.strip()]
 
 # Django -> FastAPI service trust (ADR-0002, interim). Read from the environment only;
 # there is deliberately NO default. Empty/short value => service calls fail closed.

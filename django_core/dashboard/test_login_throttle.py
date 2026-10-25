@@ -113,3 +113,56 @@ class AdminLoginThrottleTests(TestCase):
             self.client.post(reverse('dashboard:login'), {'username': '9000000011', 'password': 'wrong'})
         self.assertEqual(self.attempt('9000000011', 'Right-pass-1').status_code, 429)
         self.assertEqual(self.client.get(self.url).status_code, 200)
+
+
+class ClientAddressTests(TestCase):
+    """Which address the limits count: REMOTE_ADDR by default, X-Forwarded-For only behind a configured trusted proxy."""
+
+    def request(self, remote, forwarded=None):
+        from django.test import RequestFactory
+        extra = {'REMOTE_ADDR': remote}
+        if forwarded is not None:
+            extra['HTTP_X_FORWARDED_FOR'] = forwarded
+        return RequestFactory().post('/login/', **extra)
+
+    def test_default_ignores_x_forwarded_for(self):
+        from dashboard.throttle import client_ip
+        self.assertEqual(client_ip(self.request('10.0.0.5', '203.0.113.9')), '10.0.0.5')
+        self.assertEqual(client_ip(self.request('198.51.100.7', '1.2.3.4, 5.6.7.8')), '198.51.100.7')
+
+    @override_settings(THROTTLE_TRUSTED_PROXIES=['10.0.0.5', '172.18.0.0/16'])
+    def test_trusted_proxy_mode(self):
+        from dashboard.throttle import client_ip
+        self.assertEqual(client_ip(self.request('10.0.0.5', '203.0.113.9')), '203.0.113.9')
+        self.assertEqual(client_ip(self.request('10.0.0.5', '1.1.1.1, 203.0.113.9, 172.18.0.3')), '203.0.113.9')   # right-most non-proxy; the 1.1.1.1 is client-controlled
+        self.assertEqual(client_ip(self.request('172.18.4.4', '203.0.113.9')), '203.0.113.9')                    # a network entry
+        self.assertEqual(client_ip(self.request('10.0.0.5')), '10.0.0.5')                                        # no header: fall back
+        self.assertEqual(client_ip(self.request('10.0.0.5', 'not-an-ip')), '10.0.0.5')                           # malformed: fall back
+        self.assertEqual(client_ip(self.request('10.0.0.5', '203.0.113.9, junk')), '10.0.0.5')
+        self.assertEqual(client_ip(self.request('10.0.0.5', '10.0.0.5, 172.18.0.3')), '10.0.0.5')                # only proxies in the chain
+
+    @override_settings(THROTTLE_TRUSTED_PROXIES=['10.0.0.5'])
+    def test_a_header_from_an_untrusted_peer_is_ignored(self):
+        from dashboard.throttle import client_ip
+        self.assertEqual(client_ip(self.request('198.51.100.7', '203.0.113.9')), '198.51.100.7')                 # spoofing attempt
+
+    @override_settings(THROTTLE_TRUSTED_PROXIES=['not-a-network', ''])
+    def test_a_bad_setting_means_off(self):
+        from dashboard.throttle import client_ip
+        self.assertEqual(client_ip(self.request('10.0.0.5', '203.0.113.9')), '10.0.0.5')
+
+    def test_the_limits_follow_the_configured_address_end_to_end(self):
+        cache.clear()
+        self.addCleanup(cache.clear)
+        User.objects.create_user('9000000021', password='Right-pass-1')
+        def attempt(n, **extra):
+            return self.client.post(reverse('dashboard:login'), {'username': f'nobody{n}', 'password': 'x'}, **extra)
+        with override_settings(THROTTLE_TRUSTED_PROXIES=['10.0.0.5']):
+            for n in range(20):                                                   # 20 failures from client A behind the proxy
+                attempt(n, REMOTE_ADDR='10.0.0.5', HTTP_X_FORWARDED_FOR='203.0.113.9')
+            self.assertEqual(attempt(99, REMOTE_ADDR='10.0.0.5', HTTP_X_FORWARDED_FOR='203.0.113.9').status_code, 429)
+            self.assertEqual(attempt(100, REMOTE_ADDR='10.0.0.5', HTTP_X_FORWARDED_FOR='203.0.113.77').status_code, 200)   # client B is not locked
+        cache.clear()
+        for n in range(20):                                                       # default mode: everyone behind the proxy is one address
+            attempt(n, REMOTE_ADDR='10.0.0.5', HTTP_X_FORWARDED_FOR=f'203.0.113.{n}')
+        self.assertEqual(attempt(101, REMOTE_ADDR='10.0.0.5', HTTP_X_FORWARDED_FOR='203.0.113.200').status_code, 429)

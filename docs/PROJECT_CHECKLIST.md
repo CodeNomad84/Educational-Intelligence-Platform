@@ -32,7 +32,7 @@ Test status at `8435a0e`: 1150 tests on SQLite and on PostgreSQL 16, 57 `demo_in
 - [x] Slice 4b Student role with a demo-stub study assistant (`bbc0190`).
 - [x] Bulk accounts from Excel with dry run, confirm and a one-time login sheet (`983c07a`); dead `/upload/` stub replaced (`b48a0e4`).
 - [x] Forced first-login password change and profile password change (`983c07a`).
-- [x] Password reset by SchoolAdmin and by Grade Lead (school setting, default off) (`a52b81b`).
+- [x] Password reset by SchoolAdmin and by Grade Lead (school setting, default off) (`a52b81b`); a lost login sheet is reissued from the same list (test 2026-10-25, linked from the accounts page).
 - [x] Login throttle per username and address on `/login/` and `/api/token/` (`201c94d`).
 - [x] One home entry per role in the sidebar with a duplicate-link test (`4651c9a`, `dashboard/test_menu.py`).
 - [x] Persian quick-start page for the SchoolAdmin (`acf2bd8`).
@@ -86,7 +86,7 @@ Test status at `8435a0e`: 1150 tests on SQLite and on PostgreSQL 16, 57 `demo_in
 
 ## 6. Hardening before real data
 - [x] `/admin/` login throttled with the same limits and counters as `/login/` (`dashboard/throttle.py` `throttled_admin_login`, tests in `dashboard/test_login_throttle.py`).
-- [ ] Reverse proxy and trusted real-IP handling for the throttle; no HTTPS configuration (RUNBOOK).
+- [~] Throttle behind a proxy: client address source is configurable (`THROTTLE_TRUSTED_PROXIES`, default OFF, tests for both modes); still no HTTPS or reverse-proxy configuration shipped (RUNBOOK).
 - [ ] Password strength beyond length 8, 2FA for SchoolAdmin, email/SMS self-service reset (RUNBOOK).
 - [~] Migration-order fragility between `schools.0010` and `students.0009`: guarded by `schools/test_fresh_migrate.py` (fresh-DB module rows and plan order; `docs/changes/0018-migration-order-guard.md`); an explicit dependency is unsafe for databases behind on migrations, so the order is protected, not enforced.
 - [ ] PostgreSQL thread test for the concurrent import race is skipped (RUNBOOK).

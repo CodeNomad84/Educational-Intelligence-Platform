@@ -6,12 +6,13 @@ per-process memory cache, which is enough for a single process). No extra depend
   rest of the window; ``LOGIN_MAX_FAILURES_IP`` (20) failures from one address lock the address.
 * A locked username or address is refused WITHOUT checking the password, with the same answer whether or not the account exists
   (no enumeration). A success clears the username counter (not the address counter).
-* The address is ``REMOTE_ADDR``. Behind a reverse proxy that is the proxy's address, so every user would share one counter:
-  configure the proxy to pass the real address and use a trusted-proxy middleware before relying on the IP limit (RUNBOOK).
+* The address is ``REMOTE_ADDR`` unless ``THROTTLE_TRUSTED_PROXIES`` is set (see ``client_ip``); ``X-Forwarded-For`` is never trusted by
+  default. Behind a reverse proxy without that setting every user would share the proxy's counter (RUNBOOK).
 * Locking a username also locks the real owner for the window: the price of protecting guessable usernames. A SchoolAdmin
   cannot unlock; waiting out the window or a platform administrator clearing the cache are the ways out.
 """
 import hashlib
+import ipaddress
 
 from django.conf import settings
 from django.core.cache import cache
@@ -28,8 +29,40 @@ def _key(kind, value):
     return 'login-throttle:%s:%s' % (kind, hashlib.sha256((value or '').strip().lower().encode()).hexdigest()[:32])
 
 
+def _network(text):
+    try:
+        return ipaddress.ip_network(str(text).strip(), strict=False)
+    except ValueError:
+        return None
+
+
+def _trusted_networks():
+    return [n for n in map(_network, getattr(settings, 'THROTTLE_TRUSTED_PROXIES', ()) or ()) if n is not None]
+
+
 def client_ip(request):
-    return request.META.get('REMOTE_ADDR', '')
+    """The address the limits are counted for. Default: ``REMOTE_ADDR`` and nothing else. With ``THROTTLE_TRUSTED_PROXIES`` set AND
+    ``REMOTE_ADDR`` inside one of those networks, the client is the right-most ``X-Forwarded-For`` entry that is not itself a trusted
+    proxy (entries to its left are client-controlled and ignored). A missing or malformed header, or a request that does not come
+    from a trusted proxy, falls back to ``REMOTE_ADDR``."""
+    remote = request.META.get('REMOTE_ADDR', '')
+    trusted = _trusted_networks()
+    if not trusted:
+        return remote
+    try:
+        peer = ipaddress.ip_address(remote)
+    except ValueError:
+        return remote
+    if not any(peer in net for net in trusted):
+        return remote
+    for raw in reversed([p.strip() for p in request.META.get('HTTP_X_FORWARDED_FOR', '').split(',') if p.strip()]):
+        try:
+            hop = ipaddress.ip_address(raw)
+        except ValueError:
+            return remote                                  # malformed chain: do not guess
+        if not any(hop in net for net in trusted):
+            return str(hop)
+    return remote
 
 
 def is_locked(request, username):
