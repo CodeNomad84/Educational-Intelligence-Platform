@@ -47,7 +47,7 @@ Test status at `8435a0e`: 1150 tests on SQLite and on PostgreSQL 16, 57 `demo_in
 - [x] Per-school module entitlement for `advisor_ai`, `tutor_ai`, `exams`, `mission`; Student 360 and counseling stay base (`ef7a0d1`, `schools/entitlements.py`).
 - [x] Trial versus licensed rows, expiry banner, locked-but-visible menu with a static info page, per-school AI call caps (`06e9dcb`).
 - [x] Platform operator grants modules by command or Django admin, audit-logged (`set_school_module`, `schools/admin.py`).
-- [ ] Operator page: read-only per-school module state, days left, AI usage (approved in principle, queued after exams; module key "base/platform").
+- [x] Operator page `/platform/modules/` (`dashboard/operator_page.py`): superuser or PlatformAdmin only, per-school module state, end date, days left, AI usage vs caps, expiring filter, audit-logged, no student data; base/platform, not a sellable module.
 - [ ] Billing, plans, prices, invoices, license keys, renewal and usage reports: deliberately not built.
 - [!] Pricing and trial-length policy (owner decision, not yet made).
 - [~] FastAPI carries no module claim, so module gating is Django-side only (`entitlements.py` docstring).
@@ -58,7 +58,8 @@ Test status at `8435a0e`: 1150 tests on SQLite and on PostgreSQL 16, 57 `demo_in
 - [x] Slice 2 rule engine plus evaluation hook for a later ML comparison (`8001002`).
 - [x] Slice 3 per-student report, 2-3 suggested paths with `params_version`, activity-choice and parent-meeting forms, admin aggregate with groups under 5 hidden (`3390f08`).
 - [x] Read-only weights page for SchoolAdmin and grid help text (`dd4c03c`).
-- [ ] Slice 2b weights lifecycle UI (draft, simulated, pending approval, active) editable only by SchoolAdmin (queued after the operator page).
+- [x] Slice 2b weights lifecycle UI for the SchoolAdmin: draft > simulated > pending approval > active, aggregate simulation, clone, immutable active/retired, `params_version` kept (`missions/lifecycle.py`, `views_weights.py`).
+- [!] Mission weights approval: any SchoolAdmin may approve; a separate approver (four-eyes) is not required yet (owner decision).
 - [ ] Real-teacher pilot of the rubric and weights; the weights are an unvalidated first proposal.
 - [!] Whether subject teachers may enter the two forms (owner said Grade Lead only; revisit after the pilot).
 ### Exams

@@ -1,7 +1,7 @@
 {% extends 'dashboard/base.html' %}
 {% block title %}وزن‌های مأموریت‌محور{% endblock %}
 {% block content %}
-<div class="alert alert-warning">فقط نمایش. وزن‌ها و آستانه‌ها <strong>پیشنهاد اولیه و اعتبارسنجی‌نشده</strong> هستند. تغییر آن‌ها (پیش‌نویس، شبیه‌سازی، تأیید) هنوز در این صفحه ممکن نیست.</div>
+<div class="alert alert-warning">فقط نمایش. وزن‌ها و آستانه‌ها <strong>پیشنهاد اولیه و اعتبارسنجی‌نشده</strong> هستند. برای تغییر، از یک نسخه کپی بگیرید و مسیر پیش‌نویس ← شبیه‌سازی ← تأیید را بروید (صفحهٔ هر نسخه).</div>
 {% for b in blocks %}
   <h5>نسخهٔ فعال{% if b.active %} — شناسهٔ پارامترها (params_version): {{ b.active.pk }}، نسخه {{ b.active.version }}{% endif %}</h5>
   {% if b.active %}
@@ -13,9 +13,9 @@
   </table></div>
   {% else %}<p class="text-muted">نسخهٔ فعالی وجود ندارد.</p>{% endif %}
   <h6 class="mt-3">چرخهٔ نسخه‌ها</h6>
-  <table class="table table-sm bg-white"><thead><tr><th>نسخه</th><th>شناسه</th><th>وضعیت</th><th>یادداشت</th><th>تأییدکننده</th></tr></thead><tbody>
-  {% for v in b.versions %}<tr><td>{{ v.version }}</td><td>{{ v.pk }}</td><td>{{ v.get_status_display }}</td><td>{{ v.note }}</td><td>{% if v.approved_by %}{{ v.approved_by.username }}{% else %}—{% endif %}</td></tr>
-  {% empty %}<tr><td colspan="5" class="text-muted">نسخه‌ای نیست.</td></tr>{% endfor %}</tbody></table>
+  <table class="table table-sm bg-white"><thead><tr><th>نسخه</th><th>شناسه</th><th>وضعیت</th><th>یادداشت</th><th>تأییدکننده</th><th></th></tr></thead><tbody>
+  {% for v in b.versions %}<tr><td>{{ v.version }}</td><td>{{ v.pk }}</td><td>{{ v.get_status_display }}</td><td>{{ v.note }}</td><td>{% if v.approved_by %}{{ v.approved_by.username }}{% else %}—{% endif %}</td><td><a href="{% url 'missions:weight_detail' v.pk %}">{% if v.status == 'draft' %}ویرایش{% else %}مشاهده{% endif %}</a></td></tr>
+  {% empty %}<tr><td colspan="6" class="text-muted">نسخه‌ای نیست.</td></tr>{% endfor %}</tbody></table>
   <p class="small text-muted">چرخهٔ زندگی: پیش‌نویس ← شبیه‌سازی‌شده ← منتظر تأیید ← فعال ← بازنشسته.</p>
 {% empty %}<p class="text-muted">مدرسه‌ای با ماژول فعال نیست.</p>{% endfor %}
 {% include 'missions/_footer.html' %}

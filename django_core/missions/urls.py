@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import views, views_reports
+from . import views, views_reports, views_weights
 
 app_name = 'missions'
 urlpatterns = [
@@ -13,4 +13,7 @@ urlpatterns = [
     path('students/<int:pk>/meetings/', views_reports.meetings, name='meetings'),
     path('aggregate/', views_reports.aggregate, name='aggregate'),
     path('weights/', views_reports.weights, name='weights'),
+    path('weights/<int:pk>/', views_weights.detail, name='weight_detail'),
+    path('weights/<int:pk>/action/', views_weights.action, name='weight_action'),
+    path('weights/<int:pk>/simulation/', views_weights.simulation, name='weight_simulation'),
 ]
