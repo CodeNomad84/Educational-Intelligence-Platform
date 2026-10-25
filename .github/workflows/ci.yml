@@ -53,6 +53,7 @@ jobs:
     env:
       TEST_PG_HOST: localhost
       TEST_PG_PASSWORD: ci-throwaway-password
+      EIP_REQUIRE_PG: '1'          # the PostgreSQL-only tests (import race) must run here: they fail instead of skipping
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7

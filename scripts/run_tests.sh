@@ -135,7 +135,7 @@ run_pg() {
     # django_core and scripts/ only (read-only), laid out like the repository so that the tooling tests find both;
     # the repository root (.env, data/, ...) is never mounted
     docker run --rm --network "$NET" -v "$APP:/repo/django_core:ro" -v "$ROOT/scripts:/repo/scripts:ro" \
-      ${hide[@]+"${hide[@]}"} -w /repo/django_core -e EIP_TEST_CONTAINER=1 -e EIP_TEST_STRICT_GATEWAY \
+      ${hide[@]+"${hide[@]}"} -w /repo/django_core -e EIP_TEST_CONTAINER=1 -e EIP_REQUIRE_PG=1 -e EIP_TEST_STRICT_GATEWAY \
       -e DJANGO_SETTINGS_MODULE=config.settings.test_postgres \
       -e TEST_PG_HOST="$PGC" -e TEST_PG_NAME=eip_test -e TEST_PG_USER=eip_test -e TEST_PG_PASSWORD \
       "$IMAGE" python -B manage.py "$@"
