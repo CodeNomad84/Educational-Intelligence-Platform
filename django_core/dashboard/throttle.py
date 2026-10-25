@@ -85,3 +85,27 @@ class ThrottledTokenObtainPairView(TokenObtainPairView):
         elif response.status_code in (400, 401):
             record_failure(request, username)
         return response
+
+
+def throttled_admin_login(original):
+    """Wrap ``admin.site.login`` with the same limits (shared counters with ``/login/``): a locked username or address is
+    refused before the password is looked at; a re-rendered form (HTTP 200 after a POST) counts as a failure, a redirect as a
+    success. Installed in ``config/urls.py``."""
+    from functools import wraps
+
+    from django.http import HttpResponse
+
+    @wraps(original)
+    def login(request, *args, **kwargs):
+        if request.method != 'POST':
+            return original(request, *args, **kwargs)
+        username = str(request.POST.get('username', ''))[:150]
+        if is_locked(request, username):
+            return HttpResponse(LOCKED_MESSAGE, status=429, content_type='text/plain; charset=utf-8')
+        response = original(request, *args, **kwargs)
+        if response.status_code == 200:
+            record_failure(request, username)
+        elif response.status_code in (301, 302):
+            record_success(username)
+        return response
+    return login

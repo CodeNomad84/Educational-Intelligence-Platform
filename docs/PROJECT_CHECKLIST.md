@@ -84,7 +84,7 @@ Test status at `8435a0e`: 1150 tests on SQLite and on PostgreSQL 16, 57 `demo_in
 - [ ] Prompt-injection and unauthorized-retrieval tests for the AI layer (`SECURITY.md` review topics).
 
 ## 6. Hardening before real data
-- [ ] `/admin/` login is not throttled (RUNBOOK open risk).
+- [x] `/admin/` login throttled with the same limits and counters as `/login/` (`dashboard/throttle.py` `throttled_admin_login`, tests in `dashboard/test_login_throttle.py`).
 - [ ] Reverse proxy and trusted real-IP handling for the throttle; no HTTPS configuration (RUNBOOK).
 - [ ] Password strength beyond length 8, 2FA for SchoolAdmin, email/SMS self-service reset (RUNBOOK).
 - [ ] Migration-order fragility between `schools.0010` and `students.0009` (RUNBOOK open risk; needs an owner decision because it touches applied migrations).

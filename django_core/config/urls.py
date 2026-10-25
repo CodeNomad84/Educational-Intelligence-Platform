@@ -2,12 +2,14 @@ from django.contrib import admin
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from students.views import StudentViewSet
-from dashboard.throttle import ThrottledTokenObtainPairView
+from dashboard.throttle import ThrottledTokenObtainPairView, throttled_admin_login
 from rest_framework_simplejwt.views import TokenRefreshView
 
 # ساخت router
 router = DefaultRouter()
 router.register(r'students', StudentViewSet, basename='student')
+
+admin.site.login = throttled_admin_login(admin.site.login)   # /admin/ login: same brute-force limits as /login/
 
 # تعریف urlpatterns
 urlpatterns = [

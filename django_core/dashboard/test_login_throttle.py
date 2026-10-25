@@ -71,3 +71,45 @@ class ThrottleTests(TestCase):
         self.assertNotIn('access', response.json())
         AccountProfile.objects.filter(user=self.user).update(must_change_password=False)
         self.assertEqual(self.client.post(url, {'username': '9000000001', 'password': 'Right-pass-1'}).status_code, 200)
+
+
+class AdminLoginThrottleTests(TestCase):
+    """/admin/login/ shares the limits and the counters of /login/."""
+
+    def setUp(self):
+        cache.clear()
+        self.addCleanup(cache.clear)
+        self.staff = User.objects.create_user('9000000011', password='Right-pass-1', is_staff=True, is_superuser=True)
+        self.url = '/admin/login/'
+
+    def attempt(self, username, password, **extra):
+        return self.client.post(self.url, {'username': username, 'password': password, 'next': '/admin/'}, **extra)
+
+    def test_username_locks_after_five_failures_even_for_the_right_password(self):
+        for _ in range(5):
+            self.assertEqual(self.attempt('9000000011', 'wrong').status_code, 200)
+        self.assertEqual(self.attempt('9000000011', 'Right-pass-1').status_code, 429)
+        self.assertNotIn('_auth_user_id', self.client.session)
+
+    def test_success_signs_in_and_clears_the_counter(self):
+        for _ in range(4):
+            self.attempt('9000000011', 'wrong')
+        self.assertEqual(self.attempt('9000000011', 'Right-pass-1').status_code, 302)
+        self.client.logout()
+        for _ in range(4):
+            self.assertEqual(self.attempt('9000000011', 'wrong').status_code, 200)      # the counter restarted
+
+    def test_unknown_username_and_address_limits(self):
+        for _ in range(5):
+            self.attempt('9999999999', 'wrong')
+        self.assertEqual(self.attempt('9999999999', 'wrong').status_code, 429)
+        cache.clear()
+        for n in range(20):
+            self.attempt(f'u{n}', 'wrong')
+        self.assertEqual(self.attempt('9000000011', 'Right-pass-1').status_code, 429)   # the address is locked
+
+    def test_counters_are_shared_with_the_normal_login_and_get_is_untouched(self):
+        for _ in range(5):
+            self.client.post(reverse('dashboard:login'), {'username': '9000000011', 'password': 'wrong'})
+        self.assertEqual(self.attempt('9000000011', 'Right-pass-1').status_code, 429)
+        self.assertEqual(self.client.get(self.url).status_code, 200)
