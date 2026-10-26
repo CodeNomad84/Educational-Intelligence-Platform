@@ -17,7 +17,7 @@ from interventions.services import (add_followup, cancel_plan, complete_plan, cr
 from risk.services import LoopError
 from schools import audit
 from students.access import (
-    ADMIN, COUNSELOR, GRADE_LEAD, may_cancel_or_reassign_plan, may_edit_plan, may_read_plan_text, plan_students,
+    ADMIN, COUNSELOR, GRADE_LEAD, SENSITIVE_ALERT_TYPES, apply_alert_text_policy, may_cancel_or_reassign_plan, may_edit_plan, may_read_plan_text, plan_students,
     reviewable_alerts, roles_for, valid_plan_owner, visible_alerts, visible_followups, visible_plans)
 
 from .decorators import role_required
@@ -82,6 +82,9 @@ def plan_new(request, pk):
         if not raw.isdigit():
             raise Http404
         alert = get_object_or_404(reviewable_alerts(request.user).filter(student=student), pk=int(raw))
+        alert = apply_alert_text_policy(request.user, [alert])[0]
+        if alert.risk_event.risk_type in SENSITIVE_ALERT_TYPES and not alert.text_hidden:
+            audit.record(request.user, audit.ALERT_TEXT_VIEW, alert, detail=alert.risk_event.risk_type)
     is_admin = ADMIN in roles_for(request.user)
     form = PlanForm(request.POST or None)
     if request.method == 'POST' and form.is_valid():

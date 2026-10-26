@@ -50,6 +50,7 @@ INTERVENTION_STATUS = 'intervention_status'    # detail = new status
 INTERVENTION_OUTCOME = 'intervention_outcome'  # detail = outcome code
 INTERVENTION_OWNER = 'intervention_owner'      # reassigned; no detail
 FOLLOWUP_ADD = 'followup_add'                  # detail = assessment code
+ALERT_TEXT_VIEW = 'alert_text_view'            # detail = risk type; a sensitive alert's message was shown to this user
 INTERVENTION_VIEW = 'intervention_view'        # detail = text | meta (whether the text was shown)
 STAFF_ROLES_CHANGE = 'staff_roles_change'  # detail = resulting roles, e.g. T,G
 

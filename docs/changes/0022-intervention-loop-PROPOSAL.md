@@ -36,6 +36,8 @@ Codes: dismiss reasons `not_relevant`, `already_handled`, `duplicate`, `data_err
 | Parent, Student | none (404) | none (404) |
 | Superuser/PlatformAdmin | none | none |
 
+**Alert text (F3, owner decision 2026-10-26, change 0023):** for alerts of type `emotional` or `family` the message and the reviewer's note are readable only by the person who raised the alert and a Counselor with an open referral; SchoolAdmin and Grade Lead see metadata only (type, severity, status, dates, dismiss reason code, who raised and reviewed) and can still accept or dismiss. A teacher never reads a reviewer's note. Displays of such text are audit-logged (`alert_text_view`).
+
 Emotional text: Grade Lead and SchoolAdmin see metadata only unless the Grade Lead is the plan owner. SchoolAdmin may reassign the owner to a Counselor with an active referral. Every plan page view is audit-logged (`intervention_view`, `text` or `meta`).
 
 ## 6. `students/access.py` integration (Tier C: new access rules)

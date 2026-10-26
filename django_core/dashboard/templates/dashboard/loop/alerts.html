@@ -12,8 +12,8 @@
     <tr>
       <td>{{ a.student.first_name }} {{ a.student.last_name }}</td>
       <td>{{ a.risk_event.get_risk_type_display }}</td><td>{{ a.risk_event.get_severity_display }}</td>
-      <td>{{ a.message }}{% if a.recurred_plan %}<div class="small text-warning">تکرار پس از مداخله <a href="{% url 'dashboard:plan_detail' a.recurred_plan %}">#{{ a.recurred_plan }}</a></div>{% endif %}</td><td>{{ a.raised_by.username|default:"سامانه" }}</td><td>{{ a.created_at|date:"Y-m-d" }}</td>
-      <td>{{ a.get_status_display }}{% if a.dismiss_reason %} ({{ a.get_dismiss_reason_display }}){% endif %}{% if a.review_note and a.pk in reviewable %}<div class="small text-muted">{{ a.review_note }}</div>{% endif %}</td>
+      <td>{% if a.text_hidden %}<span class="text-muted">متن برای شما نمایش داده نمی‌شود</span>{% else %}{{ a.message }}{% endif %}{% if a.recurred_plan %}<div class="small text-warning">تکرار پس از مداخله <a href="{% url 'dashboard:plan_detail' a.recurred_plan %}">#{{ a.recurred_plan }}</a></div>{% endif %}</td><td>{{ a.raised_by.username|default:"سامانه" }}</td><td>{{ a.created_at|date:"Y-m-d" }}</td>
+      <td>{{ a.get_status_display }}{% if a.dismiss_reason %} ({{ a.get_dismiss_reason_display }}){% endif %}{% if a.review_note %}<div class="small text-muted">{{ a.review_note }}</div>{% endif %}</td>
       <td>
         {% if a.pk in reviewable and a.status == 'new' %}
           <form method="post" action="{% url 'dashboard:alert_review' a.pk %}" class="d-inline">{% csrf_token %}<input type="hidden" name="decision" value="accept"><button class="btn btn-sm btn-success">پذیرش</button></form>

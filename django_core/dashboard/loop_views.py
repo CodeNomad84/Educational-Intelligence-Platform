@@ -12,7 +12,9 @@ from risk.models import Alert, RiskEvent
 from risk.services import LoopError, raise_alert_as, reopen_alert, review_alert
 from interventions.reeval import recurrence
 from students.access import (
-    ADMIN, COUNSELOR, GRADE_LEAD, TEACHER, raisable_students, reviewable_alerts, roles_for, visible_alerts, visible_plans)
+    ADMIN, COUNSELOR, GRADE_LEAD, SENSITIVE_ALERT_TYPES, TEACHER, apply_alert_text_policy, raisable_students, reviewable_alerts, roles_for, visible_alerts, visible_plans)
+
+from schools import audit
 
 from .decorators import role_required
 
@@ -46,7 +48,10 @@ def alert_list(request):
     if status in dict(Alert.STATUS_CHOICES):
         alerts = alerts.filter(status=status)
     reviewable = set(reviewable_alerts(request.user).values_list('pk', flat=True))
-    alerts = list(alerts[:200])
+    alerts = apply_alert_text_policy(request.user, alerts[:200])
+    for alert in alerts:     # every display of a sensitive alert's text is audit-logged (ids and the type only)
+        if alert.risk_event.risk_type in SENSITIVE_ALERT_TYPES and not alert.text_hidden:
+            audit.record(request.user, audit.ALERT_TEXT_VIEW, alert, detail=alert.risk_event.risk_type)
     recurred = recurrence(alerts, visible_plans(request.user))      # only plans the user may see: nothing leaks to a teacher
     for alert in alerts:
         alert.recurred_plan = recurred[alert.pk].pk if alert.pk in recurred else None

@@ -420,3 +420,42 @@ def valid_plan_owner(owner, student, intervention_type):
     else:
         grants = _review_q(owner, roles)
     return grants is not None and Student.objects.filter(grants, pk=student.pk).exists()
+
+
+# --- Alert text policy (change 0022, F3, owner decision 2026-10-26) ------------------------------------------------------------
+# For alerts of a sensitive type the MESSAGE and the reviewer's NOTE are readable only by the person who raised the alert and by a
+# Counselor with an OPEN referral to the student. SchoolAdmin and Grade Lead see metadata only (type, severity, status, dates,
+# dismiss reason code, who raised and reviewed) and can still accept or dismiss on that alone. The review NOTE of any alert is
+# additionally never shown to a user who cannot review (a teacher sees status and reason code only).
+SENSITIVE_ALERT_TYPES = ('emotional', 'family')
+
+
+def visible_alert_texts(user):
+    """Alerts whose message the user may read."""
+    roles = roles_for(user)
+    parts = [~Q(risk_event__risk_type__in=SENSITIVE_ALERT_TYPES), Q(raised_by=user)]
+    counselor = _counselor_q(user, roles)
+    if counselor is not None:
+        parts.append(Q(student__in=Student.objects.filter(counselor)))
+    return visible_alerts(user).filter(_any(parts))
+
+
+def visible_alert_notes(user):
+    """Alerts whose review note the user may read: the message gate AND the right to review."""
+    return visible_alert_texts(user).filter(pk__in=reviewable_alerts(user).values('pk'))
+
+
+def apply_alert_text_policy(user, alerts):
+    """Blank the message / note of every alert the user may not read, in memory (never save these objects), and set
+    ``text_hidden``. Views call this once on whatever they are about to render, so no template decides access."""
+    alerts = list(alerts)
+    ids = [a.pk for a in alerts]
+    texts = set(visible_alert_texts(user).filter(pk__in=ids).values_list('pk', flat=True))
+    notes = set(visible_alert_notes(user).filter(pk__in=ids).values_list('pk', flat=True))
+    for alert in alerts:
+        alert.text_hidden = alert.pk not in texts
+        if alert.text_hidden:
+            alert.message = ''
+        if alert.pk not in notes:
+            alert.review_note = ''
+    return alerts
