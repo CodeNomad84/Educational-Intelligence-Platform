@@ -16,3 +16,4 @@ Proposal: <link> · Date: · Commit(s):
 - Known limitations
 - Remaining TODOs
 - Owner acceptance (major features): pending | accepted
+- User manuals updated (`docs/manuals/<role>.md` for every role whose view or actions changed; mark TO VERIFY / PENDING POLICY where needed)

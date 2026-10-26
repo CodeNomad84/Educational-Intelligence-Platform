@@ -141,3 +141,13 @@ Test status at `8435a0e`: 1150 tests on SQLite and on PostgreSQL 16, 57 `demo_in
 6. Pricing, plans and trial length (before any billing work).
 7. Hosting and operator model for production.
 8. Vocabulary tree (Tier C) versus flat codes.
+
+## User manuals (source for the final manuals)
+- [x] Skeleton and backfill 2026-10-26: `docs/manuals/` has one file per role (platform admin, school admin, grade lead, teacher, counselor, parent, student) and a README with the convention and the markers TO VERIFY / PENDING POLICY / NOT BUILT. Written in plain English first; Persian translation at the end of the project.
+- [ ] Every item marked TO VERIFY in the manuals is checked in the running product before publishing.
+- [ ] Manual material marked PENDING POLICY (consent, retention, external LLM, parent access) is finished only after the owner decides.
+
+## Template for a new slice's checklist entry
+```
+- [ ] <slice name> (proposal NNNN): code + tests green on SQLite and PostgreSQL + mutation checks for access rules + security review + docs (maps, SECURITY matrix if access changed) + **manual lines for each affected role (docs/manuals/<role>.md)** + CI green
+```

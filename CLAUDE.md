@@ -72,7 +72,7 @@ Tests exist since Phase 1 (Django + FastAPI, stdlib only); no CI yet (T-01). Com
 For significant changes give **WHY / WHAT / WHERE / HOW / RISKS** in concise engineering language. Explain any change touching >10 files, new abstraction, dependency or service. Answer "where do I change X?" with `/where-is` (evidence only, no invented paths).
 
 ## 12. Self-review & Definition of Done
-Before reporting: correctness, architecture fit, security/authorization, data consistency, performance, maintainability, docs, customization, AI safety. Done = requirement understood + implemented + tests passing + security & permissions reviewed + migration handled + docs updated + customization considered + no known critical regression + Change Report (+ owner acceptance for major features). Definition: `docs/CHANGE_PROCESS.md`.
+Before reporting: correctness, architecture fit, security/authorization, data consistency, performance, maintainability, docs, customization, AI safety. Done = requirement understood + implemented + tests passing + security & permissions reviewed + migration handled + docs updated + **the manual of every role whose view or actions changed (`docs/manuals/<role>.md`: how, what you see, what you do NOT see, who to ask)** + customization considered + no known critical regression + Change Report (+ owner acceptance for major features). Definition: `docs/CHANGE_PROCESS.md`.
 
 ## 13. When uncertain
 Ambiguous requirement → list interpretations, consequences, recommendation, and ask. Missing evidence → say `NOT VERIFIED`. Needs a decision → `DECISION REQUIRED`. Prefer asking one precise question over guessing a business rule.

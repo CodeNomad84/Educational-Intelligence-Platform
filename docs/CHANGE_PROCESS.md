@@ -12,7 +12,7 @@
 L1 may skip steps 4–5. Never push without owner authorization.
 
 ## Definition of Done (project-wide)
-Requirement understood + implementation complete + tests passing (real run, real results) + security reviewed + permissions reviewed (RBAC, object, school scope) + migration handled and reversible + documentation updated + customization considered (no hard-coded school logic) + no known critical regression + Change Report completed. Major features additionally need **owner acceptance**. "Done" without evidence is not done.
+Requirement understood + implementation complete + tests passing (real run, real results) + security reviewed + permissions reviewed (RBAC, object, school scope) + migration handled and reversible + documentation updated + the manual of each affected role updated (`docs/manuals/<role>.md`; a few lines: how, what you see, what you do NOT see, who to ask) + customization considered (no hard-coded school logic) + no known critical regression + Change Report completed. Major features additionally need **owner acceptance**. "Done" without evidence is not done.
 
 ## Documentation sync
 Update only what the change affects: SYSTEM_MAP, MODULE_MAP, CHANGE_GUIDE (bump `Verified-at`), ARCHITECTURE, SECURITY, TESTING, AI_GOVERNANCE, CUSTOMIZATION, ROADMAP, ADR. Deferred docs (DATA_MODEL, API_MAP, RULE_ENGINE, DEPLOYMENT) are created only when their phase starts.
