@@ -7,7 +7,7 @@ from students.access import ADMIN, COUNSELOR, GRADE_LEAD, PARENT, STUDENT, TEACH
 
 def home_url_for(user):
     """SchoolAdmin -> /school/, Teacher -> /teacher/, Grade Lead -> /grade/, Parent -> /students/; the platform superuser
-    -> /admin/. Counselor -> /counselor/."""
+    -> /admin/, a PlatformAdmin -> /platform/modules/. Counselor -> /counselor/."""
     if user.is_superuser and user.is_active:
         return '/admin/'
     roles = roles_for(user)
@@ -23,6 +23,9 @@ def home_url_for(user):
         return reverse('dashboard:student_list')
     if STUDENT in roles:
         return reverse('dashboard:me_home')
+    from .operator_page import is_platform_operator   # lazy: operator_page imports the dashboard layer
+    if is_platform_operator(user):                    # a PlatformAdmin (staff) has no school home: the overview is its page
+        return reverse('dashboard:operator_overview')
     return reverse('dashboard:login')
 
 

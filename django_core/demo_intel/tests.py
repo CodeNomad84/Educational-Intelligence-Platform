@@ -115,7 +115,7 @@ class SeedAndViewTests(TestCase):
     def test_seed_creates_schooladmin_group_and_admin_roles(self):
         """seed_demo must use the ADMIN constant (ADR-0010): SchoolAdmin exists and the pre-rename group name does not."""
         self.assertEqual(ADMIN, "SchoolAdmin")
-        self.assertEqual(set(Group.objects.values_list("name", flat=True)), {ADMIN, "Parent", "Teacher", "GradeLead", "Counselor", "Student"})
+        self.assertEqual(set(Group.objects.values_list("name", flat=True)), {ADMIN, "Parent", "Teacher", "GradeLead", "Counselor", "Student", "PlatformAdmin"})
         User = get_user_model()
         self.assertIn(ADMIN, roles_for(User.objects.get(username="demo_admin")))
         self.assertEqual(roles_for(User.objects.get(username="demo_counselor")), {"Counselor"})   # Slice 4a: a real role
@@ -702,3 +702,36 @@ class SeedDemoInterventionLoopTests(TestCase):
         call_command("seed_demo", "--reset", "--password", "Test-pass-123", verbosity=0)
         self.assertEqual(InterventionPlan.objects.count(), 3)                  # rebuilt, not doubled
         self.assertEqual(Alert.objects.count(), 3)
+
+
+@override_settings(DATABASES=DEMO_DB)
+class SeedDemoPlatformAccountTests(TestCase):
+    """The demo seed has a synthetic PlatformAdmin: staff, zero model permissions, no school role, lands on the operator page."""
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("seed_demo", "--password", "Test-pass-123", verbosity=0)
+
+    def test_account_shape(self):
+        user = get_user_model().objects.get(username="demo_platform")
+        self.assertTrue(user.is_staff)
+        self.assertFalse(user.is_superuser)
+        self.assertEqual(list(user.groups.values_list("name", flat=True)), ["PlatformAdmin"])
+        self.assertEqual(user.groups.get().permissions.count(), 0)
+        self.assertEqual(roles_for(user), set())
+        from schools.models import SchoolMembership
+        self.assertFalse(SchoolMembership.objects.filter(user=user).exists())
+
+    def test_login_lands_on_the_operator_page_and_sees_no_students(self):
+        response = self.client.post("/login/", {"username": "demo_platform", "password": "Test-pass-123"})
+        self.assertRedirects(response, "/platform/modules/", fetch_redirect_response=False)
+        page = self.client.get("/platform/modules/")
+        self.assertEqual(page.status_code, 200)
+        names = " ".join(Student.objects.values_list("first_name", flat=True))
+        self.assertFalse(any(n and n in page.content.decode() for n in names.split()[:5]))
+        self.assertEqual(self.client.get("/students/").status_code, 403)
+        self.assertEqual(self.client.get("/school/").status_code, 403)
+
+    def test_reset_keeps_exactly_one_platform_account(self):
+        call_command("seed_demo", "--reset", "--password", "Test-pass-123", verbosity=0)
+        self.assertEqual(get_user_model().objects.filter(username="demo_platform").count(), 1)

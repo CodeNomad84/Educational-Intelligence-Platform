@@ -157,7 +157,7 @@ class Command(BaseCommand):
             dist[r["level"]] += 1
         self.stdout.write(self.style.SUCCESS(
             f"Seeded {len(students)} synthetic students. Risk distribution: {dist}"))
-        self.stdout.write("Demo users (all synthetic):  demo_admin / demo_counselor / demo_parent / demo_teacher / demo_gradelead / demo_student")
+        self.stdout.write("Demo users (all synthetic):  demo_admin / demo_counselor / demo_parent / demo_teacher / demo_gradelead / demo_student / demo_platform (PlatformAdmin)")
         self.stdout.write(self.style.WARNING(f"Password: {password}"))
 
     # ---------------------------------------------------------------------------------------------
@@ -314,7 +314,21 @@ class Command(BaseCommand):
                 child.parent_user = user
                 child.save(update_fields=["parent_user"])
 
+        self._platform(password)
         self._staff(password, school, year, classes, students)
+
+    def _platform(self, password):
+        """A synthetic PlatformAdmin (staff, group PlatformAdmin, ZERO model permissions, no school role, no membership):
+        it can open the operator page and edit module rows, nothing else. Demo database only (this command refuses any other)."""
+        from students.access import PLATFORM_ADMIN
+        user, _ = get_user_model().objects.get_or_create(
+            username="demo_platform", defaults=dict(first_name="مدیر پلتفرم", last_name="نمایشی"))
+        user.set_password(password)
+        user.is_staff, user.is_superuser = True, False
+        user.save()
+        group, _ = Group.objects.get_or_create(name=PLATFORM_ADMIN)
+        group.permissions.clear()
+        user.groups.set([group])
 
     def _staff(self, password, school, year, classes, students):
         """Slice 1: a demo Subject Teacher (math in two classes) and a demo Grade Lead (grade 10), school staff accounts."""
