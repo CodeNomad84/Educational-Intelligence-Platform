@@ -6,16 +6,22 @@ Who this is: the people who run the platform, not a school. Two kinds exist toda
 Neither role sees student records. Details and evidence: `docs/changes/0024-platform-onboarding-NOTE.md`.
 
 ## Log in
-**Steps:** open `/login/`, enter username and password. A superuser lands on `/admin/`. A PlatformAdmin: where they land is **TO VERIFY**; open `/admin/` or `/platform/modules/` directly.
+**Steps:** open `/login/`, enter username and password. A superuser lands on `/admin/`; a PlatformAdmin lands on the operator page `/platform/modules/` (fixed and tested 2026-10-26; before that it landed on the login page).
+**Demo:** after `scripts/start_demo.sh --reseed` the user `demo_platform` (PlatformAdmin, synthetic) logs in with the same demo password as the other demo users. A superuser for the demo is created by hand (`createsuperuser`). Neither exists outside the demo seed.
 **You do not see:** any student, grade, attendance, alert or plan. The student pages answer "not allowed".
 **Ask:** the owner, if you do not have an account.
 
-## Create a school (superuser only)
-**Steps:** `/admin/` → Schools → Add → name and a unique code (the code cannot be changed afterwards by anyone but a superuser). Then create the first school administrator: Users → Add (username, password) → on the next page tick the group **SchoolAdmin** and leave "staff" and "superuser" unticked. Then School memberships → Add (that user and the school); without it the administrator sees nothing.
-**You see:** the new school in the list; the administrator can log in at once.
-**You do not see:** a "New school" page or a wizard (**NOT BUILT**; the proposal is in 0024 §5).
-**Ask:** the owner before creating a second real school (rule in `docs/RUNBOOK.md`).
-Note: the first administrator is not forced to change the password at first login (**TO VERIFY**); ask them to change it at `/account/`.
+## Create a school (superuser only) — the 7-step checklist
+Everything below needs the **superuser**. A PlatformAdmin cannot do it (no model permissions on purpose). Do not create a second real school before the open risks in `docs/RUNBOOK.md` are accepted.
+1. **(Once, in a terminal)** `cd django_core && python manage.py createsuperuser`. Log in at `/login/`; you land on `/admin/`.
+2. **School:** `/admin/` → Schools → Add → name and a unique code. The code cannot be changed afterwards except by a superuser.
+3. **First SchoolAdmin account:** Users → Add → username and password → Save → on the next page tick the group **SchoolAdmin**; leave "staff" and "superuser" unticked → Save. (The first password is not marked "must change"; ask them to change it at `/account/`. TO VERIFY in the running product.)
+4. **Membership:** School memberships → Add → that user and the school. Without it the SchoolAdmin sees nothing. (The user picker only lists eligible users, which is why step 3 comes first.)
+5. **Modules:** School modules → Add (module, kind trial or licensed, dates), or `python manage.py set_school_module <school_code> <module> --kind licensed`. Then in a terminal, once per school: `python manage.py seed_vocabulary --school <code>`, and for the mission module `python manage.py seed_mission --school <code>`. These two commands have no page.
+6. **Hand over:** give the SchoolAdmin the username and password. They log in at `/login/`, land on `/school/` and follow the Persian quick-start (`/school/quickstart/`): academic year, classes, staff, students, bulk accounts.
+7. **Check:** open `/platform/modules/` (module state, days left) and ask the SchoolAdmin to open `/school/audit/`. School creation itself is not recorded in an audit log yet (a `create_school` command with an audit event is planned before the second pilot school).
+**You see:** the new school in the lists. **You do not see:** a "New school" page (**NOT BUILT**; decision 2026-10-26: option A now, the command later; PlatformAdmin gets no extra powers).
+**Ask:** the owner before creating a second real school.
 
 ## Switch modules on or off for a school
 **Steps:** `/admin/` → School modules → Add: school, module (`advisor_ai`, `tutor_ai`, `exams`, `mission`), kind (trial needs an end date, licensed may be open), dates. Or in a terminal: `python manage.py set_school_module <school_code> <module> --kind licensed`. Ending a module means setting its end date; rows are never deleted. Some modules need a one-time terminal seed: `python manage.py seed_vocabulary --school <code>`, and for mission `python manage.py seed_mission --school <code>`.

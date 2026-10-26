@@ -61,6 +61,11 @@ AuthN · AuthZ · object-level access · school isolation · SQL injection · XS
 ## Counseling data
 Separate, strictest tier: strict ACL, audit, retention rules, consent where applicable, no AI exposure without approved policy (`AI_GOVERNANCE.md`).
 
+
+### Counselor notes (owner decision 2026-10-26)
+The **Grade Lead MAY read the counselor's notes of students in the own grade** (the Grade Lead is the main implementer of the counselor's advice at school). Decided by the owner on 2026-10-26 (earlier correction A3); do not restrict. What the code does, pinned by `dashboard/test_lead_counselor_notes.py`: **read only** (the only write route is the counselor-only case page); scope is the Grade Lead's enrollment-based grade in the own school (another grade or another school: 404); notes exist only through a referral (no referral, no note); **a closed referral keeps its notes readable for the Grade Lead and the SchoolAdmin** (only the Counselor loses access); a read is audit-logged at page level (`view_student_360`, ids only; **known gap: there is no note-specific audit event, and the page event is also written when the student has no note**, reported to the owner, not changed). Readers: Counselor (open referral), Grade Lead (own grade, read only), SchoolAdmin (own school). Not: Teacher, Parent, Student.
+**Deliberate asymmetry:** the Grade Lead reads counselor *notes*, but sees only metadata for `emotional` / `family` alert messages and review notes and for the text of `emotional` intervention plans (decided earlier, change 0022/0023). Whether to align the two is an open question for the owner. Future idea (not now): the counselor marks each note "counselor only" or "shared with the grade lead".
+
 ## Authorization Matrix
 Normative once approved. Legend: **CURRENT** = verified behavior; **TARGET** = intended; `DECISION REQUIRED` = owner must decide. Scope values: own / own children / own classes / school / none.
 

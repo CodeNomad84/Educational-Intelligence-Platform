@@ -47,6 +47,13 @@ Test status at `8435a0e`: 1150 tests on SQLite and on PostgreSQL 16, 57 `demo_in
 - [ ] Open item (info, from 0023 F5): no rate limit on raising alerts.
 - [ ] Open item (info, from 0023 F6): the loop's test fixture `risk/loop_testing.py` lives inside the app package and imports `dashboard.test_counselor`; move it to a test-only location when convenient.
 - [x] Alert text rule (0023 F3): message and review note of `emotional`/`family` alerts readable only by the raiser and an open-referral Counselor; SchoolAdmin and Grade Lead see metadata and can still review.
+- [x] Demo PlatformAdmin `demo_platform` in the demo seed (staff, zero permissions, demo database only); a PlatformAdmin lands on `/platform/modules/` (2026-10-26).
+- [ ] `create_school` command with an audit event (school creation is not audit-logged): **before the second pilot school**. Decision 2026-10-26: onboarding option A (manual checklist, `docs/manuals/platform-admin.md`) now; PlatformAdmin gets NO extra powers; school creation stays with the superuser.
+- [ ] S9 Django admin closure: the superuser sees every user account, including student and parent accounts whose usernames are national ids. **Must be closed before real data.**
+- [x] Owner decision 2026-10-26: the Grade Lead MAY read counselor notes of students in the own grade (read only, enrollment-based grade scope, tied to a referral; pinned by `dashboard/test_lead_counselor_notes.py`). Known gap: no note-specific audit event. Open question for the owner: align this with the metadata-only rule for emotional/family alerts and emotional plan text?
+- [ ] Future idea (not now): the counselor marks each note "counselor only" or "shared with the grade lead".
+- [ ] Proposal `docs/changes/0025-rules-and-alerts-PROPOSAL.md` (deterministic rules and derived analytics feeding the alerts): awaiting owner decision.
+- [ ] P3 exit plan `docs/changes/0026-p3-exit-plan-NOTE.md`: owner/legal/ops tasks (O1-O9) can start now; code tasks (C-*) in order.
 - [ ] Parent notifications, parent-teacher messaging, printable report card, behavior log UI (backlog items 3-6).
 - [!] Parent individual-record access (Parent sees `parent_user`; recorded as C5a-R3/C6 in `SECURITY.md`).
 

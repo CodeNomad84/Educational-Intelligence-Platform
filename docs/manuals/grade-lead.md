@@ -10,7 +10,8 @@ Who this is: the person responsible for one grade (matched through the students'
 
 ## Refer a student to a counselor
 **Steps:** on the Student 360 page use the referral box (counselor and a short reason). The counselor then sees that student until the referral is closed.
-**You see:** the referral in the Student 360 page. **TO VERIFY:** by code (`visible_counselor_notes`) a grade lead can read the counselor's notes of students of the own grade, read only; confirm with the owner that this is wanted before publishing.
+**You see:** the referral and, on the Student 360 page, the counselor's notes of students of your own grade, read only (owner decision 2026-10-26: you are the main implementer of the counselor's advice). Notes stay readable after the referral is closed. You cannot write or edit notes.
+**You do not see:** notes of other grades or schools. Note the difference: for emotional or family alerts and for the text of emotional intervention plans you see metadata only.
 
 ## Raise and review alerts
 **Steps:** "ثبت نگرانی" on a student page raises an alert. `/alerts/` lists alerts of your grade: Accept, or Dismiss with a reason (note required for "other"). Accepted alerts offer "create an intervention plan".

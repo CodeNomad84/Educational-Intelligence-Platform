@@ -6,7 +6,7 @@ Status: demo and pilot on SYNTHETIC data only. Commands run from the repository 
 ```
 DEMO_PASSWORD='choose-a-password' scripts/start_demo.sh --reseed   # deletes demo_db.sqlite3, migrates, seeds 40 synthetic students
 ```
-Open http://127.0.0.1:8000/login/ . Users (all use that password): `demo_admin` (SchoolAdmin), `demo_gradelead`, `demo_teacher`, `demo_counselor`, `demo_parent`, `demo_student`. Each logs in and lands on its own page (admin `/school/`, grade lead `/grade/`, teacher `/teacher/`, counselor `/counselor/`, parent `/students/`, student `/me/`). Without `--reseed` the script refuses a seed older than one day (`DEMO_ALLOW_STALE=1` overrides). If migrate fails the script prints the fix. The demo only ever touches `django_core/demo_db.sqlite3`.
+Open http://127.0.0.1:8000/login/ . Users (all use that password): `demo_platform` (PlatformAdmin, synthetic, lands on `/platform/modules/`; staff, zero model permissions; exists only in the demo seed), `demo_admin` (SchoolAdmin), `demo_gradelead`, `demo_teacher`, `demo_counselor`, `demo_parent`, `demo_student`. Each logs in and lands on its own page (admin `/school/`, grade lead `/grade/`, teacher `/teacher/`, counselor `/counselor/`, parent `/students/`, student `/me/`). Without `--reseed` the script refuses a seed older than one day (`DEMO_ALLOW_STALE=1` overrides). If migrate fails the script prints the fix. The demo only ever touches `django_core/demo_db.sqlite3`.
 
 ## 2. Create a school and its administrator (platform superuser)
 The superuser is the PLATFORM account: it manages schools and accounts and sees no student data.
