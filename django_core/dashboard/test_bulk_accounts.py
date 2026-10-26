@@ -367,19 +367,22 @@ class LoginSheetOnceTests(Base):
     def test_passwords_exist_only_in_the_download(self):
         import os
         import tempfile
-        from django.conf import settings
         from django.db import connection
+        from django.test import override_settings
 
-        def files():
-            roots = {tempfile.gettempdir(), str(getattr(settings, 'MEDIA_ROOT', '') or '')}
-            return {os.path.join(d, f) for r in roots if r and os.path.isdir(r) for d, _s, fs in os.walk(r) for f in fs}
+        # The server may write only into this test's own temp dir, which is also where tempfile and MEDIA_ROOT point: files that
+        # other processes (the Docker runtime, other tests) put into the global /tmp can no longer be mistaken for ours.
+        with tempfile.TemporaryDirectory() as private:
+            def files():
+                return {os.path.join(d, f) for d, _s, fs in os.walk(private) for f in fs}
 
-        before = files()
-        with self.assertNoLogs(level='DEBUG'):
-            response = self.confirm([['Ali Test', '9000000001', 7, '7-A', '9000000101', '', '', '']])
-        passwords = [r[3] for r in load_workbook(io.BytesIO(response.content)).active.iter_rows(min_row=2, values_only=True) if r[3]]
-        self.assertEqual(len(passwords), 2)
-        self.assertEqual(files() - before, set())                       # nothing written to disk by the server
+            with override_settings(MEDIA_ROOT=private), mock.patch.object(tempfile, 'tempdir', private):
+                before = files()
+                with self.assertNoLogs(level='DEBUG'):
+                    response = self.confirm([['Ali Test', '9000000001', 7, '7-A', '9000000101', '', '', '']])
+                passwords = [r[3] for r in load_workbook(io.BytesIO(response.content)).active.iter_rows(min_row=2, values_only=True) if r[3]]
+                self.assertEqual(len(passwords), 2)
+                self.assertEqual(files() - before, set())               # nothing written to disk by the server
         with connection.cursor() as cursor:                             # nowhere in the database in plain text
             for table in connection.introspection.table_names():
                 cursor.execute(f'SELECT * FROM "{table}"')
