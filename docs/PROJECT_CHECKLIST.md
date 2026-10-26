@@ -43,6 +43,10 @@ Test status at `8435a0e`: 1150 tests on SQLite and on PostgreSQL 16, 57 `demo_in
 - [!] Retention period for alerts, plans, follow-ups and risk events waits for the legal policy; risk events 3 years per doc 12, not enforced; nothing is deleted automatically.
 - [ ] Open item: `Referral` and `CounselorNote` still use `CASCADE` on the student, the new loop tables use `PROTECT` (students are deactivated, never deleted); decide whether to align (changes applied models, Tier C).
 - [ ] Open item: the local `.git/info/exclude` hides `django_core/{risk,interventions,behavior,governance,accounts,core}`; `risk/` and `interventions/` were force-added (new files there need `git add -f`).
+- [ ] Open item (info, from 0023 F4): list pages and the Student 360 tile are not audit-logged (plan pages and sensitive alert text are); part of the audit completeness review.
+- [ ] Open item (info, from 0023 F5): no rate limit on raising alerts.
+- [ ] Open item (info, from 0023 F6): the loop's test fixture `risk/loop_testing.py` lives inside the app package and imports `dashboard.test_counselor`; move it to a test-only location when convenient.
+- [x] Alert text rule (0023 F3): message and review note of `emotional`/`family` alerts readable only by the raiser and an open-referral Counselor; SchoolAdmin and Grade Lead see metadata and can still review.
 - [ ] Parent notifications, parent-teacher messaging, printable report card, behavior log UI (backlog items 3-6).
 - [!] Parent individual-record access (Parent sees `parent_user`; recorded as C5a-R3/C6 in `SECURITY.md`).
 
