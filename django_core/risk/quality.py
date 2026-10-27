@@ -24,7 +24,11 @@ def rule_quality(school_id):
         if raised < MIN_GROUP:
             out.append({'code': code, 'raised': None, 'accepted': None, 'dismissed': {}, 'withheld': True})
             continue
-        out.append({'code': code, 'raised': raised, 'accepted': shown(c.get(Alert.ACCEPTED, 0)), 'withheld': False,
-                    'dismissed': {reason: shown(c.get('dismissed:' + reason, 0)) for reason, _label in Alert.DISMISS_REASONS
-                                  if c.get('dismissed:' + reason, 0)}})
+        accepted = shown(c.get(Alert.ACCEPTED, 0))
+        dismissed = {reason: shown(c.get('dismissed:' + reason, 0)) for reason, _label in Alert.DISMISS_REASONS
+                     if c.get('dismissed:' + reason, 0)}
+        withheld_cell = accepted is None or None in dismissed.values()
+        # When any cell is withheld the row total is hidden too, so a withheld cell cannot be recovered by subtraction.
+        out.append({'code': code, 'raised': None if withheld_cell else raised, 'accepted': accepted, 'withheld': False,
+                    'dismissed': dismissed})
     return out

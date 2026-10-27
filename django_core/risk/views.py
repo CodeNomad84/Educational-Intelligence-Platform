@@ -25,7 +25,8 @@ SLOTS = 4
 
 
 def _settings(school):
-    return RuleSettings.objects.get_or_create(school=school)[0]
+    """The school's settings, or unsaved defaults: a GET never writes (the row is created when the SchoolAdmin saves)."""
+    return RuleSettings.objects.filter(school=school).first() or RuleSettings(school=school)
 
 
 def _number(raw, name, integer=False):
@@ -104,7 +105,7 @@ def run_now(request, school):
 @school_page
 @require_POST
 def save_settings(request, school):
-    current = _settings(school)
+    current = _settings(school)      # unsaved defaults when absent; saved below
     try:
         scale = (request.POST.get('grade_scale_max') or '').strip()
         scale = _number(scale, 'سقف مقیاس', integer=True) if scale else None

@@ -9,7 +9,7 @@
 <h5 class="mt-4">کیفیت قواعد (فقط شمارش؛ مقادیر کمتر از ۵ پنهان است)</h5>
 <table class="table table-sm bg-white small"><thead><tr><th>قاعده</th><th>هشدار</th><th>پذیرفته‌شده</th><th>ردشده (به تفکیک دلیل)</th></tr></thead>
 <tbody>{% for q in quality %}<tr><td>{{ q.code }}</td>{% if q.withheld %}<td colspan="3" class="text-muted">تعداد کمتر از ۵؛ نمایش داده نمی‌شود</td>{% else %}
-<td>{{ q.raised }}</td><td>{% if q.accepted is None %}—{% else %}{{ q.accepted }}{% endif %}</td><td>{% for reason, n in q.dismissed.items %}{{ reason }}: {% if n is None %}—{% else %}{{ n }}{% endif %}{% if not forloop.last %}، {% endif %}{% endfor %}</td>{% endif %}</tr>
+<td>{% if q.raised is None %}—{% else %}{{ q.raised }}{% endif %}</td><td>{% if q.accepted is None %}—{% else %}{{ q.accepted }}{% endif %}</td><td>{% for reason, n in q.dismissed.items %}{{ reason }}: {% if n is None %}—{% else %}{{ n }}{% endif %}{% if not forloop.last %}، {% endif %}{% endfor %}</td>{% endif %}</tr>
 {% empty %}<tr><td colspan="4" class="text-muted">هنوز هشداری از قواعد ثبت نشده است.</td></tr>{% endfor %}</tbody></table>
 {% endblock %}
 {% block content %}

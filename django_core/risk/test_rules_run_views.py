@@ -67,9 +67,15 @@ class QualityTests(RulesBase):
         self.make(3, 'dismissed', 'duplicate')
         self.make(4, 'accepted')
         (row,) = rule_quality(self.a.pk)
-        self.assertEqual((row['raised'], row['accepted'], row['withheld']), (18, None, False))      # 4 accepted < 5 -> withheld
+        self.assertEqual((row['raised'], row['accepted'], row['withheld']), (None, None, False))    # a withheld cell hides the total too
         self.assertEqual(row['dismissed'], {'not_relevant': 5, 'duplicate': None})
         self.assertNotIn('student', str(row))
+
+    def test_the_total_is_shown_only_when_no_cell_is_withheld(self):
+        self.make(6, 'accepted')
+        self.make(5, 'dismissed', 'not_relevant')
+        (row,) = rule_quality(self.a.pk)
+        self.assertEqual((row['raised'], row['accepted'], row['dismissed']), (11, 6, {'not_relevant': 5}))
 
     def test_a_rule_with_fewer_than_five_alerts_shows_nothing(self):
         self.make(4, 'new')
@@ -101,3 +107,17 @@ class AlertDisplayTests(RulesBase):
         for user in (self.teacher, self.admin_b, self.lead_b):
             self.client.force_login(user)
             self.assertNotContains(self.client.get(reverse('dashboard:alert_list')), 'repeated_absence', msg_prefix=user.username)
+
+
+class GetWritesNothingTests(RulesBase):
+    def test_get_pages_create_no_settings_row_and_show_defaults(self):
+        from risk.models import RuleSettings
+        RuleSettings.objects.all().delete()
+        self.client.force_login(self.admin)
+        for name in ('rules:index', 'rules:create'):
+            self.assertEqual(self.client.get(reverse(name)).status_code, 200)
+        page = self.client.get(reverse('rules:index'))
+        self.assertEqual((page.context['settings'].breaker_percent, page.context['settings'].grade_scale_max), (15, None))
+        self.assertEqual(RuleSettings.objects.count(), 0)
+        self.client.post(reverse('rules:settings'), {'grade_scale_max': '20', 'breaker_percent': '15'})
+        self.assertEqual(RuleSettings.objects.get(school=self.a).grade_scale_max, 20)
