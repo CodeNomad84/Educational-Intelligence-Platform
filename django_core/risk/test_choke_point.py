@@ -31,10 +31,15 @@ class MigrationTests(TestCase):
     def test_loop_migrations_only_create_tables_and_depend_on_the_latest_of_others(self):
         loader = MigrationLoader(None, ignore_no_migrations=True)
         for app in ('risk', 'interventions'):
-            keys = [k for k in loader.disk_migrations if k[0] == app]
-            self.assertEqual(keys, [(app, '0001_initial')])
-            for op in loader.disk_migrations[keys[0]].operations:
-                self.assertIsInstance(op, (migrations.CreateModel, migrations.AddIndex, migrations.AddConstraint))   # new tables only
+            keys = sorted(k for k in loader.disk_migrations if k[0] == app)
+            self.assertEqual(keys[0], (app, '0001_initial'))
+            if app == 'risk':
+                self.assertEqual(keys, [('risk', '0001_initial'), ('risk', '0002_rules')])   # 0025: rule tables only
+            else:
+                self.assertEqual(len(keys), 1)
+            for key in keys:
+                for op in loader.disk_migrations[key].operations:
+                    self.assertIsInstance(op, (migrations.CreateModel, migrations.AddIndex, migrations.AddConstraint))   # new tables only
 
     def test_models_are_not_in_the_django_admin(self):
         registered = {m._meta.label for m in admin.site._registry}
