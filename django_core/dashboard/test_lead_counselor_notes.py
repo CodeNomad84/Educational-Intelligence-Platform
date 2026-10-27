@@ -1,6 +1,6 @@
 """Owner decision 2026-10-26 (earlier correction A3): a Grade Lead MAY read the counselor's notes of students of the own grade.
 These tests pin what that access is and is not: read only, enrollment-based grade scope in the own school, tied to an existing
-referral, audit-logged at page level. See SECURITY.md (counselor notes) for the decision and the known audit gap."""
+referral, audit-logged (page event plus counselor_note_view). See SECURITY.md (counselor notes) for the decision."""
 from django.urls import reverse
 
 from dashboard.test_counselor import Base, make_user
@@ -80,14 +80,31 @@ class LeadReadsCounselorNotesTests(Base):
     def test_reads_are_audit_logged_at_page_level_without_content(self):
         AuditEvent.objects.all().delete()
         self.page(self.lead)
-        rows = list(AuditEvent.objects.values_list('username', 'action', 'object_type', 'detail'))
-        self.assertEqual(rows, [('lead', 'view_student_360', 'Student', '')])
+        rows = list(AuditEvent.objects.order_by('pk').values_list('username', 'action', 'object_type', 'detail'))
+        self.assertEqual(rows, [('lead', 'view_student_360', 'Student', ''), ('lead', 'counselor_note_view', 'Student', 'n1')])
         every = ' '.join(f'{a} {b} {c} {d} {e}' for a, b, c, d, e in AuditEvent.objects.values_list(
             'username', 'action', 'object_type', 'object_id', 'detail'))
         self.assertNotIn('NOTE-text', every)
-        # known gap (reported to the owner, not fixed): there is no note-specific event, and the page event is also written
-        # when the student has no note at all
-        self.assertFalse(AuditEvent.objects.filter(action__contains='note').exists())
+
+    def test_note_view_event_for_every_role_that_reads_text(self):
+        for user in (self.lead, self.admin):
+            AuditEvent.objects.all().delete()
+            self.page(user)
+            event = AuditEvent.objects.get(action='counselor_note_view')
+            self.assertEqual((event.username, event.detail, event.school_id), (user.username, 'n1', self.a.pk), user.username)
+        AuditEvent.objects.all().delete()
+        self.client.force_login(self.counselor)
+        self.assertContains(self.client.get(reverse('dashboard:counselor_case', args=[self.referral.pk])), NOTE)
+        event = AuditEvent.objects.get(action='counselor_note_view')
+        self.assertEqual((event.username, event.object_type, event.detail), ('counselor', 'Referral', 'n1'))
+
+    def test_no_note_view_event_when_no_note_text_is_displayed(self):
+        AuditEvent.objects.all().delete()
+        self.page(self.lead8, self.s8)                                  # no referral, no note: page shown, no text
+        self.assertFalse(AuditEvent.objects.filter(action='counselor_note_view').exists())
+        self.assertTrue(AuditEvent.objects.filter(action='view_student_360').exists())
+        self.page(self.lead_b)                                          # 404: nothing shown
+        self.assertFalse(AuditEvent.objects.filter(action='counselor_note_view').exists())
 
     def test_parent_teacher_and_student_never_read_notes(self):
         teacher = make_user('t', 'Teacher', self.a)

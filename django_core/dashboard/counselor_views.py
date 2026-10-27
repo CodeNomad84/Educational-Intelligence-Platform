@@ -81,8 +81,10 @@ def case(request, pk):
     audit.record(request.user, audit.VIEW_CASE, referral)
     audit.record(request.user, audit.SHOW_PARENT_PHONES, student)    # the case page displays the parents' phone numbers
     context = summary_context(request, student)
-    context.update(referral=referral, form=form,
-                   notes=visible_counselor_notes(request.user).filter(referral=referral).select_related('author'))
+    notes = list(visible_counselor_notes(request.user).filter(referral=referral).select_related('author'))
+    if notes:       # note text is rendered on this page: counts only in the audit event
+        audit.record(request.user, audit.COUNSELOR_NOTE_VIEW, referral, detail=f'n{len(notes)}')
+    context.update(referral=referral, form=form, notes=notes)
     return render(request, 'dashboard/counselor/case.html', context)
 
 

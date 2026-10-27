@@ -18,7 +18,7 @@ Who this is: the person who runs one school's data and accounts. You only ever s
 
 ## Look at one student (Student 360) and refer to a counselor
 **Steps:** `/students/` → open a student → "پرونده ۳۶۰" (Student 360). Use the referral box to send the student to a counselor with a short reason.
-**You see:** identity, enrollment per year, grades per year and subject, attendance summary, teacher recommendations, referrals and counselor notes of your school, and a summary of alerts and interventions.
+**You see:** identity, enrollment per year, grades per year and subject, attendance summary, teacher recommendations, referrals and counselor notes of your school, and a summary of alerts and interventions. Note text shown to you is recorded in the audit log (counts only).
 **You do not see:** the text of an emotional-type intervention plan or its follow-ups; the message of an emotional or family alert; students of other schools.
 
 ## Review alerts

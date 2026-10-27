@@ -48,6 +48,16 @@ Unsure? Classify upward. Never execute L3 without explicit approval.
 **Reports:** one page: what changed, evidence (test counts), Tier B decisions taken, and only the Tier C items that need the owner.
 **Unchanged:** `&&` chain before every commit, both databases, `/security-review`, mutation checks for access changes, no real student data until P3 exit.
 
+### 6a-bis. TEMPORARY: "Phase 2 autonomous" run mode (owner decision 2026-10-27; REMOVE THIS SUBSECTION AT THE START OF PHASE 3)
+Valid until the end of Phase 2, then STOP for the Phase 3 start. Supplements 6a; never overrides section 7.
+- **May decide alone (Tier A/B, and Tier C-lite = a design decision inside already-approved principles that touches no access rule, tenancy, privacy, irreversible migration or product/commercial policy):** order of the remaining Phase 2 slices (computed from `ROADMAP.md` and `PROJECT_CHECKLIST.md`, listed at the top of the next report), proposal and implementation in the same run, naming, UI details, default thresholds, test strategy.
+- **Cadence:** chain slices without waiting for review; 5-line report after each; push to `phase-1/boot-security` only at slice boundaries (never force; no rapid pushes that supersede CI runs); confirm CI green.
+- **Decision log:** `docs/DECISIONS_BY_CODE.md`, one entry per decision that would otherwise have been asked: date, slice, decision, reason, alternative, how to reverse.
+- **Resume note:** after each slice, update `PROJECT_CHECKLIST.md` with a one-line "next step" so a fresh session can continue.
+- **Still STOP and ask:** access rules and school isolation, anything about real data, irreversible or applied-migration changes, changing the meaning of existing tables, Medium+ security findings, product/commercial/legal decisions (pricing, licences, consent, retention, external LLM), unexplained test/CI results, any new multi-school stage, two documents contradicting each other on behavior.
+- **Never:** push to main/Test, force-push, real data, S8-S10, LLM/external AI, billing. Explicit `git add` paths (`-f` only for `risk/` and `interventions/`); tests green before commit.
+- **Exit:** write `docs/changes/00xx-phase-2-exit-REPORT.md`, run a full-branch security review, STOP.
+
 ## 7. Hard rules
 - Never read, print, edit or commit `.env` or secrets; never reproduce secret values found in code (cite file:line only). Rotation, not history rewrite.
 - Never run `git push`, force-push, rebase, `reset --hard`, `clean`, or rewrite history or any command that writes to GitHub without the owner's explicit approval in chat for that specific action.. Check `git status` before and `git diff` after work. One focused change per commit; no unrelated edits.

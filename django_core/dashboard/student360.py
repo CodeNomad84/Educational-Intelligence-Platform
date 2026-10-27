@@ -61,8 +61,10 @@ def student_360(request, pk):
     audit.record(request.user, audit.VIEW_360, student)
     context = summary_context(request, student)
     context['referrals'] = visible_referrals(request.user).filter(student=student).select_related('counselor')
-    context['counselor_notes'] = visible_counselor_notes(request.user).filter(
-        referral__student=student).select_related('author')
+    notes = list(visible_counselor_notes(request.user).filter(referral__student=student).select_related('author'))
+    context['counselor_notes'] = notes
+    if notes:       # note text is rendered below: record that, counts only (view_student_360 stays the page-level event)
+        audit.record(request.user, audit.COUNSELOR_NOTE_VIEW, student, detail=f'n{len(notes)}')
     roles = roles_for(request.user)
     if roles & {ADMIN, GRADE_LEAD}:
         # Intervention loop tile: metadata only (counts, type, status, dates, owner, outcome code). The scoped querysets give a

@@ -5,6 +5,7 @@ from .models import AuditEvent
 VIEW_360 = 'view_student_360'
 VIEW_DETAIL = 'view_student_detail'
 VIEW_CASE = 'view_counselor_case'
+COUNSELOR_NOTE_VIEW = 'counselor_note_view'    # detail = n<count of notes shown>; written only when note text is displayed; never the text
 SHOW_PARENT_PHONES = 'show_parent_phones'
 NOTE_ADD = 'counselor_note_add'
 REFERRAL_CREATE = 'referral_create'
