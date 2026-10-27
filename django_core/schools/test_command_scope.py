@@ -16,7 +16,7 @@ from schools.models import AcademicYear, GradeLeadAssignment, School, SchoolClas
 from students.models import Enrollment, Student
 from vocabulary.models import VocabularyTerm
 
-NEEDS_SCHOOL = {'seed_mission', 'seed_vocabulary', 'normalize_year_texts', 'backfill_enrollments'}
+NEEDS_SCHOOL = {'run_rules', 'seed_mission', 'seed_vocabulary', 'normalize_year_texts', 'backfill_enrollments'}
 SINGLE_SCHOOL = {   # act on exactly one school, or refuse when it is ambiguous
     'set_school_module', 'seed_demo', 'rollover_academic_year', 'import_history', 'backfill_school_memberships',
     'backfill_student_school'}

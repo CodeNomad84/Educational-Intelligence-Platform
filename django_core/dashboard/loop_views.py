@@ -44,7 +44,7 @@ def _fail(request, error):
 @role_required(*STAFF)
 def alert_list(request):
     status = request.GET.get('status', Alert.NEW)
-    alerts = visible_alerts(request.user).select_related('student', 'risk_event', 'raised_by', 'reviewed_by')
+    alerts = visible_alerts(request.user).select_related('student', 'risk_event', 'raised_by', 'reviewed_by').prefetch_related('rule_hits__rule')
     if status in dict(Alert.STATUS_CHOICES):
         alerts = alerts.filter(status=status)
     reviewable = set(reviewable_alerts(request.user).values_list('pk', flat=True))

@@ -13,11 +13,16 @@ from datetime import timedelta
 from numbers import Real
 
 from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
+from django.utils import timezone
 
-from students.access import system_scope_attendance, system_scope_enrollments, system_scope_grades
+from students.access import system_scope_attendance, system_scope_enrollments, system_scope_grades, system_scope_students
+
+from schools import audit
 
 from . import signals
-from .models import Rule, RuleSettings
+from .models import Alert, Rule, RuleHit, RuleRun, RuleSettings
+from .services import raise_alert
 
 MAX_CLAUSES = 4
 MAX_SPAN_DAYS = 730
@@ -173,3 +178,93 @@ def simulate(rule, *, as_of, weeks=8):
                        'fired': fired if fired >= MIN_GROUP else None,
                        'by_grade': {g: (n if n >= MIN_GROUP else None) for g, n in sorted(by_grade.items())}})
     return result
+
+
+# ---- the runner (live): the only code that turns rule hits into alerts ----
+METRIC_FA = {'absence_rate': 'نرخ غیبت', 'absence_shift_pp': 'افزایش نرخ غیبت (واحد درصد)', 'late_count': 'تعداد تأخیر',
+             'absent_days': 'تعداد روزهای غیبت', 'max_consecutive_absences': 'بیشترین غیبت پیاپی', 'avg_score': 'میانگین نمرات',
+             'grades_count': 'تعداد نمرات', 'subject_drop': 'بیشترین افت نمرهٔ یک درس'}
+OPEN_PLAN_STATUSES = ('planned', 'active')
+DEFAULT_BREAKER_PERCENT = 15
+
+
+def message_for(rule, evidence):
+    """Deterministic text from the evidence (numbers only, no diagnosis, no free text)."""
+    parts = [f"{METRIC_FA[e['metric']]}: {e['value']:g} ({e['op']} {e['threshold']:g}) در {e['window_days']} روز اخیر، {e['records']} رکورد"
+             for e in evidence]
+    text = f"طبق قاعدهٔ «{rule.title}» ({rule.code} نسخهٔ {rule.version}): " + "؛ ".join(parts)
+    return text[:300], text[:500]
+
+
+def _blocked_by_cooldown(rule, hits, as_of):
+    """``hits``: this student's earlier RuleHits of the same rule code. An earlier alert blocks a new one while it is new, or
+    accepted with a planned/active plan; otherwise only until ``cooldown_days`` have passed since the last hit (``evaluated_on``, the run's own date)."""
+    for hit in hits:
+        alert = hit.alert
+        if alert.status == Alert.NEW:
+            return True
+        if alert.status == Alert.ACCEPTED and alert.plans.filter(status__in=OPEN_PLAN_STATUSES).exists():
+            return True
+    last = max((h.evaluated_on for h in hits), default=None)
+    return last is not None and (as_of - last).days < rule.cooldown_days
+
+
+def _run_rule(rule, students, attendance, grades, as_of, school_id, scale_ok, breaker_percent, actor, triggered_by):
+    run = RuleRun(school_id=school_id, rule=rule, mode='live', as_of=as_of, triggered_by=triggered_by, evaluated=len(students))
+    uses_scale = any(c['metric'] == 'avg_score' for c in rule.clauses)
+    if uses_scale and not scale_ok:
+        run.status = RuleRun.Status.NO_SCALE
+        run.save()
+        return run
+    verdicts = evaluate_rule(rule, students, attendance, grades, as_of)
+    fired = {sid: ev for sid, (v, ev) in verdicts.items() if v == 'fired'}
+    run.hits = len(fired)
+    run.skipped_insufficient = sum(1 for v, _e in verdicts.values() if v == 'insufficient')
+    if students and len(fired) * 100 > breaker_percent * len(students):      # circuit breaker: more than N% would fire
+        run.status = RuleRun.Status.BREAKER
+        run.save()
+        return run
+    earlier = defaultdict(list)
+    for hit in RuleHit.objects.filter(school_id=school_id, rule__code=rule.code, student_id__in=fired).select_related('alert'):
+        earlier[hit.student_id].append(hit)
+    for student in system_scope_students(school_id).filter(pk__in=fired):
+        if _blocked_by_cooldown(rule, earlier[student.pk], as_of):
+            run.skipped_cooldown += 1
+            continue
+        message, explanation = message_for(rule, fired[student.pk])
+        try:
+            with transaction.atomic():           # one transaction per student: a failed hit insert rolls its alert back
+                alert = raise_alert(student, risk_type=rule.risk_type, severity=rule.severity, message=message,
+                                    explanation=explanation, detected_by='rule_engine', raised_by=None)
+                RuleHit.objects.create(school_id=school_id, rule=rule, student=student, alert=alert, evaluated_on=as_of,
+                                       evidence={'items': fired[student.pk]})
+        except IntegrityError:                   # the same rule+student+day already has a hit (a simultaneous run won)
+            run.skipped_cooldown += 1
+            continue
+        run.alerts_raised += 1
+        audit.record(actor, audit.ALERT_RAISE, alert, school=school_id, detail=rule.code[:40])
+    run.save()
+    return run
+
+
+def run_school(school_id, *, as_of=None, triggered_by=None):
+    """Evaluate every ACTIVE rule of ONE school and raise alerts. ``school_id`` is explicit; ``triggered_by`` is a user (the button)
+    or None (command / scheduler, audited as the ``system`` actor). Writes alerts, events, hits and run rows only."""
+    if isinstance(school_id, bool) or not isinstance(school_id, int):
+        raise ValueError('run_school needs one explicit school id')
+    as_of = as_of or timezone.localdate()
+    actor = triggered_by or audit.SYSTEM
+    settings = RuleSettings.objects.filter(school_id=school_id).first()
+    breaker = settings.breaker_percent if settings else DEFAULT_BREAKER_PERCENT
+    scale_ok = bool(settings and settings.grade_scale_max)
+    active = list(Rule.objects.filter(school_id=school_id, status=Rule.Status.ACTIVE).order_by('code'))
+    runs = []
+    if active:
+        students, attendance, grades = load_school(school_id, as_of, as_of)
+        for rule in active:
+            run = _run_rule(rule, students, attendance, grades, as_of, school_id, scale_ok, breaker, actor, triggered_by)
+            audit.record(actor, audit.RULE_RUN, rule, school=school_id,
+                         detail=f"e{run.evaluated}h{run.hits}a{run.alerts_raised}c{run.skipped_cooldown}i{run.skipped_insufficient}"
+                                + ('B' if run.status == RuleRun.Status.BREAKER else 'S' if run.status == RuleRun.Status.NO_SCALE else ''))
+            runs.append(run)
+    return runs

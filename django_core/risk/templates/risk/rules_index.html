@@ -1,5 +1,17 @@
 {% extends 'dashboard/base.html' %}
-{% block title %}قواعد هشدار{% endblock %}
+{% block title %}قواعد هشدار<h5 class="mt-4">اجرای قواعد</h5>
+<p class="small text-muted">قواعد فعال را روی دانش‌آموزان همین مدرسه اجرا می‌کند. اجرای خودکار زمان‌بندی‌شده وجود ندارد (دستور <code>run_rules</code> در RUNBOOK).</p>
+{% if has_active %}<form method="post" action="{% url 'rules:run' %}" class="mb-3">{% csrf_token %}<button class="btn btn-sm btn-warning">اجرای قواعد فعال همین حالا</button></form>{% endif %}
+<table class="table table-sm bg-white small"><thead><tr><th>زمان</th><th>قاعده</th><th>وضعیت</th><th>ارزیابی‌شده</th><th>برقرار</th><th>هشدار جدید</th><th>مهلت/تکراری</th><th>داده ناکافی</th></tr></thead>
+<tbody>{% for r in runs %}<tr class="{% if r.status != 'ok' %}table-danger{% endif %}"><td>{{ r.started_at|date:'Y-m-d H:i' }}</td><td>{{ r.rule.code }} v{{ r.rule.version }}</td><td>{{ r.get_status_display }}{% if r.status == 'breaker_tripped' %}<div>آستانه‌ها را بازبینی کنید: {{ r.hits }} از {{ r.evaluated }} دانش‌آموز برقرار بود.</div>{% endif %}</td>
+<td>{{ r.evaluated }}</td><td>{{ r.hits }}</td><td>{{ r.alerts_raised }}</td><td>{{ r.skipped_cooldown }}</td><td>{{ r.skipped_insufficient }}</td></tr>
+{% empty %}<tr><td colspan="8" class="text-muted">هنوز اجرایی انجام نشده است.</td></tr>{% endfor %}</tbody></table>
+<h5 class="mt-4">کیفیت قواعد (فقط شمارش؛ مقادیر کمتر از ۵ پنهان است)</h5>
+<table class="table table-sm bg-white small"><thead><tr><th>قاعده</th><th>هشدار</th><th>پذیرفته‌شده</th><th>ردشده (به تفکیک دلیل)</th></tr></thead>
+<tbody>{% for q in quality %}<tr><td>{{ q.code }}</td>{% if q.withheld %}<td colspan="3" class="text-muted">تعداد کمتر از ۵؛ نمایش داده نمی‌شود</td>{% else %}
+<td>{{ q.raised }}</td><td>{% if q.accepted is None %}—{% else %}{{ q.accepted }}{% endif %}</td><td>{% for reason, n in q.dismissed.items %}{{ reason }}: {% if n is None %}—{% else %}{{ n }}{% endif %}{% if not forloop.last %}، {% endif %}{% endfor %}</td>{% endif %}</tr>
+{% empty %}<tr><td colspan="4" class="text-muted">هنوز هشداری از قواعد ثبت نشده است.</td></tr>{% endfor %}</tbody></table>
+{% endblock %}
 {% block content %}
 {% include 'dashboard/school/_nav.html' %}
 <h4>قواعد هشدار (قاعده‌محور و قابل‌توضیح)</h4>
@@ -21,4 +33,16 @@
     <td><span class="badge bg-secondary">{{ r.get_status_display }}</span></td><td><a href="{% url 'rules:detail' r.pk %}">باز کردن</a></td></tr>
   {% empty %}<tr><td colspan="7" class="text-muted">هنوز قاعده‌ای تعریف نشده است.</td></tr>{% endfor %}</tbody>
 </table>
+<h5 class="mt-4">اجرای قواعد</h5>
+<p class="small text-muted">قواعد فعال را روی دانش‌آموزان همین مدرسه اجرا می‌کند. اجرای خودکار زمان‌بندی‌شده وجود ندارد (دستور <code>run_rules</code> در RUNBOOK).</p>
+{% if has_active %}<form method="post" action="{% url 'rules:run' %}" class="mb-3">{% csrf_token %}<button class="btn btn-sm btn-warning">اجرای قواعد فعال همین حالا</button></form>{% endif %}
+<table class="table table-sm bg-white small"><thead><tr><th>زمان</th><th>قاعده</th><th>وضعیت</th><th>ارزیابی‌شده</th><th>برقرار</th><th>هشدار جدید</th><th>مهلت/تکراری</th><th>داده ناکافی</th></tr></thead>
+<tbody>{% for r in runs %}<tr class="{% if r.status != 'ok' %}table-danger{% endif %}"><td>{{ r.started_at|date:'Y-m-d H:i' }}</td><td>{{ r.rule.code }} v{{ r.rule.version }}</td><td>{{ r.get_status_display }}{% if r.status == 'breaker_tripped' %}<div>آستانه‌ها را بازبینی کنید: {{ r.hits }} از {{ r.evaluated }} دانش‌آموز برقرار بود.</div>{% endif %}</td>
+<td>{{ r.evaluated }}</td><td>{{ r.hits }}</td><td>{{ r.alerts_raised }}</td><td>{{ r.skipped_cooldown }}</td><td>{{ r.skipped_insufficient }}</td></tr>
+{% empty %}<tr><td colspan="8" class="text-muted">هنوز اجرایی انجام نشده است.</td></tr>{% endfor %}</tbody></table>
+<h5 class="mt-4">کیفیت قواعد (فقط شمارش؛ مقادیر کمتر از ۵ پنهان است)</h5>
+<table class="table table-sm bg-white small"><thead><tr><th>قاعده</th><th>هشدار</th><th>پذیرفته‌شده</th><th>ردشده (به تفکیک دلیل)</th></tr></thead>
+<tbody>{% for q in quality %}<tr><td>{{ q.code }}</td>{% if q.withheld %}<td colspan="3" class="text-muted">تعداد کمتر از ۵؛ نمایش داده نمی‌شود</td>{% else %}
+<td>{{ q.raised }}</td><td>{% if q.accepted is None %}—{% else %}{{ q.accepted }}{% endif %}</td><td>{% for reason, n in q.dismissed.items %}{{ reason }}: {% if n is None %}—{% else %}{{ n }}{% endif %}{% if not forloop.last %}، {% endif %}{% endfor %}</td>{% endif %}</tr>
+{% empty %}<tr><td colspan="4" class="text-muted">هنوز هشداری از قواعد ثبت نشده است.</td></tr>{% endfor %}</tbody></table>
 {% endblock %}

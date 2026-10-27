@@ -62,9 +62,21 @@ RULE_SETTINGS = 'rule_settings'                # detail = changed keys only
 STAFF_ROLES_CHANGE = 'staff_roles_change'  # detail = resulting roles, e.g. T,G
 
 
+SYSTEM = 'system'      # actor of scheduled / command runs (no user): stored as user=None, username 'system', roles 'system'
+
+
 def record(user, action, obj=None, *, school=None, detail=''):
     """Append one event. ``school`` defaults to ``obj.school_id`` (a Student) or the student's school."""
     from students.access import roles_for
+
+    if user == SYSTEM:
+        school_id = getattr(school, 'pk', school)
+        if school_id is None:
+            raise ValueError('audit event without a school')
+        return AuditEvent.objects.create(
+            user=None, username=SYSTEM, roles=SYSTEM, school_id=school_id, action=action,
+            object_type=type(obj).__name__ if obj is not None else '', object_id=str(getattr(obj, 'pk', '') or ''),
+            detail=detail[:40])
 
     school_id = getattr(school, 'pk', school)
     if school_id is None and obj is not None:

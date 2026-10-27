@@ -15,8 +15,8 @@ from django.views.decorators.http import require_http_methods, require_POST
 from dashboard.school_views import school_page
 from schools import audit
 
-from . import lifecycle, rules, signals
-from .models import Rule, RuleSettings
+from . import lifecycle, quality, rules, signals
+from .models import Rule, RuleRun, RuleSettings
 
 UNVALIDATED = ('آستانه‌ها پیشنهاد اولیه و اعتبارسنجی‌نشده‌اند؛ پیش از فعال‌سازی، معلمان همین مدرسه باید آن‌ها را بازبینی کنند.')
 ACTIONS = {'submit': lifecycle.submit, 'approve': lifecycle.approve, 'reopen': lifecycle.reopen, 'pause': lifecycle.pause,
@@ -80,7 +80,25 @@ def _context(school, request, **extra):
 def index(request, school):
     rows = list(Rule.objects.filter(school=school).select_related('created_by', 'approved_by'))
     return render(request, 'risk/rules_index.html', _context(
-        school, request, rules=rows, settings=_settings(school), kinds=Rule.KINDS, starters=sorted(rules.STARTERS)))
+        school, request, rules=rows, settings=_settings(school), kinds=Rule.KINDS, starters=sorted(rules.STARTERS),
+        runs=RuleRun.objects.filter(school=school, mode='live').select_related('rule')[:12], quality=quality.rule_quality(school.pk),
+        has_active=any(r.status == Rule.Status.ACTIVE for r in rows)))
+
+
+@school_page
+@require_POST
+def run_now(request, school):
+    """The school is the page's own (membership-derived) school; nothing in the request names a school."""
+    runs = rules.run_school(school.pk, triggered_by=request.user)
+    if not runs:
+        messages.info(request, 'قاعدهٔ فعالی برای اجرا وجود ندارد.')
+    for run in runs:
+        text = f'{run.rule.code}: ارزیابی {run.evaluated}، هشدار جدید {run.alerts_raised}، تکراری/مهلت {run.skipped_cooldown}'
+        if run.status == RuleRun.Status.OK:
+            messages.success(request, text)
+        else:
+            messages.warning(request, f'{text} — {run.get_status_display()}')
+    return redirect('rules:index')
 
 
 @school_page
