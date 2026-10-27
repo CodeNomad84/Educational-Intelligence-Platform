@@ -46,6 +46,10 @@ python manage.py seed_mission --school <school_code>   # once: vocabulary terms,
 ```
 Without `seed_mission` the grid has no activity types and the report says there is no active weight set.
 
+## 3b. Rules: running them on a schedule (change 0025)
+No scheduler is built in. After a SchoolAdmin has activated rules (`/rules/`), run them from cron, one line per school (the command refuses to run without `--school` once several schools exist, and never runs "all schools"):
+`cd django_core && .venv/bin/python manage.py run_rules --school <school-code>` (optional `--as-of YYYY-MM-DD`). Run once per school day after attendance is entered; a second run on the same day adds nothing. Output: one line per rule with counts; a rule that matched more students than the school's breaker percentage raises NO alerts and says `breaker_tripped` (the SchoolAdmin sees it on `/rules/`). `seed_rules --school <code>` creates the four starter rules as drafts (first proposal, not validated).
+
 ## 4. What is NOT done
 * **No real LLM.** FastAPI chat / RAG / ingestion are disabled (HTTP 403 in Phase 1). The student "study assistant" and the risk views are rule-based demo stubs; no student data leaves Django.
 * **No real student data** until you approve it: the audit log exists (`/school/audit/`), but the security exit criteria (`docs/SECURITY.md`) are not signed off.

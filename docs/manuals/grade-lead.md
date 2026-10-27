@@ -17,6 +17,8 @@ Who this is: the person responsible for one grade (matched through the students'
 **Steps:** "ثبت نگرانی" on a student page raises an alert. `/alerts/` lists alerts of your grade: Accept, or Dismiss with a reason (note required for "other"). Accepted alerts offer "create an intervention plan".
 **You do not see:** the message and reviewer note of emotional or family alerts unless you raised them (metadata only; you can still decide).
 
+Some alerts are raised by an **alert rule** your school activated: the alert says "raised by rule X" and its text shows the numbers behind it (for example absence rate or average). It is not a diagnosis; accept or dismiss it like any other. You cannot edit rules; ask the school admin if a rule raises too many alerts.
+
 ## Intervention plans
 **Steps:** `/interventions/` → plans of your grade. Create a plan from an accepted alert or directly; open it to start, add follow-ups, close with an outcome, or cancel. You may own an emotional plan you created; then only you and a counselor with an open referral can read its text.
 **You do not see:** the text of emotional plans owned by someone else (type, status, dates, owner, outcome code only).

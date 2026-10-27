@@ -1,6 +1,6 @@
 # CHANGE GUIDE — "If I want to change X, where do I look?"
 
-Verified-at: `3404a1a` + Phase 1 branch `phase-1/boot-security`; the commit `3404a1a` is resolvable in this repository's history (verified 2026-10-13); Phase 1 closed at `4c096de`. Paths re-checked against the working tree on 2026-10-12. Bulk accounts / password rows added 2026-10-23. Schools/vocabulary rows re-verified 2026-10-16 (C4b). Membership/PlatformAdmin rows added 2026-10-19 (multi-school S1, S2); student-school assignment row added 2026-10-22 (S2b). Access-rule rows re-verified 2026-10-16 (2.2a-4c switch: `students/access.py` decides Grade Lead / Subject Teacher scope by current enrollment). Rows marked NOT YET IMPLEMENTED have no location yet; classify via `CHANGE_PROCESS.md`. Any change touching auth/data is at least L2.
+Verified-at: `3404a1a` + Phase 1 branch `phase-1/boot-security`; the commit `3404a1a` is resolvable in this repository's history (verified 2026-10-13); Phase 1 closed at `4c096de`. Paths re-checked against the working tree on 2026-10-12. Rules rows added 2026-10-28 (change 0025). Bulk accounts / password rows added 2026-10-23. Schools/vocabulary rows re-verified 2026-10-16 (C4b). Membership/PlatformAdmin rows added 2026-10-19 (multi-school S1, S2); student-school assignment row added 2026-10-22 (S2b). Access-rule rows re-verified 2026-10-16 (2.2a-4c switch: `students/access.py` decides Grade Lead / Subject Teacher scope by current enrollment). Rows marked NOT YET IMPLEMENTED have no location yet; classify via `CHANGE_PROCESS.md`. Any change touching auth/data is at least L2.
 
 | I want to change… | Look at | Notes |
 |---|---|---|
@@ -9,6 +9,7 @@ Verified-at: `3404a1a` + Phase 1 branch `phase-1/boot-security`; the commit `340
 | Who can see/do what | `students/access.py` (roles, student scope), `dashboard/decorators.py` + `dashboard/views.py` (`@role_required`), `students/permissions.py` + `students/views.py` (API), `fastapi_core/main.py` (`require_roles`), `docs/SECURITY.md` | L3 (S-04, ADR-0003) |
 | Django→FastAPI trust | `django_core/config/service_auth.py`, `fastapi_core/auth.py`, env `SERVICE_JWT_SECRET` (local file `.env.service`; never in `.env.example` values) | L3 (ADR-0002) |
 | FastAPI database role / grants | `FASTAPI_DB_ROLE.md`, `fastapi_core/rag_service.py`, `.env.fastapi` | L3 (authZ/data) |
+| A risk rule, its metrics, thresholds or the runner | `risk/signals.py` (metric catalog), `risk/rules.py` (`STARTERS`, validation, `run_school`), `risk/lifecycle.py`, `RuleSettings` (scale, breaker, second approver) | L2; changing who may read student data without a user (`system_scope_*`) is L3 |
 | Dataset / model artifacts / local secret files | `DATA_AND_ARTIFACTS.md` | L2 |
 | RAG documents table | Django migration `students/0007_rag_documents_table.py` (FastAPI must not create schema) | L3 (ADR-0001) |
 | Login / tokens | `dashboard/views.py` (login_view), `config/urls.py` (`api/token/`), `config/settings/base.py` | L3 |

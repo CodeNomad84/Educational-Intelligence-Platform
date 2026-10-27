@@ -17,6 +17,8 @@ Who this is: the school counselor. You see a student only while an **open referr
 **You see:** the message and reviewer note of emotional and family alerts of your open cases (you and the person who raised an alert are the only readers; the school admin and grade lead see metadata only). Each time such a text is shown it is recorded in the audit log (no content in the log).
 **You do not see:** alerts of students without an open referral.
 
+Alerts raised by an **alert rule** show "raised by rule X" and the numbers that led to it (only for students of your open cases). You cannot edit rules.
+
 ## Intervention plans
 **Steps:** `/interventions/` → plans of your cases. Create a plan (any type, including emotional), start it, add follow-ups, close it with an outcome, cancel it. A school admin may reassign an emotional plan to you.
 **You see:** the full text of every emotional plan of a student with an open referral to you, including plans owned by others. **You do not see:** these texts once the referral is closed (the plan row also disappears from your list).

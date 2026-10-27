@@ -21,5 +21,7 @@ Who this is: a teacher assigned to one or more classes and a subject. You land o
 **Steps:** `/mission/` → open an activity → the grid: score the indicators you actually observed ("not observed" is allowed and is excluded). `/mission/students/<id>/report/` shows only a status for your own observations and the indicators still to observe.
 **You do not see:** other people's scores, any suggested path, the weights. (Whether teachers may fill the activity-choice and parent-meeting forms: not allowed today; owner decision.)
 
+You do not see alerts raised by alert rules (only alerts you raised yourself) and you have no rules page.
+
 ## Not built
 Attendance entry by teachers (**TO VERIFY**: no teacher attendance page exists in `dashboard/urls.py`), parent messaging.

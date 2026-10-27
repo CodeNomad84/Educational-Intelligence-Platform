@@ -12,6 +12,14 @@
     <td>{% if p.outcome %}{{ p.get_outcome_display }}{% endif %}{% if p.status == 'completed' and p.reevaluate_on %} (ارزیابی مجدد: {{ p.reevaluate_on|date:"Y-m-d" }}){% endif %} <a href="{% url 'dashboard:plan_detail' p.pk %}">مشاهده</a></td></tr>{% endfor %}
 </table>
 {% endif %}
+{% if trend_weeks %}
+<h5 class="mt-4">روند (محاسبهٔ خودکار، فقط برای مرور)</h5>
+<p class="small text-muted">نرخ غیبت هفتگی در ۱۲ هفتهٔ اخیر؛ «—» یعنی کمتر از ۳ رکورد در آن هفته. این ارقام تصمیم نیستند و تشخیص یا برچسب دانش‌آموز نیستند.</p>
+<div class="table-responsive"><table class="table table-sm bg-white text-center small"><tr>{% for end, rate, n in trend_weeks %}<th>{{ end|date:'m/d' }}</th>{% endfor %}</tr>
+<tr>{% for end, rate, n in trend_weeks %}<td>{% if rate is None %}—{% else %}{{ rate|floatformat:0 }}٪{% endif %}</td>{% endfor %}</tr></table></div>
+{% if trend_subjects %}<table class="table table-sm bg-white w-auto small"><thead><tr><th>درس</th><th>۹۰ تا ۱۳۵ روز پیش</th><th>۴۵ تا ۹۰ روز پیش</th><th>۴۵ روز اخیر</th></tr></thead><tbody>
+{% for subject, avgs in trend_subjects.items %}<tr><td>{{ subject }}</td>{% for a in avgs %}<td>{% if a is None %}—{% else %}{{ a|floatformat:1 }}{% endif %}</td>{% endfor %}</tr>{% endfor %}</tbody></table>{% endif %}
+{% endif %}
 {% if referrals %}
 <h5 class="mt-4">ارجاع به مشاور</h5>
 <table class="table table-sm bg-white"><thead><tr><th>مشاور</th><th>دلیل</th><th>وضعیت</th><th>تاریخ</th></tr></thead><tbody>

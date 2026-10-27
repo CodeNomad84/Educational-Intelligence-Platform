@@ -67,6 +67,12 @@ def student_360(request, pk):
         audit.record(request.user, audit.COUNSELOR_NOTE_VIEW, student, detail=f'n{len(notes)}')
     roles = roles_for(request.user)
     if roles & {ADMIN, GRADE_LEAD}:
+        # Trend tile (0025): derived only from the rows this user's own visible_* helpers return; a Parent never gets it.
+        from django.utils import timezone
+        from risk import trends
+        today = timezone.localdate()
+        context['trend_weeks'] = trends.weekly_absence(visible_attendances(request.user).filter(student=student), today)
+        context['trend_subjects'] = trends.subject_period_averages(visible_grades(request.user).filter(student=student), today)
         # Intervention loop tile: metadata only (counts, type, status, dates, owner, outcome code). The scoped querysets give a
         # Parent nothing, and the tile is not rendered for them at all.
         context['loop_alerts'] = visible_alerts(request.user).filter(student=student).select_related('risk_event')[:10]

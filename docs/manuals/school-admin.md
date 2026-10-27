@@ -39,5 +39,11 @@ Who this is: the person who runs one school's data and accounts. You only ever s
 **You do not see:** individual students' scores in these overviews, any ranking, any export. The output is always "initial, not validated, not a decision".
 **Ask:** the platform admin to switch a module on. **PENDING POLICY:** whether a second approver is required for mission weights (today one admin approves).
 
+## Alert rules (`/rules/`)
+**Steps:** set the grade scale maximum and the breaker percentage; create a rule (or start from a first proposal: "از پیشنهاد اولیه"); edit the thresholds; "Simulate" to see weekly counts on your own history (counts only, groups under 5 shown as "—", no names, no alerts created); submit for approval; approve (activate). Pause or archive at any time; to change an active rule, copy it as a new version. "Run now" runs the active rules for YOUR school; an IT person can schedule `run_rules`.
+**You see:** rule versions, status, who created and approved, run history (including "breaker tripped: no alerts were raised, review the thresholds"), and per-rule counts of alerts raised, accepted and dismissed by reason (any count under 5 is shown as "—", and then the total is hidden too). **You do not see:** a score or level of any student; a list of students a rule matched (you see them as ordinary alerts after a run).
+**Important:** the thresholds are a first proposal and NOT validated. Have your own teachers review them before activating. A score-based rule cannot be activated until the grade scale is set. A rule can only be of type academic, attendance or behavioral.
+**Ask:** the owner/operator for scheduled runs. **PENDING POLICY:** how long rule hits and runs are kept.
+
 ## Not built
-Parent notifications, a parent view of alerts or interventions, an automatic risk engine (alerts are raised by hand), billing.
+Parent notifications, a parent view of alerts or interventions, a scheduler for rules (run by command or button), ML risk, billing.
