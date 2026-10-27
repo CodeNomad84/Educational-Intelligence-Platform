@@ -459,3 +459,30 @@ def apply_alert_text_policy(user, alerts):
         if alert.pk not in notes:
             alert.review_note = ''
     return alerts
+
+
+# ---- System read path (change 0025). The ONLY place that reads student data without a user. ----
+# Rules: ONE explicit school id (never "all", never defaulted); only students with a CURRENT enrollment in that school (the
+# same condition the role scopes use); read-only querysets; imported only by ``risk/rules.py`` (guard test in
+# ``risk/test_system_scope.py``). A new caller needs a new review.
+def system_scope_students(school):
+    school_id = getattr(school, 'pk', school)
+    if isinstance(school_id, bool) or not isinstance(school_id, int) or school_id <= 0:
+        raise ValueError('system_scope_students needs one explicit school id')
+    return Student.objects.filter(_current_enrollment(school_id))
+
+
+def system_scope_attendance(school):
+    return Attendance.objects.filter(student__in=system_scope_students(school))
+
+
+def system_scope_grades(school):
+    return Grade.objects.filter(student__in=system_scope_students(school))
+
+
+def system_scope_enrollments(school):
+    """The CURRENT enrollments (grade per student) of the system-scope students of one school."""
+    school_id = getattr(school, 'pk', school)
+    return Enrollment.objects.filter(
+        student__in=system_scope_students(school_id), ended_on__isnull=True, status__in=CURRENT_STATUSES,
+        academic_year__is_current=True, academic_year__school_id=school_id)

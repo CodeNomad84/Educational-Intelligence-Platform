@@ -6,6 +6,7 @@ always copied from the student. Nothing here is a label of the student, only a r
 Manual only for now: ``raise_alert`` (``risk/services.py``) is the single entry point a rule engine will call later.
 """
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 
 
@@ -138,6 +139,19 @@ class Rule(models.Model):
             models.CheckConstraint(condition=models.Q(risk_type__in=["academic", "attendance", "behavioral"]),
                                    name="rule_risk_type_not_sensitive"),
         ]
+
+    PARAM_FIELDS = ("kind", "risk_type", "severity", "connective", "clauses", "cooldown_days", "code", "version", "school_id")
+
+    def save(self, *args, **kwargs):
+        # Parameters are frozen once a version is live or finished (clone to change): active, paused and archived rows only
+        # change status / approval fields. Draft, simulated and pending rows are edited through risk.lifecycle.
+        if self.pk:
+            old = Rule.objects.filter(pk=self.pk).first()
+            if old is not None and old.status in ("active", "paused", "archived"):
+                for name in self.PARAM_FIELDS:
+                    if getattr(old, name) != getattr(self, name):
+                        raise ValidationError("A live or archived rule version cannot be edited; clone it.")
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.code} v{self.version} ({self.status})"

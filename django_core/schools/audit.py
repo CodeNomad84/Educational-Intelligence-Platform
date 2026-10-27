@@ -53,6 +53,12 @@ INTERVENTION_OWNER = 'intervention_owner'      # reassigned; no detail
 FOLLOWUP_ADD = 'followup_add'                  # detail = assessment code
 ALERT_TEXT_VIEW = 'alert_text_view'            # detail = risk type; a sensitive alert's message was shown to this user
 INTERVENTION_VIEW = 'intervention_view'        # detail = text | meta (whether the text was shown)
+RULE_CREATE = 'rule_create'                    # detail = <code> v<version>
+RULE_EDIT = 'rule_edit'
+RULE_STATUS = 'rule_status'                    # detail = new status
+RULE_SIMULATE = 'rule_simulate'                # detail = counts only
+RULE_RUN = 'rule_run'                          # detail = counts only; actor 'system' for the runner
+RULE_SETTINGS = 'rule_settings'                # detail = changed keys only
 STAFF_ROLES_CHANGE = 'staff_roles_change'  # detail = resulting roles, e.g. T,G
 
 

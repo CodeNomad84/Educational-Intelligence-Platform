@@ -30,7 +30,7 @@ jobs:
       - run: pip install -r requirements.txt
       - run: python manage.py check --settings=config.settings.development
       - run: python manage.py makemigrations --check --dry-run --settings=config.settings.development
-      - run: python manage.py test students dashboard schools vocabulary missions exams --settings=config.settings.test_sqlite
+      - run: python manage.py test students dashboard schools vocabulary missions exams risk interventions --settings=config.settings.test_sqlite
       - run: python manage.py test demo_intel --settings=config.settings.demo
   postgres:
     runs-on: ubuntu-22.04
@@ -62,7 +62,7 @@ jobs:
           cache: pip
           cache-dependency-path: django_core/requirements.txt
       - run: pip install -r requirements.txt
-      - run: python manage.py test students dashboard schools vocabulary missions exams --settings=config.settings.test_postgres
+      - run: python manage.py test students dashboard schools vocabulary missions exams risk interventions --settings=config.settings.test_postgres
   fastapi:
     runs-on: ubuntu-22.04
     timeout-minutes: 15

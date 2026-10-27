@@ -1,0 +1,45 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}قاعده{% endblock %}
+{% block content %}
+{% include 'dashboard/school/_nav.html' %}
+<a class="btn btn-link" href="{% url 'rules:index' %}">← قواعد هشدار</a>
+<div class="alert alert-warning">{{ unvalidated }}</div>
+{% if rule %}<h5>{{ rule.code }} نسخهٔ {{ rule.version }} — <span class="badge bg-secondary">{{ rule.get_status_display }}</span></h5>
+<table class="table table-sm w-auto small"><tbody>
+  <tr><th>ساخته‌شده توسط</th><td>{{ rule.created_by.username|default:'—' }} ({{ rule.created_at|date:'Y-m-d H:i' }})</td></tr>
+  <tr><th>تأییدکننده</th><td>{{ rule.approved_by.username|default:'—' }}{% if rule.approved_at %} ({{ rule.approved_at|date:'Y-m-d H:i' }}){% endif %}</td></tr>
+</tbody></table>{% else %}<h5>قاعدهٔ جدید</h5>{% endif %}
+{% for e in errors %}<div class="alert alert-danger">{{ e }}</div>{% endfor %}
+<form method="post" action="{% if rule %}{% url 'rules:detail' rule.pk %}{% else %}{% url 'rules:create' %}{% endif %}">{% csrf_token %}
+<div class="card card-body mb-3"><div class="row g-2 small">
+  <div class="col-md-3"><label>کد</label><input class="form-control form-control-sm" name="code" value="{{ form.code }}" {% if rule %}disabled{% endif %}></div>
+  <div class="col-md-3"><label>نوع</label><select class="form-select form-select-sm" name="kind" {% if rule %}disabled{% endif %}>{% for k in kinds %}<option {% if form.kind == k %}selected{% endif %}>{{ k }}</option>{% endfor %}</select></div>
+  <div class="col-md-6"><label>عنوان</label><input class="form-control form-control-sm" name="title" maxlength="120" value="{{ form.title }}" {% if not editable %}disabled{% endif %}></div>
+  <div class="col-md-3"><label>نوع ریسک (فقط آموزشی، غیبت، رفتاری)</label><select class="form-select form-select-sm" name="risk_type" {% if not editable %}disabled{% endif %}>{% for t in risk_types %}<option {% if form.risk_type == t %}selected{% endif %}>{{ t }}</option>{% endfor %}</select></div>
+  <div class="col-md-2"><label>شدت</label><select class="form-select form-select-sm" name="severity" {% if not editable %}disabled{% endif %}><option {% if form.severity == 'yellow' %}selected{% endif %}>yellow</option><option {% if form.severity == 'orange' %}selected{% endif %}>orange</option></select></div>
+  <div class="col-md-2"><label>ترکیب شروط</label><select class="form-select form-select-sm" name="connective" {% if not editable %}disabled{% endif %}><option {% if form.connective == 'all' %}selected{% endif %}>all</option><option {% if form.connective == 'any' %}selected{% endif %}>any</option></select></div>
+  <div class="col-md-2"><label>مهلت بین هشدارها (روز)</label><input class="form-control form-control-sm" name="cooldown_days" value="{{ form.cooldown_days }}" {% if not editable %}disabled{% endif %}></div>
+</div></div>
+<table class="table table-sm bg-white small"><thead><tr><th>معیار</th><th>عملگر</th><th>آستانه</th><th>بازه (روز)</th><th>دورهٔ مبنا (روز)</th><th>حداقل رکورد</th></tr></thead><tbody>
+{% for c in slots %}<tr>
+  <td><select class="form-select form-select-sm" name="c{{ forloop.counter0 }}_metric" {% if not editable %}disabled{% endif %}><option value=""></option>{% for m in metrics %}<option {% if c.metric == m %}selected{% endif %}>{{ m }}</option>{% endfor %}</select></td>
+  <td><select class="form-select form-select-sm" name="c{{ forloop.counter0 }}_op" {% if not editable %}disabled{% endif %}>{% for o in ops %}<option {% if c.op == o %}selected{% endif %}>{{ o }}</option>{% endfor %}</select></td>
+  <td><input class="form-control form-control-sm" name="c{{ forloop.counter0 }}_threshold" value="{{ c.threshold|default_if_none:'' }}" {% if not editable %}disabled{% endif %}></td>
+  <td><input class="form-control form-control-sm" name="c{{ forloop.counter0 }}_window" value="{{ c.window_days|default_if_none:'' }}" {% if not editable %}disabled{% endif %}></td>
+  <td><input class="form-control form-control-sm" name="c{{ forloop.counter0 }}_baseline" value="{{ c.baseline_days|default_if_none:'' }}" {% if not editable %}disabled{% endif %}></td>
+  <td><input class="form-control form-control-sm" name="c{{ forloop.counter0 }}_min" value="{{ c.min_records|default_if_none:'' }}" {% if not editable %}disabled{% endif %}></td></tr>{% endfor %}
+</tbody></table>
+{% if editable %}<button class="btn btn-primary">ذخیره{% if rule %} (قاعده به پیش‌نویس برمی‌گردد){% endif %}</button>{% endif %}
+</form>
+{% if rule %}<div class="mt-3 d-flex flex-wrap gap-2">
+<form method="post" action="{% url 'rules:action' rule.pk %}">{% csrf_token %}
+  {% if can.simulate %}<button class="btn btn-outline-primary btn-sm" name="do" value="simulate">شبیه‌سازی روی داده‌های مدرسه (فقط شمارش)</button>{% endif %}
+  {% if can.submit %}<button class="btn btn-outline-secondary btn-sm" name="do" value="submit">ارسال برای تأیید</button>{% endif %}
+  {% if can.approve %}<button class="btn btn-success btn-sm" name="do" value="approve">تأیید و فعال‌سازی</button>{% endif %}
+  {% if can.reopen %}<button class="btn btn-outline-secondary btn-sm" name="do" value="reopen">بازگشت به پیش‌نویس</button>{% endif %}
+  {% if can.pause %}<button class="btn btn-warning btn-sm" name="do" value="pause">توقف</button>{% endif %}
+  {% if can.resume %}<button class="btn btn-outline-success btn-sm" name="do" value="resume">ادامه</button>{% endif %}
+  {% if can.archive %}<button class="btn btn-outline-danger btn-sm" name="do" value="archive">بایگانی</button>{% endif %}
+  <button class="btn btn-outline-secondary btn-sm" name="do" value="clone">کپی به‌عنوان نسخهٔ جدید</button>
+</form></div>{% endif %}
+{% endblock %}
