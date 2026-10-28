@@ -1,6 +1,6 @@
 # 0027 — Phase 2 exit report (autonomous run 2026-10-27 to 2026-10-28)
 
-Status: **STOPPED for the owner.** One Medium finding from the independent security review (section 6) needs a decision (Tier C); the Phase 3 start waits for you. Synthetic data only; nothing pushed to `main`/`Test`; no force-push; no LLM, billing or S8-S10.
+Status: **owner decisions of 2026-10-28 applied (section 6a); STOPPED before Phase 3.** The Phase 3 start waits for the owner (remove `CLAUDE.md` §6a-bis first). Synthetic data only; nothing pushed to `main`/`Test`; no force-push; no LLM, billing or S8-S10.
 
 ## 1. Built in this run (commits on `phase-1/boot-security`, pushed up to `224593b`, CI green)
 | Commit | What |
@@ -27,10 +27,10 @@ Status: **STOPPED for the owner.** One Medium finding from the independent secur
 - Slice security review (self-review, no findings >= Medium) and the independent review (section 6).
 
 ## 4. Open risks and items for the record
-- **Independent review findings 1-4 (section 6), not fixed** (finding 1 is Medium = Tier C stop; 2 touches authentication; 3 and 4 need a schema/validation decision).
+- Independent review findings 1-4: all handled per the owner's decisions of 2026-10-28, see section 6a.
 - Rule hits and runs retention: PENDING POLICY (same as alerts).
 - Thresholds of the 4 starter rules are unvalidated assumptions from the demo; no school may activate one before its own teachers review them (owner pilot task).
-- SchoolAdmin still reads counselor-note text after a referral is closed (Grade Lead too); your decision is pending (`access.py` `visible_counselor_notes`, lines 257-269). No behavior change was made.
+- Closed-referral counselor notes: decided 2026-10-28 and implemented (SchoolAdmin metadata only; Grade Lead unchanged; Counselor none). See section 6a.
 - Open info items carried over (checklist): list pages not audit-logged, no rate limit on raising alerts, `risk/loop_testing.py` lives in the app package, local git exclude requires `git add -f` for `risk/` and `interventions/`.
 
 ## 5. Skipped because they need an owner/legal/product decision (listed, not built)
@@ -129,9 +129,18 @@ Status: **STOPPED for the owner.** One Medium finding from the independent secur
 
 Claude's note on the raw findings (not part of the reviewer's text): finding 1 is classified Medium, so under the stop rules it needs your decision; I did not fix it. Options: (a) accept the insider trust model and correct the word "never" in `SECURITY.md`; (b) block SchoolAdmin password reset of Counselors and require a second actor for Counselor creation + referral; (c) both. Finding 4's fix adds a column to the new `Rule` table (unreleased, no real data) and is cheap; finding 2 is an authentication-configuration change; finding 3 changes validators on the Student create path. I have not verified any of the four findings myself.
 
+## 6a. Status of the independent review findings (after the owner's decisions of 2026-10-28)
+| # | Severity | Status | Commit | Evidence |
+|---|---|---|---|---|
+| 1 | Medium | **Accepted risk with detective controls (option a).** Path demonstrated by test; SECURITY.md wording corrected ("no direct read", not "never"); audit of counselor account creation, role grant, password reset and referral creation verified by test; a Grade Lead can never reset a Counselor or SchoolAdmin (test); residual risk (second actor for sensitive role changes) recorded in the checklist as a possible later hardening | `df740d8` | `dashboard/test_sensitive_role_path.py` (5 tests) |
+| 2 | Low | **Fixed.** `SIMPLE_JWT['CHECK_REVOKE_TOKEN']`: tokens are bound to a hash of the password; a token issued before a reset/change is rejected (the old refresh token may still mint an access token, which is rejected). No new table, no migration | `85b2417` | `students/test_token_revocation.py` (3 tests; mutation fails 2) |
+| 3 | Low | **Fixed.** One fixed message for a taken national id in the form, the API and the import report, identical for same-school and other-school ids, naming no school (the refusal itself remains until S7) | `4decf4e` | `students/test_national_id_message.py` (5 tests; mutation fails 3) |
+| 4 | Low | **Fixed.** New column `Rule.last_edited_by` (migration `risk.0003`); with the switch on the approver must differ from the creator AND the last editor | `75000d0` | `risk/test_rules_lifecycle.py` (3 new tests; mutation fails) |
+| - | - | Closed-referral counselor notes (owner decision 3): SchoolAdmin metadata only; Grade Lead unchanged; Counselor sees nothing after close | `d8f7d80` | `dashboard/test_lead_counselor_notes.py` |
+
 ## 7. Owner tasks for Phase 3 (from `0026-p3-exit-plan-NOTE.md`, plus this run)
-1. Decide finding 1 (and 2-4); decide SchoolAdmin text access to closed-referral counselor notes.
-2. Resend the principals' questionnaire spec (or confirm `docs/owner/QUESTIONS_FOR_SCHOOL_PRINCIPALS.fa.md` is final).
+1. (Done 2026-10-28.) Findings and closed-referral notes decided and applied.
+2. The principals' questionnaire: spec arrives in the owner's next message (handled after this report).
 3. Legal/consent/retention policy (gates 2.6, 2.7, questionnaires, hits/runs retention); hosting and operator; backup policy.
 4. Pilot: have the school's own teachers review the starter thresholds before any rule is activated; set the grade scale per school.
 5. Remove `CLAUDE.md` §6a-bis at the Phase 3 start.
