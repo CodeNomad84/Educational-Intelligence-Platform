@@ -129,3 +129,14 @@ def parent_choices(user, *, keep_pk=None):
     linked = Student.objects.filter(school_id__in=schools, parent_user__isnull=False).values('parent_user_id')
     return get_user_model().objects.filter(Q(pk__in=linked) | Q(pk=keep_pk), is_active=True).order_by('username') \
         if schools else get_user_model().objects.none()
+
+
+def national_id_taken(national_id, exclude_pk=None):
+    """True when ANY student (any school) already has this national id. Used only to refuse a duplicate with the one fixed message
+    ``NATIONAL_ID_REFUSED``; nothing about the other student is returned (review 0027 F3)."""
+    from .models import Student
+
+    rows = Student.objects.filter(national_id=national_id)
+    if exclude_pk is not None:
+        rows = rows.exclude(pk=exclude_pk)
+    return rows.exists()
