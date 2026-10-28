@@ -126,6 +126,8 @@ class Rule(models.Model):
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT, db_index=True)
     params_hash = models.CharField(max_length=64, blank=True)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    last_edited_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+",
+                                       help_text="Last person who changed the parameters; with the second-approver switch the approver must differ from this and from created_by.")
     approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
     approved_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

@@ -138,3 +138,45 @@ class LifecycleTests(RulesBase):
         every = ' '.join(AuditEvent.objects.values_list('detail', flat=True))
         self.assertNotIn('Kid', every)
         self.assertTrue(all(len(d) <= 40 for d in AuditEvent.objects.values_list('detail', flat=True)))
+
+
+class SecondApproverLastEditorTests(RulesBase):
+    """Independent review 0027 finding 4: with the switch on, the approver differs from the creator AND the last editor."""
+    def setUp(self):
+        super().setUp()
+        self.b_admin = make_user('admin-b2', 'SchoolAdmin')
+        SchoolMembership.objects.create(user=self.b_admin, school=self.a)
+        self.c_admin = make_user('admin-c2', 'SchoolAdmin')
+        SchoolMembership.objects.create(user=self.c_admin, school=self.a)
+        RuleSettings.objects.filter(school=self.a).update(require_second_approver=True)
+
+    def pending_after_edit_by_b(self):
+        rule = self.starter(code='repeated_absence')                        # created by self.admin (A)
+        fields = dict(title=rule.title, risk_type=rule.risk_type, severity=rule.severity, connective=rule.connective,
+                      clauses=[dict(c) for c in rule.clauses], cooldown_days=rule.cooldown_days)
+        fields['clauses'][0]['threshold'] = 4
+        rule = lifecycle.edit(rule, self.b_admin, **fields)                 # B rewrites A's draft
+        lifecycle.simulate(rule, self.b_admin, as_of=TODAY)
+        lifecycle.submit(rule, self.b_admin)
+        return Rule.objects.get(pk=rule.pk)
+
+    def test_the_last_editor_cannot_approve_what_they_wrote(self):
+        rule = self.pending_after_edit_by_b()
+        self.assertEqual((rule.created_by_id, rule.last_edited_by_id), (self.admin.pk, self.b_admin.pk))
+        for actor in (self.b_admin, self.admin):                            # the editor and the creator are both refused
+            with self.assertRaises(ValidationError):
+                lifecycle.approve(rule, actor)
+        self.assertEqual(Rule.objects.get(pk=rule.pk).status, 'pending_approval')
+        self.assertEqual(lifecycle.approve(rule, self.c_admin).approved_by_id, self.c_admin.pk)
+
+    def test_switch_off_keeps_the_single_approver(self):
+        RuleSettings.objects.filter(school=self.a).update(require_second_approver=False)
+        rule = self.pending_after_edit_by_b()
+        self.assertEqual(lifecycle.approve(rule, self.b_admin).status, 'active')
+
+    def test_a_clone_is_authored_by_the_cloner(self):
+        RuleSettings.objects.filter(school=self.a).update(require_second_approver=False)
+        live = self.live()
+        RuleSettings.objects.filter(school=self.a).update(require_second_approver=True)
+        copy = lifecycle.clone(live, self.b_admin)
+        self.assertEqual((copy.created_by_id, copy.last_edited_by_id), (self.b_admin.pk, self.b_admin.pk))

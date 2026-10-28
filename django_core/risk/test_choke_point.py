@@ -34,12 +34,12 @@ class MigrationTests(TestCase):
             keys = sorted(k for k in loader.disk_migrations if k[0] == app)
             self.assertEqual(keys[0], (app, '0001_initial'))
             if app == 'risk':
-                self.assertEqual(keys, [('risk', '0001_initial'), ('risk', '0002_rules')])   # 0025: rule tables only
+                self.assertEqual(keys, [('risk', '0001_initial'), ('risk', '0002_rules'), ('risk', '0003_rule_last_edited_by')])   # 0025: rule tables only (0003: one column on them)
             else:
                 self.assertEqual(len(keys), 1)
             for key in keys:
                 for op in loader.disk_migrations[key].operations:
-                    self.assertIsInstance(op, (migrations.CreateModel, migrations.AddIndex, migrations.AddConstraint))   # new tables only
+                    self.assertIsInstance(op, (migrations.CreateModel, migrations.AddIndex, migrations.AddConstraint, migrations.AddField))   # new tables only
 
     def test_models_are_not_in_the_django_admin(self):
         registered = {m._meta.label for m in admin.site._registry}

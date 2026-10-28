@@ -6,8 +6,8 @@ SchoolAdmin of the rule's school (``school_ids_for_admin``, re-checked at call t
   approval never covers parameters that changed afterwards.
 * ``simulate`` (draft or simulated -> simulated) stores the ``params_hash`` it ran for; ``submit`` and ``approve`` require the hash to
   equal the current parameters.
-* ``approve``: one approver (any SchoolAdmin of the school); with ``RuleSettings.require_second_approver`` the approver must not be
-  the author. Activation archives the previous live version of the same code in the same transaction.
+* ``approve``: one approver (any SchoolAdmin of the school); with ``RuleSettings.require_second_approver`` the approver must be
+  neither the author (``created_by``) nor the last editor of the parameters (``last_edited_by``). Activation archives the previous live version of the same code in the same transaction.
 * active/paused/archived parameters never change (model guard); ``clone`` creates the next version as a draft.
 """
 import re
@@ -56,7 +56,8 @@ def create(actor, school_id, *, code, kind, title, risk_type, severity, connecti
     if Rule.objects.filter(school_id=school_id, code=code).exists():
         raise ValidationError('این کد قبلاً استفاده شده است؛ برای نسخهٔ جدید از «کپی» استفاده کنید.')
     rule = Rule(school_id=school_id, code=code, version=1, kind=kind, title=title.strip()[:120], risk_type=risk_type,
-                severity=severity, connective=connective, clauses=clauses, cooldown_days=cooldown_days, created_by=actor)
+                severity=severity, connective=connective, clauses=clauses, cooldown_days=cooldown_days, created_by=actor,
+                last_edited_by=actor)
     if not rule.title:
         raise ValidationError('عنوان لازم است.')
     _check(rule)
@@ -76,6 +77,7 @@ def edit(rule, actor, *, title, risk_type, severity, connective, clauses, cooldo
         raise ValidationError('عنوان لازم است.')
     _check(locked)
     locked.status, locked.params_hash = Rule.Status.DRAFT, ''
+    locked.last_edited_by = actor
     locked.save()
     audit.record(actor, audit.RULE_EDIT, locked, school=locked.school_id, detail=f'{locked.code} v{locked.version}')
     return locked
@@ -90,7 +92,7 @@ def clone(source, actor):
     copy = Rule.objects.create(
         school_id=source.school_id, code=source.code, version=version, kind=source.kind, title=source.title,
         risk_type=source.risk_type, severity=source.severity, connective=source.connective, clauses=source.clauses,
-        cooldown_days=source.cooldown_days, created_by=actor)
+        cooldown_days=source.cooldown_days, created_by=actor, last_edited_by=actor)
     audit.record(actor, audit.RULE_CREATE, copy, school=copy.school_id, detail=f'{copy.code} v{version}')
     return copy
 
@@ -151,8 +153,8 @@ def approve(rule, actor):
     if locked.status != Rule.Status.PENDING or not _hash_ok(locked):
         raise ValidationError('فقط قاعدهٔ منتظر تأیید با پارامترهای شبیه‌سازی‌شده فعال می‌شود.')
     settings = _settings(locked.school_id)
-    if settings is not None and settings.require_second_approver and locked.created_by_id == actor.pk:
-        raise ValidationError('تأییدکننده باید غیر از سازندهٔ قاعده باشد.')
+    if settings is not None and settings.require_second_approver and actor.pk in (locked.created_by_id, locked.last_edited_by_id):
+        raise ValidationError('تأییدکننده باید غیر از سازنده و آخرین ویرایشگر قاعده باشد.')
     locked.clauses = rules.validate_clauses(locked.clauses, locked.connective, school_id=locked.school_id)   # fail closed: scale
     for old in Rule.objects.select_for_update().filter(school_id=locked.school_id, code=locked.code,
                                                        status__in=(Rule.Status.ACTIVE, Rule.Status.PAUSED)):
