@@ -30,6 +30,9 @@
 <h5 class="mt-4">یادداشت‌های مشاور (فقط مشاور، مسئول پایه و مدیر مدرسه)</h5>
 {% for n in counselor_notes %}<div class="border rounded p-2 mb-2 bg-white"><small class="text-muted">{{ n.created_at|date:"Y-m-d" }}</small><div>{{ n.text|linebreaksbr }}</div></div>{% endfor %}
 {% endif %}
+{% if closed_note_dates %}
+<p class="mt-3 small text-muted">یادداشت‌های مشاور پس از بسته‌شدن ارجاع: {{ closed_note_dates|length }} یادداشت ({% for d in closed_note_dates %}{{ d|date:"Y-m-d" }}{% if not forloop.last %}، {% endif %}{% endfor %}). متن این یادداشت‌ها برای مدیر نمایش داده نمی‌شود.</p>
+{% endif %}
 {% if student_account %}<p class="mt-4"><strong>حساب دانش‌آموز:</strong> {{ student_account.username }}</p>{% endif %}
 {% if account_form %}
 <div class="card mt-4"><div class="card-header">ساخت حساب برای دانش‌آموز</div><div class="card-body">

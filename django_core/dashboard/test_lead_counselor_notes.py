@@ -71,11 +71,37 @@ class LeadReadsCounselorNotesTests(Base):
         self.assertNotContains(page, NOTE)
         self.assertFalse(page.context['counselor_notes'])
 
-    def test_a_closed_referral_keeps_its_notes_readable_for_the_lead_and_the_admin(self):
+    def test_a_closed_referral_keeps_its_notes_readable_for_the_lead_only(self):
+        """Owner decision 2026-10-28: the Grade Lead is unchanged; the SchoolAdmin gets metadata only after close; the Counselor none."""
         Referral.objects.filter(pk=self.referral.pk).update(status='closed')
-        self.assertContains(self.page(self.lead), NOTE)                    # current behaviour: only the COUNSELOR loses access
+        self.assertContains(self.page(self.lead), NOTE)                                  # unchanged (owner decision 2026-10-26)
+        self.assertEqual(visible_counselor_notes(self.counselor).count(), 0)             # the counselor loses it on close
+        self.assertEqual(visible_counselor_notes(self.admin).count(), 0)                 # no text path for the admin any more
+        page = self.page(self.admin)
+        self.assertEqual(page.status_code, 200)
+        self.assertNotContains(page, NOTE)
+        self.assertContains(page, 'متن این یادداشت‌ها برای مدیر نمایش داده نمی‌شود')       # existence and date only
+        self.assertEqual(len(page.context['closed_note_dates']), 1)
+        self.assertFalse(page.context['counselor_notes'])
+
+    def test_the_admin_reads_the_text_while_the_referral_is_open(self):
         self.assertContains(self.page(self.admin), NOTE)
-        self.assertEqual(visible_counselor_notes(self.counselor).count(), 0)
+        self.assertEqual(self.page(self.admin).context['closed_note_dates'], [])
+
+    def test_no_note_view_event_for_the_admin_when_only_metadata_is_shown(self):
+        Referral.objects.filter(pk=self.referral.pk).update(status='closed')
+        AuditEvent.objects.all().delete()
+        self.page(self.admin)
+        self.assertFalse(AuditEvent.objects.filter(action='counselor_note_view').exists())
+        self.page(self.lead)
+        self.assertEqual(AuditEvent.objects.get(action='counselor_note_view').username, 'lead')
+
+    def test_the_metadata_queryset_is_empty_for_every_other_role(self):
+        from students.access import counselor_note_metadata
+        Referral.objects.filter(pk=self.referral.pk).update(status='closed')
+        self.assertEqual(counselor_note_metadata(self.admin).count(), 1)
+        for user in (self.lead, self.counselor, self.admin_b, self.parent, make_user('t', 'Teacher', self.a)):
+            self.assertEqual(counselor_note_metadata(user).count(), 0, user.username)
 
     def test_reads_are_audit_logged_at_page_level_without_content(self):
         AuditEvent.objects.all().delete()

@@ -18,7 +18,8 @@ Who this is: the person who runs one school's data and accounts. You only ever s
 
 ## Look at one student (Student 360) and refer to a counselor
 **Steps:** `/students/` → open a student → "پرونده ۳۶۰" (Student 360). Use the referral box to send the student to a counselor with a short reason.
-**You see:** identity, enrollment per year, grades per year and subject, attendance summary, teacher recommendations, referrals and counselor notes of your school, and a summary of alerts and interventions. Note text shown to you is recorded in the audit log (counts only).
+**You see:** identity, enrollment per year, grades per year and subject, attendance summary, teacher recommendations, referrals of your school, counselor notes while the referral is open, and a summary of alerts and interventions. Note text shown to you is recorded in the audit log (counts only). **After a referral is closed you see only that counselor notes exist and their dates, not their text** (owner decision 2026-10-28; the grade lead keeps reading them).
+**Counselor accounts and sensitive text:** you do not read emotional or family alert text or emotional plan text directly. Be aware that creating or resetting a Counselor account and referring students to it would give that account access to such text; these steps are recorded in the audit log and are accepted as an insider-trust risk (see SECURITY).
 **You do not see:** the text of an emotional-type intervention plan or its follow-ups; the message of an emotional or family alert; students of other schools.
 
 ## Review alerts

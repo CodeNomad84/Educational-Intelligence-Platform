@@ -8,8 +8,8 @@ Who this is: the school counselor. You see a student only while an **open referr
 **Ask:** the school admin or grade lead who referred the student.
 
 ## Write notes and close a case
-**Steps:** on the case page add a note. "Close referral" ends your access to that student at once (your notes stay for the school admin).
-**You see:** your notes. The school admin and the grade lead of the student's grade can read them too, read only (owner decision 2026-10-26); they keep that access after you close the case. Each time note text is shown to anyone (you included) it is recorded in the audit log (counts only, no text). A "counselor only" option per note is a future idea, not built. **You do not see:** the student again after closing, unless referred again.
+**Steps:** on the case page add a note. "Close referral" ends your access to that student at once (your notes stay for the grade lead; the school admin sees only that they exist and their dates).
+**You see:** your notes. While the referral is open the school admin and the grade lead of the student's grade can read them too, read only (owner decisions 2026-10-26 and 2026-10-28); after you close the case the grade lead keeps reading them and the school admin sees only that notes exist and their dates (no text). Each time note text is shown to anyone (you included) it is recorded in the audit log (counts only, no text). A "counselor only" option per note is a future idea, not built. **You do not see:** the student again after closing, unless referred again (after closing you see no notes at all).
 **PENDING POLICY:** parental consent states (awaiting parent consent, declined, active), the crisis / escalation path, retention of counseling records, satisfaction feedback. None of these workflows exist yet.
 
 ## Alerts about your students

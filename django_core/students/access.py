@@ -255,10 +255,12 @@ def visible_referrals(user):
 
 
 def visible_counselor_notes(user):
-    """Counselor notes: the counselor of the (open) case, the Grade Lead of the student's grade (read-only) and the school's SchoolAdmin. Teachers, parents and students never."""
+    """Counselor notes (TEXT): the counselor of the (open) case, the Grade Lead of the student's grade (read-only, also after the
+    referral is closed: owner decision 2026-10-26) and the school's SchoolAdmin ONLY while the referral is open (owner decision
+    2026-10-28: after it is closed the SchoolAdmin gets metadata only, see ``counselor_note_metadata``). Teachers, parents and students never."""
     roles = roles_for(user)
     admin = _school_admin_q(user, roles)
-    parts = [Q(referral__student__in=Student.objects.filter(admin)) if admin is not None else None]
+    parts = [Q(referral__student__in=Student.objects.filter(admin), referral__status='open') if admin is not None else None]
     counselor = _counselor_q(user, roles)
     if counselor is not None:
         parts.append(Q(referral__counselor=user, referral__student__in=Student.objects.filter(counselor)))
@@ -267,6 +269,16 @@ def visible_counselor_notes(user):
         parts.append(Q(referral__student__in=Student.objects.filter(lead)))
     scope = _any(parts)
     return CounselorNote.objects.none() if scope is None else CounselorNote.objects.filter(scope)
+
+
+def counselor_note_metadata(user):
+    """Notes of CLOSED referrals that the SchoolAdmin may know exist (existence and date only). Callers must read only ``created_at``
+    from this queryset, never ``text``. Empty for every other role (the Grade Lead and the Counselor use ``visible_counselor_notes``)."""
+    roles = roles_for(user)
+    admin = _school_admin_q(user, roles)
+    if admin is None:
+        return CounselorNote.objects.none()
+    return CounselorNote.objects.filter(referral__student__in=Student.objects.filter(admin), referral__status='closed')
 
 
 def search_students(queryset, term):

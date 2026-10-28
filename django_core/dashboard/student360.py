@@ -8,7 +8,7 @@ from django.db.models import Count
 from django.shortcuts import get_object_or_404, render
 
 from students.access import (
-    ADMIN, GRADE_LEAD, PARENT, roles_for, visible_alerts, visible_plans, visible_attendances, visible_counselor_notes, visible_grades,
+    ADMIN, GRADE_LEAD, PARENT, roles_for, visible_alerts, visible_plans, visible_attendances, visible_counselor_notes, counselor_note_metadata, visible_grades,
     visible_recommendations, visible_referrals, visible_students)
 from students.models import Enrollment
 
@@ -63,6 +63,9 @@ def student_360(request, pk):
     context['referrals'] = visible_referrals(request.user).filter(student=student).select_related('counselor')
     notes = list(visible_counselor_notes(request.user).filter(referral__student=student).select_related('author'))
     context['counselor_notes'] = notes
+    # SchoolAdmin, closed referral: existence and date only (the text is not read from the database here)
+    context['closed_note_dates'] = list(counselor_note_metadata(request.user).filter(referral__student=student)
+                                        .order_by('created_at').values_list('created_at', flat=True))
     if notes:       # note text is rendered below: record that, counts only (view_student_360 stays the page-level event)
         audit.record(request.user, audit.COUNSELOR_NOTE_VIEW, student, detail=f'n{len(notes)}')
     roles = roles_for(request.user)
