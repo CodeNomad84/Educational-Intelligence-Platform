@@ -81,6 +81,11 @@ SERVICE_JWT_SECRET = os.environ.get('SERVICE_JWT_SECRET', '')
 # Deliberately neutral: a deployment must set the real school name here (or edit the School in the admin).
 DEFAULT_SCHOOL_NAME = os.environ.get('DEFAULT_SCHOOL_NAME', 'Default School')
 
+# JWT: a token carries a hash of the account's password and is rejected once the password changed (reset by an admin or a Grade Lead,
+# forced change, user change). Without this a refresh token issued before a reset kept working for its whole lifetime
+# (independent review 0027 finding 2). No new table, no migration.
+SIMPLE_JWT = {'CHECK_REVOKE_TOKEN': True}
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
