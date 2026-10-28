@@ -19,6 +19,11 @@ from schools.models import School
 
 from .access import school_ids_for_admin
 
+# The ONE message for a national id that cannot be registered. It is identical whether the id belongs to a student of the same
+# school or of another school, and says nothing about either (independent review 0027 finding 3). National_id is globally unique
+# until S7, so the refusal itself cannot be hidden; the wording must not distinguish the cases.
+NATIONAL_ID_REFUSED = 'این کد ملی قابل ثبت نیست.'
+
 NO_SCHOOL_ACCESS = 'no_school_access'          # a non-superuser without a valid membership
 TARGET_REQUIRED = 'target_school_required'     # several memberships (or a superuser) and nothing names the school
 SCHOOL_NOT_ALLOWED = 'school_not_allowed'      # the school is not one of the user's schools (or does not exist)

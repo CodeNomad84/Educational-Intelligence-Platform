@@ -3,7 +3,7 @@ from django import forms
 from schools.models import School, SchoolClass
 from students.models import Student
 from students.student_school import (
-    StudentSchoolError, allowed_school_ids, class_choices, parent_choices, resolve_student_school)
+    NATIONAL_ID_REFUSED, StudentSchoolError, allowed_school_ids, class_choices, parent_choices, resolve_student_school)
 
 
 class StudentForm(forms.ModelForm):
@@ -24,6 +24,12 @@ class StudentForm(forms.ModelForm):
         self.fields['parent_user'].queryset = parent_choices(user, keep_pk=self.instance.parent_user_id)
         field.empty_label = '— بدون کلاس —'
         field.required = False
+
+    def _post_clean(self):
+        super()._post_clean()
+        # The model's unique check would say "already exists" for every school alike; one fixed message, same for same-school and other-school.
+        if any(e.code == 'unique' for e in self.errors.as_data().get('national_id', [])):
+            self._errors['national_id'] = self.error_class([NATIONAL_ID_REFUSED])
 
     def clean(self):
         cleaned = super().clean()

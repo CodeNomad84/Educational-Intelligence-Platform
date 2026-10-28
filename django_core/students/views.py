@@ -20,7 +20,7 @@ from .class_resolution import (
 )
 import requests
 from .serializers import StudentSerializer, FileUploadSerializer
-from .student_school import StudentSchoolError, resolve_student_school
+from .student_school import NATIONAL_ID_REFUSED, StudentSchoolError, resolve_student_school
 from .permissions import IsAdminUser  # فقط ادمین بتواند آپلود کند
 from django.core.exceptions import ImproperlyConfigured
 from config.service_auth import service_headers
@@ -70,7 +70,7 @@ class ImportSchoolConflict(Exception):
     """The national id belongs to a student of ANOTHER school. The message is fixed and generic on purpose: it must
     not tell the importer anything about that student or school (national_id is still globally unique until S7)."""
 
-    MESSAGE = 'این کد ملی قابل ثبت نیست.'
+    MESSAGE = NATIONAL_ID_REFUSED
 
     def __init__(self):
         super().__init__(self.MESSAGE)

@@ -1,11 +1,12 @@
 # students/serializers.py
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
+from rest_framework.validators import UniqueValidator
 
 from schools.models import SchoolClass
 
 from .models import Student
-from .student_school import MESSAGES, SCHOOL_NOT_ALLOWED, StudentSchoolError, class_choices, parent_choices, resolve_student_school
+from .student_school import MESSAGES, NATIONAL_ID_REFUSED, SCHOOL_NOT_ALLOWED, StudentSchoolError, class_choices, parent_choices, resolve_student_school
 
 
 class OwnSchoolClassField(serializers.PrimaryKeyRelatedField):
@@ -44,6 +45,8 @@ class StudentSerializer(serializers.ModelSerializer):
             'school', 'school_class', 'target_school', 'created_at', 'updated_at',
         ]
         read_only_fields = ['id', 'class_name', 'school', 'created_at', 'updated_at']
+        # one fixed message for a taken national id, whatever school holds it (review 0027 F3)
+        extra_kwargs = {'national_id': {'validators': [UniqueValidator(queryset=Student.objects.all(), message=NATIONAL_ID_REFUSED)]}}
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
