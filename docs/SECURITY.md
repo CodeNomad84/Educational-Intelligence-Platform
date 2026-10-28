@@ -94,7 +94,7 @@ Roles use the real groups (the generic matrix above predates them). Base module:
 |---|---|---|---|---|
 | Raise an alert | yes | yes | yes | yes, own classes only |
 | Alert metadata (type, severity, status, dates, dismiss reason code, who raised / reviewed) | yes | yes | yes | own alerts |
-| **Message of an `emotional` or `family` alert** | **never** (unless they raised it) | **only if they raised it** | **yes (open referral)** | own alerts |
+| **Message of an `emotional` or `family` alert** | **no direct read** (unless they raised it); reachable only through a Counselor account, see "Accepted insider-trust risk" below | **only if they raised it** | **yes (open referral)** | own alerts |
 | Message of other alerts | yes | yes | yes | own alerts |
 | Reviewer's note (any alert; for those two types the message gate applies first) | yes | yes | yes | **never** |
 | See alerts | all of the school | own grade | referred students | only the ones they raised |
@@ -102,10 +102,12 @@ Roles use the real groups (the generic matrix above predates them). Base module:
 | Reopen a dismissed alert | yes | no | no | no |
 | Create a plan | yes (cannot create or own an `emotional` plan) | yes | yes | no |
 | See plan metadata (existence, type, status, dates, owner, outcome code) | all | own grade | referred students | no |
-| **Text of an `emotional` plan and its follow-ups** | **never** | **only as the plan owner** | **yes (open referral)**; as owner | no |
+| **Text of an `emotional` plan and its follow-ups** | **no direct read**; same accepted insider path | **only as the plan owner** | **yes (open referral)**; as owner | no |
 | Text of other plan types | yes | yes | yes | no |
 | Follow-up, start, complete with outcome | non-emotional plans | own plans | own plans | no |
 | Cancel / reassign (reassign an `emotional` plan only to a Counselor or Grade Lead who sees the student) | yes | own plans | own plans | no |
+
+**Accepted insider-trust risk (owner decision 2026-10-28, from the independent review 0027 finding 1; evidence: `dashboard/test_sensitive_role_path.py`).** The SchoolAdmin has no direct read of that text, but the SchoolAdmin creates and resets Counselor accounts (`/school/counselors/`, `/school/resets/`), grants the Counselor role (`/school/staff-roles/`) and refers students to a Counselor. A SchoolAdmin can therefore log in as a Counselor they control and read the text. This is accepted and compensated by audit, not prevented: each step is logged with ids and codes only (`staff_account_create`, `staff_roles_change`, `password_reset`, `referral_create`, and every display of the text as `alert_text_view` / `intervention_view` by the Counselor account). A Grade Lead can NEVER reset the password of a Counselor or a SchoolAdmin (test). Residual risk and a possible later hardening (a second school-level actor for sensitive role changes and Counselor resets) are recorded in `PROJECT_CHECKLIST.md`.
 
 Rules: SchoolAdmin and Grade Lead can accept or dismiss a sensitive alert on its metadata alone (`other` still needs a note, which the reviewer writes without reading the message). Every display of a sensitive alert's message is audit-logged (`alert_text_view`, detail = risk type; no text). Every read of a plan page is audit-logged (`intervention_view`, detail `text` or `meta`); audit rows hold ids and codes only. Closing a referral ends the Counselor's access at once. No export, no parent or student view, no AI. Alerts and plans protect their student (`PROTECT`): students are deactivated, never deleted (the API answers 409). Retention: no period decided, no automatic deletion; risk events 3 years per doc 12 is not enforced. `Referral` and `CounselorNote` still use `CASCADE` (open item).
 

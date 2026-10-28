@@ -161,6 +161,8 @@ Test status at `8435a0e`: 1150 tests on SQLite and on PostgreSQL 16, 57 `demo_in
 
 - [x] Rules and derived analytics (proposal 0025): signals, tables, lifecycle, simulation, pages, runner, command, breaker, system audit actor, quality aggregates, seed command, trend tile, manuals (school admin, grade lead, counselor, teacher), RUNBOOK cron. Tests green on SQLite and PostgreSQL, mutation checks done. Security review of the slice: see the Phase 2 exit report. Retention of hits/runs: PENDING POLICY.
 
+- [ ] Possible later hardening (P3 plan): a second school-level actor (another admin, or the platform) for Counselor account creation, Counselor password reset, Counselor role grant and referral to a freshly created Counselor. Residual risk accepted by the owner 2026-10-28 (independent review finding 1), compensated by audit.
+
 ## Resume note (Phase 2 autonomous mode, CLAUDE.md §6a-bis)
 - **Done 2026-10-27/28:** `a95e299` counselor_note_view audit event; `29c05ee` rules 0025 commit 1 (signals, tables, parity tests). Not pushed yet (push at the end of the rules slice after `scripts/run_tests.sh all`).
 - **Next step:** 0025 commit 2: clause validation against `risk/signals.METRICS` (refuse emotional/family; `low_average` needs `RuleSettings.grade_scale_max`), lifecycle (draft > simulated > pending_approval > active > paused > archived, `params_hash`, single approver, optional second approver), simulation (aggregate counts, groups under 5 withheld, writes nothing but RuleRun), SchoolAdmin pages with the "unvalidated" note. Then c3 runner (`system_scope_students`, circuit breaker, atomic per-student, `rule_run` audit with `system` actor), c4 seed/trend tile/manuals/docs, c5 security review.
