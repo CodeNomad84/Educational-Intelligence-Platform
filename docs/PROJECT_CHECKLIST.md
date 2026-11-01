@@ -19,7 +19,7 @@ Test status at `8435a0e`: 1150 tests on SQLite and on PostgreSQL 16, 57 `demo_in
 - [x] Multi-school S7 decided 2026-10-26: **S7 = C (keep global `national_id` uniqueness) until a second real school or first transfer case is planned; then A with a username rule** (`docs/changes/0020-s7-national-id-PROPOSAL.md`). Nothing to build now.
 - [ ] Multi-school S8 platform split, S9 Django admin restricted to platform operators, S10 second-school go-live gate: **DEFERRED until after P3** (owner, 2026-10-26; only needed once a second school exists; admin is still ungated, see `0021`).
 - [x] Audit log: who viewed or changed what, no content stored (`ac7be60`, `schools/audit.py`).
-- [~] Backup and restore: rehearsal script for the demo DB and a documented path (`501f2d1`, `RUNBOOK.md` §3), but no scheduled backups and no encrypted off-site copy.
+- [~] Backup and restore: production scripts since 2026-11-01 (C-K): `scripts/backup.sh` (pg_dump + media, GPG public-key encryption, 14/8/12 rotation, add-only off-site copy), `scripts/restore_backup.sh` (empty database only, checksums), rehearsal `scripts/test_backup_restore.sh` (CI job `backup`); demo rehearsal `scripts/backup_restore_check.sh` (`501f2d1`). Still open: running it on the real server with a real off-site target and the owner's key (O3).
 - [x] Test tooling: `scripts/run_tests.sh sqlite|pg|all`, disposable PostgreSQL container, isolation traps (`fde42b0`, `cb2b44f`; fast test-only hasher `0c0430e`).
 - [~] CI (T-01): `.github/workflows/ci.yml` runs Django check, migrations check, SQLite and PostgreSQL tests and `demo_intel`, green on GitHub since 2026-10-25; the FastAPI suite is a separate job (`fastapi_core/requirements-test.txt`).
 
@@ -118,7 +118,7 @@ Test status at `8435a0e`: 1150 tests on SQLite and on PostgreSQL 16, 57 `demo_in
 
 ## 7. Deployment and operations
 - [ ] Production deployment from `docs/DEPLOYMENT.md` (Docker compose exists; production never run; unverified).
-- [ ] Scheduled, encrypted, off-site backups with a rehearsed restore on real infrastructure.
+- [~] Scheduled, encrypted, off-site backups: scripts and rehearsal done (C-K, `RUNBOOK.md` §3); schedule, off-site target and a restore on the real infrastructure wait for the server (O2/O3).
 - [ ] Monitoring, logging and alerting.
 - [ ] Onboarding runbook for a first pilot school: create school, admin, year, classes, staff, bulk accounts (steps 2 and 6 of `RUNBOOK.md` exist; pilot not done).
 - [ ] Pilot feedback loop with teachers (mission observations and exam use) feeding weights and rubric changes.

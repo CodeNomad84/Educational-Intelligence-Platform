@@ -78,3 +78,11 @@ jobs:
           cache-dependency-path: fastapi_core/requirements-test.txt
       - run: pip install -r requirements-test.txt
       - run: python -m unittest discover -s tests -t .
+  backup:
+    # Backup/restore rehearsal (P3 C-K): throw-away PostgreSQL container without network, throw-away GPG key, synthetic rows.
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - run: docker pull pgvector/pgvector:pg16
+      - run: scripts/test_backup_restore.sh

@@ -80,8 +80,8 @@ Release gate: `DJANGO_SETTINGS_MODULE=config.settings.production python manage.p
 
 ## 6. Backups and recovery (PROPOSED)
 
-- Scheduled `pg_dump` (or base backup + WAL if RPO needs it) to storage outside the VM disk; encrypted at rest.
-- Retention and RPO/RTO: `DECISION REQUIRED`.
+- `CURRENT` since 2026-11-01 (C-K): `scripts/backup.sh` (nightly `pg_dump` + media, encrypted to a GPG public key, 14 daily / 8 weekly / 12 monthly, add-only off-site copy by rsync or rclone to any S3-compatible or SSH target) and `scripts/restore_backup.sh`; procedure in `RUNBOOK.md` §3; rehearsal `scripts/test_backup_restore.sh` (CI). WAL archiving for a shorter RPO: later.
+- Retention and RPO/RTO: proposed in `changes/0028` P3-2 (RPO 24 h, RTO 4 h); owner approval pending.
 - A restore is rehearsed on a throwaway instance before go-live and after each schema change.
 - Uploaded documents / MinIO objects and model files are included in scope.
 - `CURRENT` practice (dev): manual directory copy `data/postgres.bak-<date>`; this is not a backup strategy.
@@ -112,7 +112,7 @@ Release gate: `DJANGO_SETTINGS_MODULE=config.settings.production python manage.p
 | D4 | Data in the hosted instance | **Synthetic data only** until Phase 3 exit (fixed rule; D4 is only "which synthetic set") |
 | D5 | Reverse proxy product | Any (OW-4, provider-agnostic); nginx example in `deploy/nginx/` |
 | D6 | Who operates it | Named owner/operator, on-call expectation, patch cadence |
-| D7 | Backup RPO/RTO and storage target | See section 6 |
+| D7 | Backup RPO/RTO and storage target | Proposed in decision pack 0028 P3-2; script: C-K |
 | D8 | Authentication hardening | Rate limit/lockout, MFA for Admin (future), admin URL exposure |
 | D9 | R-04 fix timing | Prerequisite for section 2; own L3 proposal |
 | D10 | Single school vs multi-school host | Design stays "school key can be added"; do not hard-code one school |
