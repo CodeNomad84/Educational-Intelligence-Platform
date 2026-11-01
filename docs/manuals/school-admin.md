@@ -33,7 +33,7 @@ Who this is: the person who runs one school's data and accounts. You only ever s
 **PENDING POLICY:** how long alerts and plans are kept; nothing is deleted automatically today.
 
 ## Audit log
-**Steps:** `/school/audit/`. **You see:** who did what and when, with ids and codes only. **You do not see:** the content of notes, messages or plans.
+**Steps:** `/school/audit/`. **You see:** who did what and when, with ids and codes only. **You do not see:** the content of notes, messages or plans. Since 2026-11-01 list pages are recorded too: `list_view` with the page and the number of rows shown (for example `students:n24`, `alerts:n3`, `api_students:n24`), one line per school; a single student read through the API appears as `view_student_detail` with detail `api`; a new school appears as `school_create`. Pages with totals only (dashboard, school home) are not recorded.
 
 ## Modules (mission, exams, assistants)
 **Steps:** locked modules stay visible in the menu and open an information page. Mission: `/mission/aggregate/` (counts per grade and branch status, groups under 5 hidden) and `/mission/weights/` (the weight sets: draft, simulate, send for approval, approve; the active set is read only, a copy becomes the next draft). Exams: `/exams/admin/` (per exam started / finished and first-try rate per topic, no names, groups under 5 hidden).

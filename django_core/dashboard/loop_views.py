@@ -49,6 +49,7 @@ def alert_list(request):
         alerts = alerts.filter(status=status)
     reviewable = set(reviewable_alerts(request.user).values_list('pk', flat=True))
     alerts = apply_alert_text_policy(request.user, alerts[:200])
+    audit.record_list(request.user, 'alerts', alerts)
     for alert in alerts:     # every display of a sensitive alert's text is audit-logged (ids and the type only)
         if alert.risk_event.risk_type in SENSITIVE_ALERT_TYPES and not alert.text_hidden:
             audit.record(request.user, audit.ALERT_TEXT_VIEW, alert, detail=alert.risk_event.risk_type)

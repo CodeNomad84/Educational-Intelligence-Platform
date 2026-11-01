@@ -69,8 +69,10 @@ def plan_list(request):
     elif status in dict(InterventionPlan.STATUS_CHOICES):
         plans = plans.filter(status=status)
     due = due_for_reevaluation(visible_plans(request.user), visible_alerts(request.user), date.today())
+    plans = list(plans[:200])
+    audit.record_list(request.user, 'plans', plans)
     return render(request, 'dashboard/loop/plans.html', {
-        'due': due, 'plans': plans[:200], 'status': status, 'statuses': [('open', 'باز')] + InterventionPlan.STATUS_CHOICES})
+        'due': due, 'plans': plans, 'status': status, 'statuses': [('open', 'باز')] + InterventionPlan.STATUS_CHOICES})
 
 
 @role_required(*REVIEWERS)

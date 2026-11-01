@@ -43,7 +43,7 @@ Test status at `8435a0e`: 1150 tests on SQLite and on PostgreSQL 16, 57 `demo_in
 - [!] Retention period for alerts, plans, follow-ups and risk events waits for the legal policy; risk events 3 years per doc 12, not enforced; nothing is deleted automatically.
 - [ ] Open item: `Referral` and `CounselorNote` still use `CASCADE` on the student, the new loop tables use `PROTECT` (students are deactivated, never deleted); decide whether to align (changes applied models, Tier C).
 - [ ] Open item: the local `.git/info/exclude` hides `django_core/{risk,interventions,behavior,governance,accounts,core}`; `risk/` and `interventions/` were force-added (new files there need `git add -f`).
-- [ ] Open item (info, from 0023 F4): list pages and the Student 360 tile are not audit-logged (plan pages and sensitive alert text are); part of the audit completeness review.
+- [x] Open item (info, from 0023 F4) closed 2026-11-01 (C-L): student, referral, alert and plan lists and the student API write `list_view` (counts per school); the Student 360 tile is covered by the page's `view_student_360` event (`dashboard/test_audit_lists.py`).
 - [ ] Open item (info, from 0023 F5): no rate limit on raising alerts.
 - [ ] Open item (info, from 0023 F6): the loop's test fixture `risk/loop_testing.py` lives inside the app package and imports `dashboard.test_counselor`; move it to a test-only location when convenient.
 - [x] Alert text rule (0023 F3): message and review note of `emotional`/`family` alerts readable only by the raiser and an open-referral Counselor; SchoolAdmin and Grade Lead see metadata and can still review.
@@ -107,7 +107,7 @@ Test status at `8435a0e`: 1150 tests on SQLite and on PostgreSQL 16, 57 `demo_in
 - [~] R-a batch-file provenance: signed batch files exist (`067571b`), no per-row provenance (RUNBOOK).
 - [ ] FastAPI module claim in the service token (RUNBOOK).
 - [ ] Django admin not school-scoped and not module-gated (RUNBOOK; S9).
-- [ ] Audit log completeness review (list pages, exports, admin actions) (RUNBOOK).
+- [~] Audit log completeness: list pages and the student API done 2026-11-01 (C-L); exports do not exist; Django admin actions only in Django's admin history (closed with C-A, Tier C).
 - [ ] Test-container overlay misses files replaced mid-run (RUNBOOK; avoid reseeding the demo while tests run).
 - [x] FastAPI suite re-run 2026-10-25: 28 tests OK in the fastapi image (`docs/TESTING.md`); still not part of CI.
 - [~] Dependency audit done 2026-11-01 (C-D, `docs/changes/0029-dependency-audit-REPORT.md`): Django 5.2.18, DRF 3.18.3, SimpleJWT 5.5.1, requests 2.34.2; FastAPI web stack 0.162/starlette 1.7/PyJWT 2.15.1; `.pth` loaded `weights_only`. Open: FastAPI ML/RAG stack (torch, transformers, langchain, chromadb) until P7; `scaler.joblib` pickle; S-11 untracking stays with the owner.

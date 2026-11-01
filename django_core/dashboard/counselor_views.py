@@ -60,6 +60,7 @@ def student_refer(request, pk):
 @role_required(COUNSELOR)
 def home(request):
     referrals = visible_referrals(request.user).filter(counselor=request.user).select_related('student')
+    audit.record_list(request.user, 'referrals', referrals)
     return render(request, 'dashboard/counselor/home.html', {'referrals': referrals})
 
 

@@ -92,6 +92,7 @@ def student_list_view(request):
     grade = request.GET.get('grade', '')
     if grade.isdigit():   # a Grade Lead lands on the list of the own grade (?grade=N); the scope itself is unchanged
         students = students.filter(grade=int(grade))
+    audit.record_list(request.user, 'students', students)
     return render(request, 'dashboard/student_list.html', {'students': students})
 
 # جزئیات یک دانش‌آموز + نمایش نتیجه‌ی پیش‌بینی

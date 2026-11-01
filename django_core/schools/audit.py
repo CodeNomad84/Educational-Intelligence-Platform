@@ -60,6 +60,8 @@ RULE_SIMULATE = 'rule_simulate'                # detail = counts only
 RULE_RUN = 'rule_run'                          # detail = counts only; actor 'system' for the runner
 RULE_SETTINGS = 'rule_settings'                # detail = changed keys only
 STAFF_ROLES_CHANGE = 'staff_roles_change'  # detail = resulting roles, e.g. T,G
+LIST_VIEW = 'list_view'                    # detail = <page>:n<rows shown>; one event per school among the rows; no row ids
+LIST_PAGES = ('students', 'referrals', 'plans', 'alerts', 'api_students')
 SCHOOL_CREATE = 'school_create'            # detail = cmd | admin (which path created it); object = the School
 
 
@@ -90,3 +92,21 @@ def record(user, action, obj=None, *, school=None, detail=''):
         roles=','.join(sorted(roles_for(user)))[:120], school_id=school_id, action=action,
         object_type=type(obj).__name__ if obj is not None else '', object_id=str(getattr(obj, 'pk', '') or ''),
         detail=detail[:40])
+
+
+def record_list(user, page, rows):
+    """A list of student records was shown: one ``list_view`` event per school among ``rows`` with the number of rows shown
+    for it (C-L). Nothing is written for an empty list. ``rows`` is an unsliced queryset or an iterable of objects with
+    ``school_id``."""
+    from collections import Counter
+
+    from django.db.models import QuerySet
+
+    if page not in LIST_PAGES:
+        raise ValueError(f'unknown list page {page!r}')
+    if isinstance(rows, QuerySet) and not rows.query.is_sliced:
+        counts = Counter(rows.order_by().values_list('school_id', flat=True))
+    else:
+        counts = Counter(row.school_id for row in rows)
+    for school_id, shown in sorted(counts.items()):
+        record(user, LIST_VIEW, school=school_id, detail=f'{page}:n{shown}')

@@ -26,6 +26,7 @@ from django.core.exceptions import ImproperlyConfigured
 from config.service_auth import service_headers
 from . import import_store
 from .enrollment_sync import ensure_current_enrollment
+from schools import audit
 from .access import search_students, visible_attendances, visible_grades, visible_students
 
 # --- student import: class resolution (C3c-2) -------------------------------------------------------------
@@ -219,6 +220,17 @@ class StudentViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         # Deny by default; the union of the user's grants (see students/access.py)
         return visible_students(self.request.user)
+
+    # Reads are audit-logged like the pages (C-L): counts per school for the list, the object for one record.
+    def list(self, request, *args, **kwargs):
+        response = super().list(request, *args, **kwargs)
+        audit.record_list(request.user, 'api_students', self.filter_queryset(self.get_queryset()))
+        return response
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        audit.record(request.user, audit.VIEW_DETAIL, instance, detail='api')
+        return Response(self.get_serializer(instance).data)
 
     # Writes are SchoolAdmin only; the instance has no tier annotation, so mark it full for the response.
     def perform_create(self, serializer):
