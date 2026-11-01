@@ -49,6 +49,8 @@ vendor claims are **NOT independently verified**. "Have / Partial / Missing" is 
 8. **Student-facing study assistant with an LLM** under the access, pseudonymisation and escalation rules of `docs/ASSISTANT_DESIGN.md` (after approval; default OFF). (L3)
 9. **Satisfaction / climate micro-surveys** (anonymous, aggregated, minimum group size) — only after a privacy policy exists. (L3: sensitive data)
 10. **Operational hardening that unlocks real data**: rate limiting / lockout, HTTPS, scheduled backups with a tested restore, CI, 2FA for SchoolAdmin. Not a feature, but it gates items 3, 5 and 8. (L3)
+11. **Interactive exam / practice with per-option explanations and learning analytics** — design in `docs/EXAM_AND_SURVEY_DESIGN.md` §1 (3 slices). (L3: new student-level data)
+12. **In-platform family and student questionnaires** (consent, retention, restricted access; no Google Forms) — `docs/EXAM_AND_SURVEY_DESIGN.md` §2. Refines item 9; real data only after the retention/consent policy. (L3)
 
 ## 4. Method and limits
 Four standard searches (one per product); results are marketing pages, district pages and one review site. Feature lists

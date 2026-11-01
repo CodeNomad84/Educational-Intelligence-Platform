@@ -19,6 +19,7 @@ database/*.db
 
 # Runtime volumes (PostgreSQL, Redis, MinIO, Ollama, static/media) and downloaded datasets
 /data/
+docs/qalamestaan/
 
 # Spreadsheets / exports
 *.xlsx
