@@ -1,5 +1,7 @@
 # 0028 — Decision pack P3 to P8 (PROPOSAL, 2026-11-01)
 
+> **Owner decision 2026-11-01: APPROVED as written** for P3-1..P3-8, P3-10, P4-*, P5-*, P6-1..P6-3, P7-*, P8-* (every PROPOSED default below is now DECIDED). Refinements: **P5-3** parent visibility = parents see **positive entries only** (the DECISION REQUIRED is closed). **P3-2** the offline private backup key is held by the **owner**; the deputy holder is a placeholder (`DEPUTY: to be named`, `RUNBOOK.md` §3). **P8-2** recorded as ADR-0013 and in `ARCHITECTURE.md`. **P3-9 and P6-4 stay LEGAL**, untouched. Order: gate 2 > C-A > demo track (P8-3 design system, P5-1, P5-2, P6-1, polish of every page) > R-04 before any public/demo server > P7.
+
 Written for the owner. Purpose: put every open decision between today and P8 in one place, each with a recommended default, so they can be approved or changed in one pass and the next phases can run with few stops.
 Basis: the repository (`PROJECT_CHECKLIST.md`, `0026-p3-exit-plan-NOTE.md`, `SECURITY.md`, `ROADMAP.md`), common practice for school platforms, and Panorama Education's product list (fetched 2026-11-01 from panoramaed.com/products: Student Success = early warning + MTSS + interventions; Solara = AI grounded in district data, "walled garden"; Surveys & Engagement; Pathways = graduation/career; Class Companion = practice; 200+ integrations; SOC 2 / FERPA claims; vendor claims, NOT independently verified).
 Legend: **DECIDED** = owner decision recorded here · **PROPOSED** = recommended default waiting for approval (approve by ID, e.g. "approve P3-2, P3-3; change P7-2 to ...") · **LEGAL** = needs a legal adviser, the recommendation is only a starting point.
@@ -41,7 +43,7 @@ Legend: **DECIDED** = owner decision recorded here · **PROPOSED** = recommended
 |---|---|---|---|
 | P5-1 | Principal dashboard (the demo screen) | One school page for the SchoolAdmin/principal: students needing attention by grade/class, attendance and grade trends, open alerts by status, interventions due, rule quality; aggregates with groups under 5 withheld (existing rule). | This is Panorama Student Success's first screen and what principals will judge. |
 | P5-2 | MTSS-style tiers | Show a **support level** per student (1 universal, 2 targeted, 3 intensive), **derived** from open alerts and active interventions, never typed by hand, labelled "derived, not a diagnosis"; visible to who already sees the alerts. | Familiar MTSS language without a new access path. |
-| P5-3 | Behavior log (backlog item 6) | Simple positive/concern entries by staff, school-scoped, feeding a rule signal; Grade Lead and SchoolAdmin read; parents see positive entries only. Parent visibility = **DECISION REQUIRED** (access). | Panorama lists behavior analytics; small model. |
+| P5-3 | Behavior log (backlog item 6) | Simple positive/concern entries by staff, school-scoped, feeding a rule signal; Grade Lead and SchoolAdmin read; parents see positive entries only. Parent visibility: **DECIDED 2026-11-01, positive entries only**. | Panorama lists behavior analytics; small model. |
 | P5-4 | Printable report card (backlog) | Per-term printable page from existing grades (HTML print stylesheet, no PDF dependency). | Principals expect it; no new data. |
 
 ## 5. P6 — Rules, risk, alerts, interventions (mostly built)

@@ -14,7 +14,7 @@ AI is **advisory only**. Nothing AI-generated becomes trusted data without human
 Never claim something works without evidence (file, test output, command result). State what was run.
 
 ## 3. Architecture principles (see `docs/ARCHITECTURE.md`)
-- Django = operational core (auth, RBAC, school data, workflows). FastAPI = AI/RAG layer. PostgreSQL (+pgvector). React + Bootstrap 5 RTL is the TARGET frontend (incremental).
+- Django = operational core (auth, RBAC, school data, workflows). FastAPI = AI/RAG layer. PostgreSQL (+pgvector). Frontend TARGET for the MVP: Django templates + Bootstrap 5 RTL, React islands only, SPA deferred (ADR-0013).
 - **Zero rewrite.** Evolve existing code. No new framework/service/dependency without a Level 3 proposal.
 - Modular monolith + AI service. No microservices, Kafka, Kubernetes, agent frameworks without written justification.
 - Deterministic rules before ML. Risk model is EXPERIMENTAL/PROTOTYPE. ACL is applied **before** retrieval/generation.

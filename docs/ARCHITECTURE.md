@@ -6,7 +6,7 @@ Labels: CURRENT = verified at commit `3404a1a` (resolvable in this repository's 
 1. Django = operational core (auth, RBAC, school entities, workflows, admin).
 2. FastAPI = AI/RAG/analytics layer (LLM, RAG, prediction, extraction).
 3. PostgreSQL (+ pgvector for vectors, JSONB where justified).
-4. React + Bootstrap 5, RTL-first, role-specific dashboards — TARGET; migrated incrementally from Django templates.
+4. Server-rendered Django templates + Bootstrap 5 RTL (self-hosted, one shared base and design system), role-specific dashboards — TARGET for the MVP; React only as islands where a screen needs rich interaction; a full React SPA is DEFERRED until after pilot feedback (ADR-0013, owner 2026-11-01; replaces "React + Bootstrap 5 … migrated incrementally").
 5. Modular monolith + AI service; no microservices without documented reason.
 6. AI is advisory; humans decide. Deterministic rules before ML.
 7. Zero rewrite: preserve and evolve the existing codebase.
@@ -53,4 +53,4 @@ Labels: CURRENT = verified at commit `3404a1a` (resolvable in this repository's 
 No new service/dependency without L3 proposal. No real student data until security baseline exit (`SECURITY.md`). Configuration over custom code (`CUSTOMIZATION.md`).
 
 ## Open architectural decisions
-ADR-0001..0004 (see `adr/`). Future/deferred (numbers reserved, no files yet): data layering & provenance (0005, Phase 4), React mechanics (0006), RAG (0007), LLM provider/egress (0008).
+ADR-0001..0004 (see `adr/`); ADR-0013 (MVP frontend, ACCEPTED 2026-11-01). Future/deferred (numbers reserved, no files yet): data layering & provenance (0005, Phase 4), React island mechanics (0006, written with the first island), RAG (0007), LLM provider/egress (0008).
