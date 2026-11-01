@@ -48,19 +48,18 @@ Unsure? Classify upward. Never execute L3 without explicit approval.
 **Reports:** one page: what changed, evidence (test counts), Tier B decisions taken, and only the Tier C items that need the owner.
 **Unchanged:** `&&` chain before every commit, both databases, `/security-review`, mutation checks for access changes, no real student data until P3 exit.
 
-### 6a-bis. TEMPORARY: "Phase 2 autonomous" run mode (owner decision 2026-10-27; REMOVE THIS SUBSECTION AT THE START OF PHASE 3)
-Valid until the end of Phase 2, then STOP for the Phase 3 start. Supplements 6a; never overrides section 7.
-- **May decide alone (Tier A/B, and Tier C-lite = a design decision inside already-approved principles that touches no access rule, tenancy, privacy, irreversible migration or product/commercial policy):** order of the remaining Phase 2 slices (computed from `ROADMAP.md` and `PROJECT_CHECKLIST.md`, listed at the top of the next report), proposal and implementation in the same run, naming, UI details, default thresholds, test strategy.
-- **Cadence:** chain slices without waiting for review; 5-line report after each; push to `phase-1/boot-security` only at slice boundaries (never force; no rapid pushes that supersede CI runs); confirm CI green.
-- **Decision log:** `docs/DECISIONS_BY_CODE.md`, one entry per decision that would otherwise have been asked: date, slice, decision, reason, alternative, how to reverse.
-- **Resume note:** after each slice, update `PROJECT_CHECKLIST.md` with a one-line "next step" so a fresh session can continue.
-- **Still STOP and ask:** access rules and school isolation, anything about real data, irreversible or applied-migration changes, changing the meaning of existing tables, Medium+ security findings, product/commercial/legal decisions (pricing, licences, consent, retention, external LLM), unexplained test/CI results, any new multi-school stage, two documents contradicting each other on behavior.
-- **Never:** push to main/Test, force-push, real data, S8-S10, LLM/external AI, billing. Explicit `git add` paths (`-f` only for `risk/` and `interventions/`); tests green before commit.
-- **Exit:** write `docs/changes/00xx-phase-2-exit-REPORT.md`, run a full-branch security review, STOP.
+### 6a-bis. "Phase 3 autonomous" run mode (owner decision 2026-11-01; replaces the Phase 2 mode; REMOVE AT THE P3 EXIT)
+Scope: option A of the P3 plan (code tasks C-B, C-D, C-H incl. backups, C-L; `docs/changes/0026-p3-exit-plan-NOTE.md`) and option C (decision pack `docs/changes/0028-p3-p8-decision-pack-PROPOSAL.md`). Supplements 6a; never overrides section 7.
+Owner context 2026-11-01: hosting = Iranian servers (shared) or the school's own server (dedicated); `.ir` domain; backups are mandatory (data-loss risk); provider-agnostic server-side controls; no real data yet; goal = an MVP and frontend to show school principals; AI = two provider classes (external API, offline/local).
+- **May decide alone:** as the Phase 2 mode (Tier A/B and Tier C-lite: design inside approved principles that touches no access rule, tenancy, privacy, irreversible migration or product/commercial policy); proposal and implementation in the same run.
+- **Push:** allowed to any branch except `main` (owner 2026-11-01), at slice boundaries, never force, after `scripts/run_tests.sh all` passes; confirm CI.
+- **Decision log:** `docs/DECISIONS_BY_CODE.md`. **Resume note:** one-line "next step" in `PROJECT_CHECKLIST.md` after each slice.
+- **Still STOP and ask:** C-A (Django admin closure) and anything else that changes access rules or school isolation, real data, irreversible or applied-migration changes, Medium+ security findings, legal/consent/retention, sending any student data to an external LLM, pricing, unexplained test/CI results.
+- **Never:** push to `main`, force-push, real data, billing. Explicit `git add` paths (`-f` only for `risk/` and `interventions/`); tests green before commit.
 
 ## 7. Hard rules
 - Never read, print, edit or commit `.env` or secrets; never reproduce secret values found in code (cite file:line only). Rotation, not history rewrite.
-- Never run `git push`, force-push, rebase, `reset --hard`, `clean`, or rewrite history or any command that writes to GitHub without the owner's explicit approval in chat for that specific action.. Check `git status` before and `git diff` after work. One focused change per commit; no unrelated edits.
+- Never run `git push` (exception: §6a-bis, any branch except `main`), force-push, rebase, `reset --hard`, `clean`, or rewrite history or any command that writes to GitHub without the owner's explicit approval in chat for that specific action.. Check `git status` before and `git diff` after work. One focused change per commit; no unrelated edits.
 - Do not bypass RBAC. New endpoints/views must declare authentication, role and object/school scope; add a permission test.
 - **NO REAL STUDENT DATA** in any environment until the security baseline exit criteria (`docs/SECURITY.md`) are met. Use synthetic data only.
 - Do not send student PII to external LLMs. Counseling data is never exposed to AI without an approved policy (`docs/AI_GOVERNANCE.md`).

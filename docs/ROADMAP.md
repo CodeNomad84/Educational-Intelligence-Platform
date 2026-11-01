@@ -2,7 +2,7 @@
 
 > **Current status lives in `docs/PROJECT_CHECKLIST.md`** (start-to-finish list with evidence). This file keeps the phase definitions and history; where the two disagree, the checklist and git win. Since 2026-10-19 the product modules `mission` (slices 1-3) and `exams` (slice 1) were built on top of Phase 2.
 
-Current phase: **Phase 2 — MVP productization (compressed roadmap approved by the owner 2026-10-13), Django-first.** Phase 1 is closed on `phase-1/boot-security` at `4c096de` (`PHASE1_FINAL_STATUS.md`, `PHASE1_DEFERRED_ITEMS.md`); baseline `3404a1a` is resolvable in this repository's history. Sub-phases 2.1, 2.1m (multi-school) and 2.2a are largely built; what is done and what is open is tracked item by item in `PROJECT_CHECKLIST.md`. Each phase starts only on owner approval.
+Current phase: **Phase 3 — security baseline, started 2026-11-01** (code track of `changes/0026`; owner decisions OW-1..OW-7 and the P3-P8 decision pack in `changes/0028`). Previous: **Phase 2 — MVP productization (compressed roadmap approved by the owner 2026-10-13), Django-first.** Phase 1 is closed on `phase-1/boot-security` at `4c096de` (`PHASE1_FINAL_STATUS.md`, `PHASE1_DEFERRED_ITEMS.md`); baseline `3404a1a` is resolvable in this repository's history. Sub-phases 2.1, 2.1m (multi-school) and 2.2a are largely built; what is done and what is open is tracked item by item in `PROJECT_CHECKLIST.md`. Each phase starts only on owner approval.
 
 **Phase 2 is Django-first**: no RAG/LLM, no React, no FastAPI changes. PostgreSQL and FastAPI verification: `TESTING.md` (Django 1174 tests on SQLite and PostgreSQL, FastAPI 28; 2026-10-25). CI: `.github/workflows/ci.yml` exists (Django only; not yet run on GitHub). Phase 2 absorbs the MVP slice of P2, P4, P5 and P6 below; their full scope remains in the table.
 
@@ -25,7 +25,7 @@ Current phase: **Phase 2 — MVP productization (compressed roadmap approved by 
 | P0 | CCOS installation (docs/config only) | committed on `ccos/phase-0` in the owner's previous repository history (that branch is not present here); owner accepted |
 | P1 | Bootable Baseline + Critical Security Containment | CLOSED 2026-10-13 at `4c096de`; PostgreSQL/FastAPI re-verification deferred (`PHASE1_DEFERRED_ITEMS.md`) |
 | P2 | Test harness + Authorization Matrix decisions | Test harness DONE (`scripts/run_tests.sh`, CI workflow); matrix decided in ADR-0003/0005/0010, some cells still DECISION REQUIRED (`SECURITY.md`) |
-| P3 | Security baseline (exit criteria in SECURITY.md) | NOT STARTED |
+| P3 | Security baseline (exit criteria in SECURITY.md) | STARTED 2026-11-01 (owner): code tasks C-B, C-D, C-H, C-K backups, C-L in Phase 3 autonomous mode (`CLAUDE.md` §6a-bis); open decisions in `changes/0028-p3-p8-decision-pack-PROPOSAL.md` |
 | P4 | Core domain architecture (data layers; React foundation slice at end) | NOT STARTED |
 | P5 | Student 360 + analytics | NOT STARTED |
 | P6 | Rules / Risk / Alerts / Interventions | NOT STARTED |

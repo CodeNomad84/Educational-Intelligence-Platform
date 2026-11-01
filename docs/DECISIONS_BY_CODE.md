@@ -1,6 +1,6 @@
 # Decisions taken by Claude Code in "Phase 2 autonomous" mode
 
-Mode: CLAUDE.md §6a-bis (owner decision 2026-10-27, temporary). One entry per decision that would otherwise have been asked to the owner.
+Mode: CLAUDE.md §6a-bis (Phase 2 mode, owner decision 2026-10-27, entries 1-20; Phase 3 mode, owner decision 2026-11-01, entries 21+). One entry per decision that would otherwise have been asked to the owner.
 Format: date · slice · decision · reason · alternative · how to reverse.
 
 | # | Date | Slice | Decision | Reason | Alternative | How to reverse |

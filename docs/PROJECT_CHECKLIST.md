@@ -168,3 +168,8 @@ Test status at `8435a0e`: 1150 tests on SQLite and on PostgreSQL 16, 57 `demo_in
 - **Next step:** 0025 commit 2: clause validation against `risk/signals.METRICS` (refuse emotional/family; `low_average` needs `RuleSettings.grade_scale_max`), lifecycle (draft > simulated > pending_approval > active > paused > archived, `params_hash`, single approver, optional second approver), simulation (aggregate counts, groups under 5 withheld, writes nothing but RuleRun), SchoolAdmin pages with the "unvalidated" note. Then c3 runner (`system_scope_students`, circuit breaker, atomic per-student, `rule_run` audit with `system` actor), c4 seed/trend tile/manuals/docs, c5 security review.
 - **Blocked on owner:** principals' questionnaire spec (message not in context, resend needed); SchoolAdmin text access to closed-referral notes.
 - **STOPPED at the Phase 2 exit** (`docs/changes/0027-phase-2-exit-REPORT.md`). Review findings 1-4 and closed-referral notes: decided and applied 2026-10-28 (report §6a). Next step for a fresh session: the principals' questionnaire (owner's spec message), then STOP; the owner starts Phase 3 explicitly after removing CLAUDE.md §6a-bis.
+
+## Resume note (Phase 3 autonomous mode, CLAUDE.md §6a-bis, started 2026-11-01)
+- Owner decisions OW-1..OW-7 (Iran hosting shared/dedicated, mandatory backups, `.ir` HTTPS, provider-agnostic server-side controls, no real data, demo goal, two AI provider classes, push except `main`) and the decision pack: `docs/changes/0028-p3-p8-decision-pack-PROPOSAL.md`.
+- Order: C-B `create_school` > C-D dependency audit > C-H production hardening + self-hosted assets > C-K backups > C-L audit completeness > STOP before C-A (Tier C).
+- **Next step:** C-B.
