@@ -100,7 +100,7 @@ Test status at `8435a0e`: 1150 tests on SQLite and on PostgreSQL 16, 57 `demo_in
 
 ## 6. Hardening before real data
 - [x] `/admin/` login throttled with the same limits and counters as `/login/` (`dashboard/throttle.py` `throttled_admin_login`, tests in `dashboard/test_login_throttle.py`).
-- [~] Throttle behind a proxy: client address source is configurable (`THROTTLE_TRUSTED_PROXIES`, default OFF, tests for both modes); still no HTTPS or reverse-proxy configuration shipped (RUNBOOK).
+- [~] Throttle behind a proxy: client address source is configurable (`THROTTLE_TRUSTED_PROXIES`, default OFF, tests for both modes); HTTPS settings and a generic reverse-proxy example shipped 2026-11-01 (C-H: `config/settings/production.py`, `deploy/nginx/eip.conf.example`, `check --deploy` gate in `dashboard/deploy_checks.py`); real certificate and hosting values wait for the server (OW-1, OW-3).
 - [ ] Password strength beyond length 8, 2FA for SchoolAdmin, email/SMS self-service reset (RUNBOOK).
 - [~] Migration-order fragility between `schools.0010` and `students.0009`: guarded by `schools/test_fresh_migrate.py` (fresh-DB module rows and plan order; `docs/changes/0018-migration-order-guard.md`); an explicit dependency is unsafe for databases behind on migrations, so the order is protected, not enforced.
 - [x] Concurrent import race on PostgreSQL has a real two-connection test that runs in `pg` mode and the CI postgres job (`EIP_REQUIRE_PG=1`).

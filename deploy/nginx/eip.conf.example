@@ -1,0 +1,58 @@
+# Example reverse proxy for one host (P3 C-H, docs/DEPLOYMENT.md §3a). Generic nginx; nothing provider-specific.
+# Replace school.example.ir, the certificate paths and /srv/eip/static. Django runs behind it with:
+#   ALLOWED_HOSTS=school.example.ir  CSRF_TRUSTED_ORIGINS=https://school.example.ir  EIP_BEHIND_TLS_PROXY=1
+#   THROTTLE_TRUSTED_PROXIES=<this proxy's address as Django sees it, e.g. 127.0.0.1 or the compose network>
+# HSTS, nosniff, frame and referrer headers are set by Django; they are not repeated here.
+
+limit_req_zone $binary_remote_addr zone=eip_auth:10m rate=10r/m;   # login and token endpoints (Django also throttles)
+limit_req_zone $binary_remote_addr zone=eip_all:10m rate=20r/s;
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name school.example.ir;
+    location /.well-known/acme-challenge/ { root /var/www/acme; }   # any ACME client (certbot, acme.sh, lego, ...)
+    location / { return 301 https://$host$request_uri; }
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name school.example.ir;
+
+    ssl_certificate     /etc/ssl/eip/fullchain.pem;     # from any ACME CA or a commercial certificate
+    ssl_certificate_key /etc/ssl/eip/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache shared:EIP:10m;
+    ssl_session_timeout 1d;
+    ssl_session_tickets off;
+    # No OCSP stapling: it needs the CA's responder, which may be unreachable from a domestic network.
+
+    server_tokens off;
+    client_max_body_size 10m;                           # upload limit (0028 P3-5); Django validates type and content
+    limit_req zone=eip_all burst=40 nodelay;
+
+    location /static/ {
+        alias /srv/eip/static/;                         # collectstatic output (docker-compose: ./data/static)
+        expires 7d;
+        add_header Cache-Control "public";
+    }
+    location /media/ { return 404; }                    # uploads are never served directly
+
+    location ~ ^/(login|api/token|admin/login)/ {
+        limit_req zone=eip_auth burst=5 nodelay;
+        include /etc/nginx/eip_proxy.conf;
+    }
+    # Optional: restrict /admin/ to the operators' addresses.
+    # location /admin/ { allow 203.0.113.10; deny all; include /etc/nginx/eip_proxy.conf; }
+    location / { include /etc/nginx/eip_proxy.conf; }
+}
+
+# /etc/nginx/eip_proxy.conf (separate file):
+#   proxy_pass http://127.0.0.1:8000;
+#   proxy_set_header Host $host;
+#   proxy_set_header X-Forwarded-Proto https;          # overwrite, never pass the client's value
+#   proxy_set_header X-Forwarded-For $remote_addr;     # overwrite: one hop, the real client
+#   proxy_read_timeout 60s;

@@ -1,6 +1,6 @@
 # DEPLOYMENT — DRAFT PROPOSAL
 
-Status: **PROPOSED / DRAFT** (2026-10-15). Nothing here is implemented unless marked `CURRENT`. Created on the owner's instruction (R-03 decision); not an approved design.
+Status: **PROPOSED / DRAFT** (2026-10-15; §3/§3a updated 2026-11-01 by P3 C-H, owner decisions OW-1..OW-4 in `changes/0028`). Nothing here is implemented unless marked `CURRENT`. Created on the owner's instruction (R-03 decision); not an approved design.
 
 > **NO REAL STUDENT DATA in any environment until the Phase 3 security baseline exit criteria (`SECURITY.md`) are met.** Everything below, including any public or hosted demo, uses synthetic data only.
 
@@ -32,23 +32,34 @@ Internet ──443──> reverse proxy (TLS, HSTS, headers, rate limit)
 
 `CURRENT` in `config/settings/production.py`: `DEBUG = False` (no env override), `SECRET_KEY` fail-closed (length / placeholder checks), PostgreSQL, Redis cache. `ALLOWED_HOSTS` comes from the `ALLOWED_HOSTS` env var (default `localhost,127.0.0.1`).
 
-`NOT YET IMPLEMENTED` (verified by reading `production.py` and `base.py`; no matches for these names):
+`CURRENT` since 2026-11-01 (`config/settings/production.py`, tests `dashboard/test_deploy_checks.py`), values from the environment:
 
-| Setting | Proposed value | Why |
+| Setting | Value | Env |
 |---|---|---|
-| `ALLOWED_HOSTS` | exact public hostname(s) only, set via env | Host-header validation |
-| `CSRF_TRUSTED_ORIGINS` | `https://<domain>` | Required for HTTPS behind a proxy (Django ≥ 4) |
-| `SECURE_PROXY_SSL_HEADER` | `('HTTP_X_FORWARDED_PROTO', 'https')` | Only if the proxy strips and sets the header itself; wrong config lets clients spoof HTTPS |
-| `SECURE_SSL_REDIRECT` | `True` (or redirect at the proxy) | No plaintext sessions |
-| `SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE` | `True` | Cookies never over HTTP |
-| `SESSION_COOKIE_HTTPONLY`, `SESSION_COOKIE_SAMESITE` | `True`, `'Lax'` | Reduce XSS/CSRF impact |
-| `SECURE_HSTS_SECONDS` | start 3600, raise after verification; `INCLUDE_SUBDOMAINS` only if all subdomains are HTTPS | HSTS is hard to undo; stage it |
-| `SECURE_CONTENT_TYPE_NOSNIFF`, `X_FRAME_OPTIONS='DENY'`, referrer policy | on | Standard hardening |
-| Admin URL | non-default path and/or proxy IP allow-list | `/admin/` is a high-value target |
-| `api/token/` | review before exposure; needs rate limiting | The JWT token endpoint is a credential-guessing surface. (`/test-fastapi/`, an unauthenticated debug route, was removed 2026-10-16 with a 404 regression test.) |
-| Login rate limiting / lockout | `NOT YET IMPLEMENTED` | Needs a decision (proxy rate limit vs app-level) |
+| `ALLOWED_HOSTS` | exact public host name(s) | `ALLOWED_HOSTS` (deploy check eip.E001 refuses empty, `*`, localhost-only) |
+| `CSRF_TRUSTED_ORIGINS` | `https://<domain>` | `CSRF_TRUSTED_ORIGINS` (eip.E002 refuses `http://`) |
+| `SECURE_PROXY_SSL_HEADER` | `('HTTP_X_FORWARDED_PROTO', 'https')` | on unless `EIP_BEHIND_TLS_PROXY=0`; the proxy must overwrite the header and gunicorn must not be reachable directly |
+| `SECURE_SSL_REDIRECT` | `True` | `SECURE_SSL_REDIRECT` (eip.W003 if on without the proxy header) |
+| `SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE` | `True` (fixed) | — |
+| `SECURE_HSTS_SECONDS` | 3600 by default (staged; raise to 604800, then 31536000) | `SECURE_HSTS_SECONDS`; eip.I006 reminds while below one year |
+| `SECURE_HSTS_INCLUDE_SUBDOMAINS` / `PRELOAD` | off / off (preload fixed off) | `SECURE_HSTS_INCLUDE_SUBDOMAINS` |
+| nosniff, `X_FRAME_OPTIONS='DENY'`, referrer `same-origin` | on (fixed) | — |
+| `LOGGING` | console, WARNING+, no e-mail handler, no request bodies | — |
+| Database password | must be set | eip.E005 |
+| Login/token rate limiting | `CURRENT` in the app (`dashboard/throttle.py`) plus the proxy (`deploy/nginx/eip.conf.example`); behind a proxy set `THROTTLE_TRUSTED_PROXIES` | — |
+| No external assets in pages | Bootstrap, icons and Chart.js are self-hosted (`dashboard/static/dashboard/vendor/`) | eip.E004 scans first-party templates |
+| Admin URL | still `/admin/`; optional IP allow-list at the proxy (example config); closure of the admin = C-A (Tier C) | — |
 
-`python manage.py check --deploy` must be clean against the production settings; it becomes a deployment gate.
+Release gate: `DJANGO_SETTINGS_MODULE=config.settings.production python manage.py check --deploy --fail-level WARNING` with the real environment (exit 0; Django's W005/W021 are silenced on purpose, see the settings comment).
+
+## 3a. HTTPS for a `.ir` domain (owner decision OW-3; decision pack 0028 P3-3/P3-4)
+
+- **Provider-agnostic:** TLS ends at any reverse proxy; `deploy/nginx/eip.conf.example` is a complete generic example (HTTP→HTTPS redirect, ACME challenge path, TLS 1.2/1.3, upload limit, rate limits for login/token, static files, no direct media). Caddy or HAProxy work the same way; a hosting provider's CDN/WAF may sit in front, but the platform must stay secure without it.
+- **Certificate:** any ACME CA (renew 30 days before expiry; monitor expiry) or a commercial certificate. Whether a given CA issues for `.ir` and is reachable from the chosen hosting network is **NOT VERIFIED**; check at setup and keep a second CA as fallback. No OCSP stapling (the CA's responder may be unreachable from a domestic network).
+- **HSTS staging:** 1 hour > 1 week > 1 year, each step only after a week without HTTPS problems; `includeSubDomains` only when every subdomain serves HTTPS; never preload during the pilot.
+- **National-network resilience:** pages load nothing from abroad (eip.E004). Fonts, scripts and stylesheets are served by the platform, so a server inside Iran keeps working during an international outage. Certificate renewal still needs the CA: renew early.
+- **Dedicated install (school's own server, OW-1):** same files; the school's domain or a subdomain of the platform's; the school names its operator (0028 P3-1).
+
 
 ## 4. Prerequisites (blockers)
 
@@ -95,11 +106,11 @@ Internet ──443──> reverse proxy (TLS, HSTS, headers, rate limit)
 
 | # | Decision | Options / notes |
 |---|---|---|
-| D1 | Hosting location and **data residency** | School premises server, Iranian domestic provider, or foreign cloud. Residency/legal requirements for student data apply once real data is allowed. |
-| D2 | Domain name and TLS certificates | Owned domain; ACME (Let's Encrypt) vs organisational CA; internal-only name for an intranet deployment |
+| D1 | Hosting location and **data residency** | **DECIDED 2026-11-01 (OW-1):** Iranian servers (shared) or the school's own server (dedicated). Legal residency rules still with O1. |
+| D2 | Domain name and TLS certificates | **DECIDED 2026-11-01 (OW-3):** `.ir` domain; certificate from any ACME CA or a commercial one (§3a) |
 | D3 | Audience | Public internet demo vs private/intranet/VPN only. Recommendation: private (VPN or IP allow-list) until Phase 3 exit |
 | D4 | Data in the hosted instance | **Synthetic data only** until Phase 3 exit (fixed rule; D4 is only "which synthetic set") |
-| D5 | Reverse proxy product | nginx / Caddy / Traefik |
+| D5 | Reverse proxy product | Any (OW-4, provider-agnostic); nginx example in `deploy/nginx/` |
 | D6 | Who operates it | Named owner/operator, on-call expectation, patch cadence |
 | D7 | Backup RPO/RTO and storage target | See section 6 |
 | D8 | Authentication hardening | Rate limit/lockout, MFA for Admin (future), admin URL exposure |
