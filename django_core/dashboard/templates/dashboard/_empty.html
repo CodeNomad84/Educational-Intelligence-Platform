@@ -1,0 +1,6 @@
+<div class="eip-empty">
+    <div class="eip-empty-icon" aria-hidden="true"><i class="bi bi-{{ icon }}"></i></div>
+    <div class="eip-empty-title">{{ title }}</div>
+    {% if text %}<p class="eip-empty-text">{{ text }}</p>{% endif %}
+    {% if action_url %}<a class="btn btn-primary btn-sm mt-2" href="{{ action_url }}">{{ action_label }}</a>{% endif %}
+</div>

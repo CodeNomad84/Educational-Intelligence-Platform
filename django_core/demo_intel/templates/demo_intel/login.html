@@ -1,44 +1,10 @@
-{# DEMO SCOPE — whole file. Standalone demo login (no CDN, no old sidebar). #}
-{% load static %}<!DOCTYPE html>
-<html dir="rtl" lang="fa">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ورود — پلتفرم هوشمند مدرسه (نمایشی)</title>
-<link href="{% static 'demo_intel/vendor/bootstrap.rtl.min.css' %}" rel="stylesheet">
-<style>
-@font-face{font-family:Vazirmatn;src:url("{% static 'demo_intel/vendor/Vazirmatn-Regular.woff2' %}") format("woff2");font-weight:400}
-@font-face{font-family:Vazirmatn;src:url("{% static 'demo_intel/vendor/Vazirmatn-Bold.woff2' %}") format("woff2");font-weight:700}
-body{font-family:Vazirmatn,Tahoma,sans-serif;background:linear-gradient(160deg,#12213f 0%,#1d3a78 60%,#2b5fd9 100%);min-height:100vh;color:#1f2a37}
-.demo-banner{background:#fff7d6;border-bottom:1px solid #ecd78a;color:#6a5600;font-size:.9rem;padding:.45rem 1rem;text-align:center}
-.panel{max-width:440px;margin:6vh auto 0;background:#fff;border-radius:18px;box-shadow:0 20px 50px rgba(0,0,0,.25);padding:2rem}
-.brand{font-weight:700;font-size:1.35rem}
-.sub{color:#6b7280;font-size:.92rem}
-.proto{border:1px dashed #8aa4d6;background:#eef3ff;color:#27428a;border-radius:10px;padding:.5rem .8rem;font-size:.82rem}
-.hint{color:#6b7280;font-size:.82rem}
-</style>
-</head>
-<body>
-<div class="demo-banner">⚠ نسخهٔ نمایشی — تمام دانش‌آموزان و داده‌ها <strong>مصنوعی</strong> هستند. | DEMO — all data is synthetic</div>
-<div class="panel">
- <div class="text-center mb-4">
-  <div style="font-size:2.4rem">🏫</div>
-  <div class="brand">پلتفرم هوشمند مدرسه</div>
-  <div class="sub">هوش تحلیلی دانش‌آموز — از داده‌های پراکنده تا اقدام به‌موقع</div>
- </div>
- {% if messages %}{% for message in messages %}
-  <div class="alert alert-danger py-2" role="alert">{{ message }}</div>
- {% endfor %}{% endif %}
- <form method="post" autocomplete="off">{% csrf_token %}
-<input type="hidden" name="next" value="{{ request.GET.next|default:'' }}">
-  <div class="mb-3"><label class="form-label">نام کاربری</label>
-   <input type="text" name="username" class="form-control form-control-lg" required autofocus dir="ltr"></div>
-  <div class="mb-3"><label class="form-label">رمز عبور</label>
-   <input type="password" name="password" class="form-control form-control-lg" required dir="ltr"></div>
-  <button type="submit" class="btn btn-primary btn-lg w-100">ورود</button>
- </form>
- <div class="hint mt-3 text-center">حساب‌های نمایشی: <span dir="ltr">demo_admin</span> · <span dir="ltr">demo_counselor</span></div>
- <div class="proto mt-3 text-center">{{ PROTOTYPE_LABEL_FA }}<br><span dir="ltr">{{ PROTOTYPE_LABEL_EN }}</span></div>
-</div>
-</body>
-</html>
+{# DEMO SCOPE — whole file. Demo login on the shared public layout (self-hosted assets, demo banner). #}
+{% extends 'dashboard/base_public.html' %}
+{% block head_title %}ورود — پلتفرم هوشمند مدرسه (نمایشی){% endblock %}
+{% block banner %}<div class="eip-demo-banner justify-content-center" role="note">⚠ نسخهٔ نمایشی — تمام دانش‌آموزان و داده‌ها <strong>مصنوعی</strong> هستند. | DEMO — all data is synthetic</div>{% endblock %}
+{% block tagline %}هوش تحلیلی دانش‌آموز — از داده‌های پراکنده تا اقدام به‌موقع{% endblock %}
+{% block content %}
+{% include 'dashboard/_login_form.html' %}
+<div class="eip-note mt-3 text-center">حساب‌های نمایشی: <span dir="ltr">demo_admin</span> · <span dir="ltr">demo_gradelead</span> · <span dir="ltr">demo_teacher</span> · <span dir="ltr">demo_counselor</span> · <span dir="ltr">demo_parent</span> · <span dir="ltr">demo_student</span></div>
+<div class="alert alert-info mt-3 mb-0 text-center small">{{ PROTOTYPE_LABEL_FA }}<br><span dir="ltr">{{ PROTOTYPE_LABEL_EN }}</span></div>
+{% endblock %}

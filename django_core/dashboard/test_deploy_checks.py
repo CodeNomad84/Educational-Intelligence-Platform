@@ -31,7 +31,7 @@ class TemplateAssetTests(TestCase):
         self.assertNotIn('cdn.jsdelivr', page)
         if 'bootstrap' in page:
             self.assertIn('/static/dashboard/vendor/bootstrap-5.3.0/', page)
-        for path in ('bootstrap-5.3.0/bootstrap.min.css', 'bootstrap-5.3.0/bootstrap.bundle.min.js',
+        for path in ('bootstrap-5.3.0/bootstrap.rtl.min.css', 'bootstrap-5.3.0/bootstrap.bundle.min.js', 'vazirmatn-33.0.3/Vazirmatn-FD-Regular.woff2',
                      'bootstrap-icons-1.11.3/bootstrap-icons.min.css', 'bootstrap-icons-1.11.3/fonts/bootstrap-icons.woff2',
                      'chartjs-4.4.1/chart.umd.js'):
             self.assertTrue((settings.BASE_DIR / 'dashboard/static/dashboard/vendor' / path).is_file(), path)

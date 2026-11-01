@@ -172,4 +172,4 @@ Test status at `8435a0e`: 1150 tests on SQLite and on PostgreSQL 16, 57 `demo_in
 ## Resume note (Phase 3 autonomous mode, CLAUDE.md §6a-bis, started 2026-11-01)
 - Owner decisions OW-1..OW-7 (Iran hosting shared/dedicated, mandatory backups, `.ir` HTTPS, provider-agnostic server-side controls, no real data, demo goal, two AI provider classes, push except `main`) and the decision pack: `docs/changes/0028-p3-p8-decision-pack-PROPOSAL.md`.
 - Order: C-B `create_school` > C-D dependency audit > C-H production hardening + self-hosted assets > C-K backups > C-L audit completeness > STOP before C-A (Tier C).
-- **Next step:** C-A Django admin closure (owner go 2026-11-01, P3-10), then the demo track: P8-3 design system > P5-1 principal dashboard > P5-2 support levels > P6-1 strategy library > page polish > demo school seed + `docs/owner/DEMO_SCRIPT.fa.md`.
+- **Next step:** (C-A and P8-3 done 2026-11-01) demo track: P5-1 principal dashboard > P5-2 support levels > P6-1 strategy library > page polish > demo school seed + `docs/owner/DEMO_SCRIPT.fa.md`.

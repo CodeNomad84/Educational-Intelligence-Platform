@@ -1,115 +1,123 @@
-{% load static %}<!DOCTYPE html>
+{% load static eip_ui %}<!DOCTYPE html>
 <html dir="rtl" lang="fa">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>پلتفرم هوشمند مدرسه</title>
-    <link href="{% static 'dashboard/vendor/bootstrap-5.3.0/bootstrap.min.css' %}" rel="stylesheet">
+    <link href="{% static 'dashboard/vendor/bootstrap-5.3.0/bootstrap.rtl.min.css' %}" rel="stylesheet">
     <link rel="stylesheet" href="{% static 'dashboard/vendor/bootstrap-icons-1.11.3/bootstrap-icons.min.css' %}">
-    <style>
-        body { background-color: #f8f9fa; }
-        .sidebar { min-height: 100vh; background-color: #343a40; color: white; }
-        .sidebar a { color: #ddd; text-decoration: none; display: block; padding: 10px; }
-        .sidebar a:hover { background-color: #495057; color: white; }
-        .main-content { padding: 20px; }
-        .card-stats { border-radius: 10px; padding: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-    </style>
+    <link rel="stylesheet" href="{% static 'dashboard/css/eip.css' %}">
 </head>
 <body>
-    <div class="container-fluid">
-        <div class="row">
-            <!-- Sidebar -->
-            <nav class="col-md-2 d-none d-md-block sidebar">
-                <h4 class="mt-3 text-center">🏫 مدرسه</h4>
-                <hr class="bg-light">
-                {# one home entry per role: /dashboard/ redirects every role but SchoolAdmin to its own home, so only SchoolAdmin gets it #}
-                {% if IS_SCHOOL_ADMIN %}<a href="{% url 'dashboard:dashboard' %}"><i class="bi bi-speedometer2"></i> داشبورد</a>{% endif %}
-                {% if IS_SCHOOL_ADMIN or IS_TEACHER or IS_GRADE_LEAD or IS_PARENT %}
-                <a href="{% url 'dashboard:student_list' %}"><i class="bi bi-people"></i> {% if IS_GRADE_LEAD %}دانش‌آموزان پایه{% elif IS_PARENT %}فرزندان من{% else %}دانش‌آموزان{% endif %}</a>
-                {% endif %}
-                {# DEMO SCOPE begin — chat/library are disabled in Phase 1 (403); hidden in the demo #}
-                {% if not DEMO_MODE %}
-                <a href="{% url 'dashboard:chat' %}"><i class="bi bi-chat-dots"></i> چت با هوش مصنوعی</a>
-                <a href="{% url 'dashboard:library' %}"><i class="bi bi-book"></i> کتابخانه</a>
-                {% endif %}
-                {# DEMO SCOPE end #}
-                {% if IS_GRADE_LEAD %}
-                <a href="{% url 'dashboard:grade_dashboard' %}"><i class="bi bi-bar-chart"></i> داشبورد پایه</a>
-                <a href="{% url 'dashboard:grade_resets' %}"><i class="bi bi-key"></i> بازنشانی رمز</a>
-                {% endif %}
-                {% if IS_TEACHER %}
-                <a href="{% url 'dashboard:teacher_home' %}"><i class="bi bi-journal-check"></i> کلاس‌های من</a>
-                {% endif %}
-                {% if IS_TEACHER or IS_GRADE_LEAD %}{% if 'mission' in ENABLED_MODULES %}
-                <a href="{% url 'missions:activities' %}"><i class="bi bi-compass"></i> مشاهدهٔ توانمندی‌ها</a>
-                {% endif %}{% endif %}
-                {% if IS_TEACHER or IS_GRADE_LEAD or IS_COUNSELOR %}{% if 'mission' in ENABLED_MODULES %}
-                <a href="{% url 'missions:students' %}"><i class="bi bi-person-lines-fill"></i> گزارش مأموریت‌محور</a>
-                {% endif %}{% endif %}
-                {% if IS_SCHOOL_ADMIN %}{% if 'mission' in ENABLED_MODULES %}
-                <a href="{% url 'missions:aggregate' %}"><i class="bi bi-pie-chart"></i> آمار مأموریت‌محور</a>
-                <a href="{% url 'missions:weights' %}"><i class="bi bi-sliders"></i> وزن‌های مأموریت‌محور</a>
-                {% endif %}{% endif %}
-                {% if IS_TEACHER %}{% if 'exams' in ENABLED_MODULES %}
-                <a href="{% url 'exams:teacher_home' %}"><i class="bi bi-patch-question"></i> آزمون‌ها (بانک پرسش)</a>
-                {% endif %}{% endif %}
-                {% if IS_GRADE_LEAD %}{% if 'exams' in ENABLED_MODULES %}
-                <a href="{% url 'exams:lead_overview' %}"><i class="bi bi-patch-check"></i> آزمون‌های پایه</a>
-                {% endif %}{% endif %}
-                {% if IS_SCHOOL_ADMIN %}{% if 'exams' in ENABLED_MODULES %}
-                <a href="{% url 'exams:admin_overview' %}"><i class="bi bi-bar-chart-steps"></i> آمار آزمون‌ها</a>
-                {% endif %}{% endif %}
-                {% if IS_STUDENT %}
-                <a href="{% url 'dashboard:me_home' %}"><i class="bi bi-person"></i> صفحهٔ من</a>
-                {% if 'exams' in ENABLED_MODULES %}<a href="{% url 'exams:student_home' %}"><i class="bi bi-patch-check"></i> آزمون‌های من</a>{% endif %}
-                {% for m in VISIBLE_MODULES %}{% if m.key == 'tutor_ai' %}<a href="{{ m.url }}"><i class="bi bi-lightbulb"></i> دستیار مطالعه (نمایشی){% if not m.enabled %} <i class="bi bi-lock"></i>{% endif %}</a>{% endif %}{% endfor %}
-                {% endif %}
-                {% if IS_SCHOOL_ADMIN or IS_GRADE_LEAD or IS_COUNSELOR %}
-                <a href="{% url 'dashboard:alert_list' %}"><i class="bi bi-bell"></i> هشدارها</a>
-                <a href="{% url 'dashboard:plan_list' %}"><i class="bi bi-clipboard2-pulse"></i> برنامه‌های مداخله</a>
-                {% elif IS_TEACHER %}
-                <a href="{% url 'dashboard:alert_list' %}"><i class="bi bi-bell"></i> نگرانی‌های ثبت‌شده</a>
-                {% endif %}
-                {% if IS_COUNSELOR %}
-                <a href="{% url 'dashboard:counselor_home' %}"><i class="bi bi-heart-pulse"></i> پرونده‌های ارجاعی</a>
-                {% endif %}
-                {% if IS_SCHOOL_ADMIN %}
-                <a href="{% url 'dashboard:school_accounts' %}"><i class="bi bi-upload"></i> ثبت گروهی از اکسل</a>
-                <a href="{% url 'dashboard:school_home' %}"><i class="bi bi-building"></i> مدیریت مدرسه</a>
-                <a href="{% url 'dashboard:quickstart' %}"><i class="bi bi-lightbulb"></i> راهنمای شروع سریع</a>
-                {% for m in VISIBLE_MODULES %}<a href="{{ m.url }}"><i class="bi bi-puzzle"></i> {{ m.label }}{% if not m.enabled %} <i class="bi bi-lock"></i>{% endif %}</a>{% endfor %}
-                {% endif %}
-                <hr class="bg-light">
-                {% if IS_PLATFORM_OPERATOR %}<a href="{% url 'dashboard:operator_overview' %}"><i class="bi bi-diagram-3"></i> نمای کلی پلتفرم</a>{% endif %}
-                <a href="{% url 'dashboard:profile' %}"><i class="bi bi-person-gear"></i> حساب من</a>
-                <a href="{% url 'dashboard:logout' %}" class="text-danger"><i class="bi bi-box-arrow-right"></i> خروج</a>
-            </nav>
-
-            <!-- Main Content -->
-            <main class="col-md-10 ms-sm-auto main-content">
-                <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h2>{% block title %}پنل مدیریت{% endblock %}</h2>
-                    <span class="badge bg-secondary">{{ user.username }}</span>
-                </div>
-                {% for n in TRIAL_NOTICES %}
-                    <div class="alert alert-warning" role="alert">
-                        {% if n.kind == 'expiring' %}دورهٔ آزمایشی «{{ n.label }}» {{ n.days }} روز دیگر پایان می‌یابد.{% else %}دورهٔ آزمایشی «{{ n.label }}» پایان یافته است ({{ n.days }} روز پیش).{% endif %}
-                        برای ادامه با پشتیبانی پلتفرم تماس بگیرید.
-                    </div>
-                {% endfor %}
-                {% if messages %}
-                    {% for message in messages %}
-                        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-                            {{ message }}
-                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                        </div>
-                    {% endfor %}
-                {% endif %}
-                {% block content %}{% endblock %}
-            </main>
+<a class="eip-skip" href="#eip-main">پرش به محتوای اصلی</a>
+<div class="eip-shell">
+    <aside class="eip-sidebar offcanvas-md offcanvas-start" tabindex="-1" id="eipSidebar" aria-label="منو">
+        <div class="d-flex align-items-center justify-content-between">
+            <div class="eip-brand">
+                <span class="eip-brand-mark" aria-hidden="true"><i class="bi bi-mortarboard"></i></span>
+                <span><span class="eip-brand-name d-block">پلتفرم هوشمند مدرسه</span>{% if SCHOOL_NAME %}<span class="eip-brand-sub d-block">{{ SCHOOL_NAME }}</span>{% endif %}</span>
+            </div>
+            <button type="button" class="btn-close d-md-none ms-3" data-bs-dismiss="offcanvas" data-bs-target="#eipSidebar" aria-label="بستن منو"></button>
         </div>
+        {# The sidebar <nav> holds every menu link (dashboard/test_menu.py reads it). Role conditions are unchanged; the real gates are server-side. #}
+        <nav class="eip-nav sidebar" aria-label="منوی اصلی">
+            <div class="eip-nav-section">اصلی</div>
+            {# one home entry per role: /dashboard/ redirects every role but SchoolAdmin to its own home, so only SchoolAdmin gets it #}
+            {% if IS_SCHOOL_ADMIN %}{% nav_link 'dashboard:dashboard' 'speedometer2' 'داشبورد مدرسه' %}{% endif %}
+            {% if IS_GRADE_LEAD %}{% nav_link 'dashboard:grade_dashboard' 'bar-chart' 'داشبورد پایه' %}{% endif %}
+            {% if IS_TEACHER %}{% nav_link 'dashboard:teacher_home' 'journal-check' 'کلاس‌های من' also='dashboard:teacher_grades dashboard:teacher_student' %}{% endif %}
+            {% if IS_STUDENT %}{% nav_link 'dashboard:me_home' 'person' 'صفحهٔ من' %}{% endif %}
+            {% if IS_COUNSELOR %}{% nav_link 'dashboard:counselor_home' 'heart-pulse' 'پرونده‌های ارجاعی' also='dashboard:counselor_case' %}{% endif %}
+            {% if IS_GRADE_LEAD %}{% nav_link 'dashboard:student_list' 'people' 'دانش‌آموزان پایه' prefix=True %}{% elif IS_PARENT %}{% nav_link 'dashboard:student_list' 'people' 'فرزندان من' prefix=True %}{% elif IS_SCHOOL_ADMIN or IS_TEACHER %}{% nav_link 'dashboard:student_list' 'people' 'دانش‌آموزان' prefix=True %}{% endif %}
+
+            {% if IS_SCHOOL_ADMIN or IS_GRADE_LEAD or IS_COUNSELOR %}
+            <div class="eip-nav-section">حمایت از دانش‌آموز</div>
+            {% nav_link 'dashboard:alert_list' 'bell' 'هشدارها' also='dashboard:alert_review' %}
+            {% nav_link 'dashboard:plan_list' 'clipboard2-pulse' 'برنامه‌های مداخله' prefix=True %}
+            {% elif IS_TEACHER %}
+            <div class="eip-nav-section">حمایت از دانش‌آموز</div>
+            {% nav_link 'dashboard:alert_list' 'bell' 'نگرانی‌های ثبت‌شده' %}
+            {% endif %}
+
+            {% if IS_SCHOOL_ADMIN or IS_STUDENT %}<div class="eip-nav-section">ماژول‌ها</div>
+            {% elif IS_TEACHER or IS_GRADE_LEAD or IS_COUNSELOR %}{% if 'mission' in ENABLED_MODULES or 'exams' in ENABLED_MODULES and IS_TEACHER or 'exams' in ENABLED_MODULES and IS_GRADE_LEAD %}<div class="eip-nav-section">ماژول‌ها</div>{% endif %}{% endif %}
+            {% if 'mission' in ENABLED_MODULES %}
+            {% if IS_TEACHER or IS_GRADE_LEAD %}{% nav_link 'missions:activities' 'compass' 'مشاهدهٔ توانمندی‌ها' %}{% endif %}
+            {% if IS_TEACHER or IS_GRADE_LEAD or IS_COUNSELOR %}{% nav_link 'missions:students' 'person-lines-fill' 'گزارش مأموریت‌محور' %}{% endif %}
+            {% if IS_SCHOOL_ADMIN %}{% nav_link 'missions:aggregate' 'pie-chart' 'آمار مأموریت‌محور' %}{% nav_link 'missions:weights' 'sliders' 'وزن‌های مأموریت‌محور' %}{% endif %}
+            {% endif %}
+            {% if 'exams' in ENABLED_MODULES %}
+            {% if IS_TEACHER %}{% nav_link 'exams:teacher_home' 'patch-question' 'آزمون‌ها (بانک پرسش)' %}{% endif %}
+            {% if IS_GRADE_LEAD %}{% nav_link 'exams:lead_overview' 'patch-check' 'آزمون‌های پایه' %}{% endif %}
+            {% if IS_SCHOOL_ADMIN %}{% nav_link 'exams:admin_overview' 'bar-chart-steps' 'آمار آزمون‌ها' %}{% endif %}
+            {% if IS_STUDENT %}{% nav_link 'exams:student_home' 'patch-check' 'آزمون‌های من' %}{% endif %}
+            {% endif %}
+            {% if IS_STUDENT %}{% for m in VISIBLE_MODULES %}{% if m.key == 'tutor_ai' %}<a href="{{ m.url }}" class="eip-nav-link"><i class="bi bi-lightbulb" aria-hidden="true"></i><span>دستیار مطالعه (نمایشی)</span>{% if not m.enabled %}<i class="bi bi-lock eip-lock" aria-label="قفل"></i>{% endif %}</a>{% endif %}{% endfor %}{% endif %}
+            {% if IS_SCHOOL_ADMIN %}{% for m in VISIBLE_MODULES %}<a href="{{ m.url }}" class="eip-nav-link{% if request.path == m.url %} active{% endif %}"><i class="bi bi-puzzle" aria-hidden="true"></i><span>{{ m.label }}</span>{% if not m.enabled %}<i class="bi bi-lock eip-lock" aria-label="قفل"></i>{% endif %}</a>{% endfor %}{% endif %}
+
+            {% if IS_SCHOOL_ADMIN or IS_GRADE_LEAD %}<div class="eip-nav-section">مدیریت</div>{% endif %}
+            {% if IS_SCHOOL_ADMIN %}
+            {% nav_link 'dashboard:school_home' 'building' 'مدیریت مدرسه' also='dashboard:school_years dashboard:school_classes dashboard:school_class_new dashboard:school_class_edit dashboard:school_staff dashboard:school_staff_detail dashboard:school_audit dashboard:school_resets dashboard:school_staff_roles rules:index' %}
+            {% nav_link 'dashboard:school_accounts' 'upload' 'ثبت گروهی از اکسل' also='dashboard:school_accounts_preview' %}
+            {% nav_link 'dashboard:quickstart' 'signpost-split' 'راهنمای شروع سریع' %}
+            {% endif %}
+            {% if IS_GRADE_LEAD %}{% nav_link 'dashboard:grade_resets' 'key' 'بازنشانی رمز' %}{% endif %}
+
+            {# DEMO SCOPE begin — chat/library are disabled in Phase 1 (403); hidden in the demo #}
+            {% if not DEMO_MODE %}
+            <div class="eip-nav-section">دستیار و منابع</div>
+            {% nav_link 'dashboard:chat' 'chat-dots' 'چت با هوش مصنوعی' %}
+            {% nav_link 'dashboard:library' 'book' 'کتابخانه' %}
+            {% endif %}
+            {# DEMO SCOPE end #}
+
+            <div class="eip-nav-section">حساب</div>
+            {% if IS_PLATFORM_OPERATOR %}{% nav_link 'dashboard:operator_overview' 'diagram-3' 'نمای کلی پلتفرم' %}{% endif %}
+            {% nav_link 'dashboard:profile' 'person-gear' 'حساب من' also='dashboard:password_change' %}
+            {% nav_link 'dashboard:logout' 'box-arrow-right' 'خروج' css='is-danger' %}
+        </nav>
+    </aside>
+
+    <div class="eip-main">
+        {% if DEMO_MODE %}<div class="eip-demo-banner" role="note"><i class="bi bi-info-circle" aria-hidden="true"></i> نسخهٔ نمایشی: همهٔ نام‌ها و داده‌ها ساختگی است.</div>{% endif %}
+        <header class="eip-topbar">
+            <button class="btn btn-light btn-sm d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#eipSidebar" aria-controls="eipSidebar" aria-label="باز کردن منو"><i class="bi bi-list fs-5"></i></button>
+            <div class="eip-topbar-title">{{ SCHOOL_NAME|default:"پلتفرم هوشمند مدرسه" }}</div>
+            <div class="ms-auto dropdown">
+                <button class="eip-user dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    <span class="eip-avatar" aria-hidden="true"><i class="bi bi-person"></i></span>
+                    <span class="d-none d-sm-inline"><span class="ltr">{{ user.username }}</span>{% if ROLE_LABEL %} <span class="text-muted">· {{ ROLE_LABEL }}</span>{% endif %}</span>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><a class="dropdown-item" href="{% url 'dashboard:profile' %}"><i class="bi bi-person-gear"></i> حساب من</a></li>
+                    <li><a class="dropdown-item text-danger" href="{% url 'dashboard:logout' %}"><i class="bi bi-box-arrow-right"></i> خروج</a></li>
+                </ul>
+            </div>
+        </header>
+        <main id="eip-main" class="eip-content">
+            {% block page_header %}
+            <div class="eip-page-header">
+                <div><h1>{% block title %}پنل مدیریت{% endblock %}</h1>{% block subtitle %}{% endblock %}</div>
+                <div class="eip-page-actions">{% block page_actions %}{% endblock %}</div>
+            </div>
+            {% endblock %}
+            {% for n in TRIAL_NOTICES %}
+                <div class="alert alert-warning" role="alert">
+                    {% if n.kind == 'expiring' %}دورهٔ آزمایشی «{{ n.label }}» {{ n.days }} روز دیگر پایان می‌یابد.{% else %}دورهٔ آزمایشی «{{ n.label }}» پایان یافته است ({{ n.days }} روز پیش).{% endif %}
+                    برای ادامه با پشتیبانی پلتفرم تماس بگیرید.
+                </div>
+            {% endfor %}
+            {% for message in messages %}
+                <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="بستن"></button>
+                </div>
+            {% endfor %}
+            {% block content %}{% endblock %}
+        </main>
     </div>
-    <script src="{% static 'dashboard/vendor/bootstrap-5.3.0/bootstrap.bundle.min.js' %}"></script>
-    {% block scripts %}{% endblock %}
+</div>
+<script src="{% static 'dashboard/vendor/bootstrap-5.3.0/bootstrap.bundle.min.js' %}"></script>
+{% block scripts %}{% endblock %}
 </body>
 </html>

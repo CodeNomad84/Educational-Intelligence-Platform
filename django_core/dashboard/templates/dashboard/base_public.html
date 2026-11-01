@@ -1,0 +1,25 @@
+{% load static %}<!DOCTYPE html>
+<html dir="rtl" lang="fa">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block head_title %}ورود — پلتفرم هوشمند مدرسه{% endblock %}</title>
+    <link href="{% static 'dashboard/vendor/bootstrap-5.3.0/bootstrap.rtl.min.css' %}" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'dashboard/vendor/bootstrap-icons-1.11.3/bootstrap-icons.min.css' %}">
+    <link rel="stylesheet" href="{% static 'dashboard/css/eip.css' %}">
+</head>
+<body class="eip-public">
+{% block banner %}{% endblock %}
+<main class="eip-public-main">
+    <div class="eip-public-card">
+        <div class="text-center mb-4">
+            <div class="eip-brand-mark mx-auto mb-2" style="width:52px;height:52px;font-size:1.6rem" aria-hidden="true"><i class="bi bi-mortarboard"></i></div>
+            <h1 class="h4 mb-1">پلتفرم هوشمند مدرسه</h1>
+            <p class="text-muted mb-0">{% block tagline %}از داده‌های پراکنده تا حمایت به‌موقع از هر دانش‌آموز{% endblock %}</p>
+        </div>
+        {% for message in messages %}<div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} py-2" role="alert">{{ message }}</div>{% endfor %}
+        {% block content %}{% endblock %}
+    </div>
+</main>
+</body>
+</html>

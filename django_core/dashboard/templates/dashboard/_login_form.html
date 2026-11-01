@@ -1,0 +1,8 @@
+<form method="post" autocomplete="off">{% csrf_token %}
+    <input type="hidden" name="next" value="{{ request.GET.next|default:'' }}">
+    <div class="mb-3"><label class="form-label" for="id_username">نام کاربری</label>
+        <input type="text" name="username" id="id_username" class="form-control form-control-lg" required autofocus dir="ltr"></div>
+    <div class="mb-3"><label class="form-label" for="id_password">رمز عبور</label>
+        <input type="password" name="password" id="id_password" class="form-control form-control-lg" required dir="ltr"></div>
+    <button type="submit" class="btn btn-primary btn-lg w-100">ورود</button>
+</form>

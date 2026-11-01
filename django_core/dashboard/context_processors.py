@@ -7,6 +7,9 @@ from students.access import ADMIN, COUNSELOR, GRADE_LEAD, PARENT, STUDENT, TEACH
 from .module_info import label
 from .operator_page import is_platform_operator
 
+# Top-bar role label (design system P8-3), in this order.
+ROLE_LABELS = ((ADMIN, 'مدیر مدرسه'), (GRADE_LEAD, 'مربی پایه'), (COUNSELOR, 'مشاور'), (TEACHER, 'معلم'), (PARENT, 'ولی'),
+               (STUDENT, 'دانش‌آموز'))
 _REAL_ROUTE = {'tutor_ai': 'dashboard:me_assistant', 'advisor_ai': 'dashboard:demo_assistant'}
 
 
@@ -19,15 +22,27 @@ def _module_url(key, enabled):
     return reverse('dashboard:module_info', args=[key])
 
 
+def _school_name(school_ids):
+    if len(school_ids) > 1:
+        return f'{len(school_ids)} مدرسه'
+    from schools.models import School
+    return School.objects.filter(pk__in=school_ids).values_list('name', flat=True).first() or '' if school_ids else ''
+
+
 def role_names(request):
     """Menus follow ALL of the user's roles (union), not the first group."""
     user = getattr(request, 'user', None)
     roles = roles_for(user)
     enabled = enabled_modules_for_user(user)
     school_ids = user_school_ids(user) if ADMIN in roles else set()
+    own_schools = school_ids or (user_school_ids(user) if roles else set())
     return {'ADMIN_ROLE': ADMIN, 'IS_SCHOOL_ADMIN': ADMIN in roles, 'IS_TEACHER': TEACHER in roles,
             'IS_GRADE_LEAD': GRADE_LEAD in roles, 'IS_PARENT': PARENT in roles, 'IS_COUNSELOR': COUNSELOR in roles,
             'IS_STUDENT': STUDENT in roles, 'IS_PLATFORM_OPERATOR': is_platform_operator(user),
+            # Top bar only: the user's own school (from the schools the user already belongs to) and role label.
+            'SCHOOL_NAME': _school_name(own_schools),
+            'ROLE_LABEL': '، '.join(text for role, text in ROLE_LABELS if role in roles)
+            or ('مدیر پلتفرم' if is_platform_operator(user) else ''),
             # ENABLED_MODULES: keys that are on (security-adjacent UI; the real gates are server-side).
             'ENABLED_MODULES': enabled,
             # VISIBLE_MODULES: all four sellable keys, locked ones included (they link to a static info page).
