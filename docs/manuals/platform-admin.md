@@ -14,12 +14,12 @@ Neither role sees student records. Details and evidence: `docs/changes/0024-plat
 ## Create a school (superuser only) — the 7-step checklist
 Everything below needs the **superuser**. A PlatformAdmin cannot do it (no model permissions on purpose). Do not create a second real school before the open risks in `docs/RUNBOOK.md` are accepted.
 1. **(Once, in a terminal)** `cd django_core && python manage.py createsuperuser`. Log in at `/login/`; you land on `/admin/`.
-2. **School:** `/admin/` → Schools → Add → name and a unique code. The code cannot be changed afterwards except by a superuser.
+2. **School:** in a terminal `python manage.py create_school <code> "<name>"` (recommended: it also seeds the school's vocabulary), or `/admin/` → Schools → Add → name and a unique code. Both paths write a `school_create` audit event (detail `cmd` or `admin`). The code cannot be changed afterwards except by a superuser.
 3. **First SchoolAdmin account:** Users → Add → username and password → Save → on the next page tick the group **SchoolAdmin**; leave "staff" and "superuser" unticked → Save. (The first password is not marked "must change"; ask them to change it at `/account/`. TO VERIFY in the running product.)
 4. **Membership:** School memberships → Add → that user and the school. Without it the SchoolAdmin sees nothing. (The user picker only lists eligible users, which is why step 3 comes first.)
-5. **Modules:** School modules → Add (module, kind trial or licensed, dates), or `python manage.py set_school_module <school_code> <module> --kind licensed`. Then in a terminal, once per school: `python manage.py seed_vocabulary --school <code>`, and for the mission module `python manage.py seed_mission --school <code>`. These two commands have no page.
+5. **Modules:** School modules → Add (module, kind trial or licensed, dates), or `python manage.py set_school_module <school_code> <module> --kind licensed`. Then in a terminal, once per school: `python manage.py seed_vocabulary --school <code>` (not needed after `create_school`), and for the mission module `python manage.py seed_mission --school <code>`. These two commands have no page.
 6. **Hand over:** give the SchoolAdmin the username and password. They log in at `/login/`, land on `/school/` and follow the Persian quick-start (`/school/quickstart/`): academic year, classes, staff, students, bulk accounts.
-7. **Check:** open `/platform/modules/` (module state, days left) and ask the SchoolAdmin to open `/school/audit/`. School creation itself is not recorded in an audit log yet (a `create_school` command with an audit event is planned before the second pilot school).
+7. **Check:** open `/platform/modules/` (module state, days left) and ask the SchoolAdmin to open `/school/audit/`. School creation is audit-logged since 2026-11-01 (the event belongs to the new school, so its SchoolAdmin sees it on `/school/audit/`).
 **You see:** the new school in the lists. **You do not see:** a "New school" page (**NOT BUILT**; decision 2026-10-26: option A now, the command later; PlatformAdmin gets no extra powers).
 **Ask:** the owner before creating a second real school.
 

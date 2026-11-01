@@ -60,6 +60,7 @@ RULE_SIMULATE = 'rule_simulate'                # detail = counts only
 RULE_RUN = 'rule_run'                          # detail = counts only; actor 'system' for the runner
 RULE_SETTINGS = 'rule_settings'                # detail = changed keys only
 STAFF_ROLES_CHANGE = 'staff_roles_change'  # detail = resulting roles, e.g. T,G
+SCHOOL_CREATE = 'school_create'            # detail = cmd | admin (which path created it); object = the School
 
 
 SYSTEM = 'system'      # actor of scheduled / command runs (no user): stored as user=None, username 'system', roles 'system'

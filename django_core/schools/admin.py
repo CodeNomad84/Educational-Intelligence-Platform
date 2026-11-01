@@ -32,6 +32,13 @@ class SchoolAdmin(admin.ModelAdmin):
     def has_delete_permission(self, request, obj=None):
         return request.user.is_superuser
 
+    def save_model(self, request, obj, form, change):
+        from . import audit
+
+        super().save_model(request, obj, form, change)
+        if not change:
+            audit.record(request.user, audit.SCHOOL_CREATE, obj, school=obj, detail='admin')
+
     def get_readonly_fields(self, request, obj=None):
         fields = super().get_readonly_fields(request, obj)
         if obj is not None and not request.user.is_superuser:

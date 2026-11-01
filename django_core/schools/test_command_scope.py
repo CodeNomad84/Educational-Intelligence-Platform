@@ -21,7 +21,7 @@ SINGLE_SCHOOL = {   # act on exactly one school, or refuse when it is ambiguous
     'set_school_module', 'seed_demo', 'rollover_academic_year', 'import_history', 'backfill_school_memberships',
     'backfill_student_school'}
 PLATFORM_WIDE = {   # not school data (global groups/rubric), batch-logged platform repair, or creates its own synthetic school
-    'setup_staff_roles', 'setup_platform_role', 'load_mission_rubric', 'check_school_memberships', 'seed_temporal_synthetic',
+    'setup_staff_roles', 'setup_platform_role', 'create_school', 'load_mission_rubric', 'check_school_memberships', 'seed_temporal_synthetic',
     'seed_temporal_realistic'}
 READ_ONLY = {
     'check_academic_years', 'check_assignment_subjects', 'check_access_switch_ready', 'check_class_links', 'check_enrollment_backfill',
