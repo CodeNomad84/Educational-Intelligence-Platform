@@ -1,8 +1,2 @@
-# DEMO SCOPE — whole file.
-from django.contrib import admin
-
-from .models import CounselingNote, InterventionRecord, StudentObservation
-
-admin.site.register(StudentObservation)
-admin.site.register(CounselingNote)
-admin.site.register(InterventionRecord)
+# DEMO SCOPE — whole file. Deliberately not registered in the Django admin (C-A, S9): observations, counseling notes and
+# intervention records are student data, and the admin is for platform operators only.

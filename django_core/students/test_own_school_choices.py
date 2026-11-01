@@ -7,7 +7,6 @@ from rest_framework.test import APIClient
 
 from dashboard.forms import StudentForm
 from schools.models import School, SchoolClass, SchoolMembership
-from students.admin import StudentAdmin
 from students.models import Student
 from students.permissions import IsAdminUser
 
@@ -77,15 +76,6 @@ class OwnSchoolChoicesTests(TestCase):
         form = StudentForm(data, user=self.admin)
         self.assertFalse(form.is_valid())
         self.assertIn('school_class', form.errors)
-
-    # --- Django admin
-    def test_admin_offers_only_own_classes_and_parents(self):
-        model_admin = StudentAdmin(Student, None)
-        request = RequestFactory().get('/admin/')
-        request.user = self.admin
-        for name, expected in (('school_class', [self.class_a]), ('parent_user', [self.parent_a])):
-            field = model_admin.formfield_for_foreignkey(Student._meta.get_field(name), request)
-            self.assertEqual(list(field.queryset), expected, name)
 
     # --- write permission
     def test_admin_permission_refuses_inactive_accounts_and_other_roles(self):

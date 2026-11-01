@@ -53,3 +53,4 @@ Answer format for new questions: Feature / Primary module / Backend / Frontend /
 | Backups and restore | `scripts/backup.sh`, `scripts/restore_backup.sh`, rehearsal `scripts/test_backup_restore.sh` (CI job `backup`), `RUNBOOK.md` §3 | 2026-11-01 (C-K) |
 | Audit of list pages / API reads | `schools/audit.py::record_list` (`LIST_PAGES`), calls in `dashboard/views.py`, `counselor_views.py`, `loop_views.py`, `plan_views.py`, `students/views.py` | 2026-11-01 (C-L); a new list page needs a page code in `LIST_PAGES` |
 | Python dependencies | `django_core/requirements.txt`, `fastapi_core/requirements*.txt`; audit procedure in `docs/changes/0029-dependency-audit-REPORT.md` | Re-run before every release |
+| Who may use the Django admin, which tables it shows | `schools/admin.py` (`_admin_site_permission`, `PlatformUserAdmin`); `students/admin.py`, `demo_intel/admin.py` deliberately empty; tests `schools/test_admin_closure.py` | 2026-11-01 (C-A); an access change (Tier C) |

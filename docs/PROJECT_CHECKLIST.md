@@ -106,7 +106,7 @@ Test status at `8435a0e`: 1150 tests on SQLite and on PostgreSQL 16, 57 `demo_in
 - [x] Concurrent import race on PostgreSQL has a real two-connection test that runs in `pg` mode and the CI postgres job (`EIP_REQUIRE_PG=1`).
 - [~] R-a batch-file provenance: signed batch files exist (`067571b`), no per-row provenance (RUNBOOK).
 - [ ] FastAPI module claim in the service token (RUNBOOK).
-- [ ] Django admin not school-scoped and not module-gated (RUNBOOK; S9).
+- [x] Django admin closed to platform operators and platform tables (C-A, 2026-11-01; `schools/test_admin_closure.py`).
 - [~] Audit log completeness: list pages and the student API done 2026-11-01 (C-L); exports do not exist; Django admin actions only in Django's admin history (closed with C-A, Tier C).
 - [ ] Test-container overlay misses files replaced mid-run (RUNBOOK; avoid reseeding the demo while tests run).
 - [x] FastAPI suite re-run 2026-10-25: 28 tests OK in the fastapi image (`docs/TESTING.md`); still not part of CI.

@@ -15,7 +15,6 @@ from django.test import TestCase
 from students.access import GRADE_LEAD, TEACHER, visible_students
 from students.models import Grade, Student
 
-from .admin import GradeLeadAssignmentForm
 from .models import GradeLeadAssignment, School, SchoolClass, TeacherAssignment
 from .vocabulary import SUBJECT_CHOICES, SUBJECT_KEYS, classify_subject
 
@@ -136,17 +135,6 @@ class GradeLeadAssignmentTests(TestCase):
         row = self.make(academic_year="1999")
         row.full_clean()  # no error
         self.assertIn("1999", row.year_warning())
-
-    def test_form_year_choices_come_from_existing_classes(self):
-        SchoolClass.objects.create(school=self.school, title="11-A", academic_year="1405")
-        SchoolClass.objects.create(school=self.school, title="blank-year")
-        form = GradeLeadAssignmentForm()
-        values = [v for v, _ in form.fields["academic_year"].choices if v]
-        self.assertEqual(values, ["1404", "1405"])
-        form = GradeLeadAssignmentForm(data={
-            "user": self.lead.pk, "school": self.school.pk, "grade": 10, "academic_year": "9999"})
-        self.assertFalse(form.is_valid())
-        self.assertIn("academic_year", form.errors)
 
     def test_assignment_grants_no_student_access(self):
         """Guard: nothing reads GradeLeadAssignment before C5a."""

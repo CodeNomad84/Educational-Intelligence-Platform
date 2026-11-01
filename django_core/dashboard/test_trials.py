@@ -133,10 +133,11 @@ class PlatformAdminOnlyTests(ModuleBase):
         self.admin.save()
         row = trial(self.a, 'exams', 5)
         self.client.force_login(self.admin)
-        self.assertEqual(self.client.get('/admin/schools/schoolmodule/').status_code, 403)
-        self.assertEqual(self.client.get('/admin/schools/schoolmodule/add/').status_code, 403)
+        # C-A: refused by the admin site itself (redirect to the admin login), before any model permission is asked
+        self.assertEqual(self.client.get('/admin/schools/schoolmodule/').status_code, 302)
+        self.assertEqual(self.client.get('/admin/schools/schoolmodule/add/').status_code, 302)
         self.assertEqual(self.client.post(f'/admin/schools/schoolmodule/{row.pk}/change/',
-                                          {'ends_on': (TODAY() + timedelta(days=99)).isoformat()}).status_code, 403)
+                                          {'ends_on': (TODAY() + timedelta(days=99)).isoformat()}).status_code, 302)
         row.refresh_from_db()
         self.assertEqual(row.ends_on, TODAY() + timedelta(days=5))
 

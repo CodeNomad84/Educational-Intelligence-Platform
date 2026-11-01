@@ -1,16 +1,18 @@
-"""Admin for School, SchoolClass, TeacherAssignment (proposal 0002, C1) and GradeLeadAssignment (C4b).
+"""Django admin = platform operators only (C-A, S9; decision pack 0028 P3-10).
 
-No permissions are granted here (C4 does that explicitly). The code only narrows what the admin offers:
-the school record is superuser-only to add/delete and its key is read-only for everyone else, and only
-eligible users can be picked as teacher.
+Only an active staff account that is a superuser or a PlatformAdmin opens the admin, and it shows platform tables only:
+schools, school modules, memberships, groups and user accounts that are not school accounts. School data (students, classes,
+teacher and grade-lead assignments, academic years, staff links) is managed on the SchoolAdmin pages under ``/school/``, which
+apply the school scopes; it is not registered here. No permissions are granted here. The school record is superuser-only to
+add/delete and its key is read-only for everyone else.
 """
 from django import forms
-from django.contrib import admin, messages
+from django.contrib import admin
 from django.contrib.auth import get_user_model
+from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
+from django.contrib.auth.forms import UserChangeForm
 
-from .models import (
-    AcademicYear, AuditEvent, GradeLeadAssignment, School, SchoolClass, SchoolMembership, SchoolModule, SchoolStaff,
-    TeacherAssignment)
+from .models import AuditEvent, School, SchoolMembership, SchoolModule
 
 
 def _is_platform_operator(user):
@@ -46,101 +48,6 @@ class SchoolAdmin(admin.ModelAdmin):
         if not _is_platform_operator(request.user):
             fields = tuple(fields) + ("ai_daily_cap", "ai_monthly_cap")   # call caps: platform admin only
         return fields
-
-
-@admin.register(SchoolClass)
-class SchoolClassAdmin(admin.ModelAdmin):
-    list_display = ("title", "academic_year", "grade", "school", "is_active")
-    list_filter = ("school", "is_active", "academic_year", "grade")
-    search_fields = ("title",)
-    readonly_fields = ("created_at", "updated_at")
-
-
-@admin.register(TeacherAssignment)
-class TeacherAssignmentAdmin(admin.ModelAdmin):
-    list_display = ("teacher", "school_class", "subject", "created_by", "created_at")
-    list_filter = ("school_class__school", "school_class__is_active")
-    search_fields = ("teacher__username", "school_class__title", "subject")
-    readonly_fields = ("created_by", "created_at", "updated_at")
-
-    def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        from students.access import TEACHER
-
-        if db_field.name == "teacher":
-            kwargs["queryset"] = (
-                get_user_model().objects
-                .filter(is_active=True, is_staff=False, is_superuser=False, groups__name=TEACHER)
-                .order_by("username")
-                .distinct()
-            )
-        elif db_field.name == "school_class":
-            kwargs["queryset"] = SchoolClass.objects.filter(is_active=True)
-        return super().formfield_for_foreignkey(db_field, request, **kwargs)
-
-    def save_model(self, request, obj, form, change):
-        if not change and obj.created_by_id is None:
-            obj.created_by = request.user
-        super().save_model(request, obj, form, change)
-
-
-class GradeLeadAssignmentForm(forms.ModelForm):
-    """Academic year is picked from the years already used by classes (no free-text typos)."""
-
-    academic_year = forms.ChoiceField(label="سال تحصیلی")
-
-    class Meta:
-        model = GradeLeadAssignment
-        fields = ("user", "school", "grade", "academic_year", "is_active")
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        years = set(
-            SchoolClass.objects.exclude(academic_year="").values_list("academic_year", flat=True).distinct())
-        if self.instance.pk and self.instance.academic_year:
-            years.add(self.instance.academic_year)  # keep an existing value selectable
-        self.fields["academic_year"].choices = [("", "---------")] + [(y, y) for y in sorted(years)]
-
-
-@admin.register(GradeLeadAssignment)
-class GradeLeadAssignmentAdmin(admin.ModelAdmin):
-    form = GradeLeadAssignmentForm
-    list_display = ("user", "school", "grade", "academic_year", "is_active", "created_by", "created_at")
-    list_filter = ("school", "grade", "academic_year", "is_active")
-    search_fields = ("user__username",)
-    readonly_fields = ("created_by", "created_at", "updated_at")
-
-    def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        from students.access import GRADE_LEAD
-
-        if db_field.name == "user":
-            kwargs["queryset"] = (
-                get_user_model().objects
-                .filter(is_active=True, is_staff=False, is_superuser=False, groups__name=GRADE_LEAD)
-                .order_by("username")
-                .distinct()
-            )
-        return super().formfield_for_foreignkey(db_field, request, **kwargs)
-
-    def save_model(self, request, obj, form, change):
-        if not change and obj.created_by_id is None:
-            obj.created_by = request.user
-        super().save_model(request, obj, form, change)
-        warning = obj.year_warning()
-        if warning:
-            messages.warning(request, warning)
-
-
-@admin.register(AcademicYear)
-class AcademicYearAdmin(admin.ModelAdmin):
-    """SchoolAdmin enters the year code and its dates (ADR-0011); nothing reads this table for access yet."""
-
-    list_display = ("code", "school", "start_date", "end_date", "is_current")
-    list_filter = ("school", "is_current")
-    search_fields = ("code", "label")
-    readonly_fields = ("created_at", "updated_at")
-
-    def has_delete_permission(self, request, obj=None):
-        return request.user.is_superuser  # enrollments protect the row; deletion is never routine
 
 
 def _platform_level(request):
@@ -201,14 +108,6 @@ class SchoolMembershipAdmin(admin.ModelAdmin):
         super().save_model(request, obj, form, change)
 
 
-@admin.register(SchoolStaff)
-class SchoolStaffAdmin(admin.ModelAdmin):
-    list_display = ("user", "school", "created_at")
-    list_filter = ("school",)
-    search_fields = ("user__username",)
-    readonly_fields = ("created_at",)
-
-
 @admin.register(AuditEvent)
 class AuditEventAdmin(admin.ModelAdmin):
     """Read-only for everyone (the platform account too); the school's SchoolAdmin reads it in the dashboard."""
@@ -264,3 +163,53 @@ class SchoolModuleAdmin(admin.ModelAdmin):
 
         super().save_model(request, obj, form, change)
         audit.record(request.user, audit.MODULE_CHANGE, obj, school=obj.school, detail=module_change_detail(obj))
+
+
+# --- C-A: the admin site itself is closed to everyone but platform operators ----------------------------------------------
+def _admin_site_permission(request):
+    """Only an active staff superuser or PlatformAdmin opens the admin; a plain staff account or a school account does not."""
+    return _is_platform_operator(request.user)
+
+
+admin.site.has_permission = _admin_site_permission
+
+
+def _school_role_names():
+    from students.access import COUNSELOR, GRADE_LEAD, PARENT, STUDENT, TEACHER
+
+    return (TEACHER, GRADE_LEAD, COUNSELOR, PARENT, STUDENT)
+
+
+class PlatformUserChangeForm(UserChangeForm):
+    """A staff or superuser account can not hold a school role, and a school account can not become staff (P3-10)."""
+
+    def clean(self):
+        from students.access import ADMIN
+
+        cleaned = super().clean()
+        privileged = cleaned.get('is_staff') or cleaned.get('is_superuser')
+        groups = {g.name for g in cleaned.get('groups') or []}
+        if privileged and groups & {ADMIN, *_school_role_names()}:
+            raise forms.ValidationError('حساب کارکنِ پلتفرم (staff یا superuser) نمی‌تواند نقش مدرسه داشته باشد؛ '
+                                        'حساب‌های مدرسه هرگز staff نیستند.')
+        return cleaned
+
+
+class PlatformUserAdmin(DjangoUserAdmin):
+    """User accounts: platform accounts, SchoolAdmins and accounts without a role yet. Accounts that only hold a school role
+    (Teacher, GradeLead, Counselor, Parent, Student; usernames are often national ids) are never listed, searched or opened
+    here; the SchoolAdmin manages them on the school pages."""
+
+    form = PlatformUserChangeForm
+
+    def get_queryset(self, request):
+        from students.access import ADMIN, PLATFORM_ADMIN
+
+        User = get_user_model()
+        school_only = (User.objects.filter(groups__name__in=_school_role_names(), is_staff=False, is_superuser=False)
+                       .exclude(groups__name__in=(ADMIN, PLATFORM_ADMIN)))
+        return super().get_queryset(request).exclude(pk__in=school_only.values('pk'))
+
+
+admin.site.unregister(get_user_model())
+admin.site.register(get_user_model(), PlatformUserAdmin)

@@ -42,5 +42,5 @@ Everything below needs the **superuser**. A PlatformAdmin cannot do it (no model
 **Steps:** the name can be changed on the same School page (superuser only). Logo, colors, address or other profile fields **do not exist** (**NOT BUILT**).
 
 ## Know the limits
-- The Django admin is not school-scoped: a superuser can list every user account, including student and parent accounts (usernames are national ids) and staff assignments of all schools. Treat the superuser login as highly sensitive. Open item S9 in the checklist.
-- School accounts cannot open `/admin/` (they are not staff).
+- Since 2026-11-01 (C-A) the Django admin opens only for a superuser or a PlatformAdmin (a plain staff account is refused) and shows platform tables only: Schools, School modules, School memberships, Users, Groups. **You do not see** students, classes, teacher or grade-lead assignments, academic years or staff links: the SchoolAdmin manages them on `/school/...`. Users lists platform accounts, SchoolAdmins and accounts without a role yet; Teacher, Grade Lead, Counselor, Parent and Student accounts are never listed, searched or opened.
+- A staff or superuser account cannot get a school group, and a school account cannot be made staff (the form refuses it). School accounts cannot open `/admin/`.

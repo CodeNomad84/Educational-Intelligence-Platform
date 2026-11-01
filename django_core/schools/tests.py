@@ -15,7 +15,7 @@ from django.urls import reverse
 from students.access import ADMIN, TEACHER, visible_students
 from students.models import Student
 
-from .admin import SchoolAdmin, TeacherAssignmentAdmin
+from .admin import SchoolAdmin
 from .models import School, SchoolClass, TeacherAssignment
 
 User = get_user_model()
@@ -168,58 +168,23 @@ class AdminTests(TestCase):
         return request
 
     def test_models_are_registered(self):
-        for model in (School, SchoolClass, TeacherAssignment):
-            self.assertIn(model, admin.site._registry)
+        """C-A (S9): the school record stays in the admin; classes and assignments are managed on the school pages."""
+        self.assertIn(School, admin.site._registry)
+        for model in (SchoolClass, TeacherAssignment):
+            self.assertNotIn(model, admin.site._registry)
 
-    def test_teacher_choices_only_active_non_staff_teachers(self):
-        """REQ: P2-REQ-04, P2-REQ-17"""
-        make_user("inactive_t", TEACHER, is_active=False)
-        make_user("staff_t", TEACHER, is_staff=True)
-        make_user("plain")
-        make_user("parent_p", "Parent")
-        model_admin = TeacherAssignmentAdmin(TeacherAssignment, admin.site)
-        field = TeacherAssignment._meta.get_field("teacher")
-        qs = model_admin.formfield_for_foreignkey(field, self.request_for(self.root)).queryset
-        self.assertEqual(list(qs.values_list("username", flat=True)), ["teacher_a"])
-
-    def test_class_choices_only_active_classes(self):
-        model_admin = TeacherAssignmentAdmin(TeacherAssignment, admin.site)
-        field = TeacherAssignment._meta.get_field("school_class")
-        qs = model_admin.formfield_for_foreignkey(field, self.request_for(self.root)).queryset
-        self.assertEqual(list(qs), [self.klass])
-
-    def test_superuser_can_add_assignment_and_creator_is_recorded(self):
-        """REQ: P2-REQ-04"""
-        self.client.force_login(self.root)
-        url = reverse("admin:schools_teacherassignment_add")
-        self.assertEqual(self.client.get(url).status_code, 200)
-        resp = self.client.post(url, {"teacher": self.teacher.pk, "school_class": self.klass.pk, "subject": "math"})
-        self.assertEqual(resp.status_code, 302)
-        row = TeacherAssignment.objects.get()
-        self.assertEqual((row.teacher, row.school_class, row.created_by), (self.teacher, self.klass, self.root))
-
-    def test_admin_form_rejects_non_teacher(self):
-        """REQ: P2-REQ-04"""
-        outsider = make_user("outsider")
-        self.client.force_login(self.root)
-        resp = self.client.post(reverse("admin:schools_teacherassignment_add"),
-                                {"teacher": outsider.pk, "school_class": self.klass.pk, "subject": ""})
-        self.assertEqual(resp.status_code, 200)  # form re-rendered with errors
-        self.assertEqual(TeacherAssignment.objects.count(), 0)
-
-    def test_staff_without_permissions_cannot_reach_assignment_admin(self):
-        """REQ: P2-REQ-17 (no grants exist in C1)"""
-        staff = make_user("staff_plain", is_staff=True)
-        self.client.force_login(staff)
-        for name in ("admin:schools_teacherassignment_add", "admin:schools_teacherassignment_changelist",
-                     "admin:schools_school_changelist", "admin:schools_schoolclass_add"):
-            self.assertEqual(self.client.get(reverse(name)).status_code, 403, name)
+    def test_staff_without_permissions_cannot_reach_the_admin(self):
+        """REQ: P2-REQ-17; C-A: a plain staff account is refused by the admin site itself."""
+        self.client.force_login(make_user("staff_plain", is_staff=True))
+        for name in ("admin:index", "admin:schools_school_changelist", "admin:schools_school_add"):
+            response = self.client.get(reverse(name))
+            self.assertEqual(response.status_code, 302, name)
+            self.assertIn(reverse("admin:login"), response["Location"])
 
     def test_teacher_cannot_reach_admin(self):
         """REQ: P2-REQ-17"""
         self.client.force_login(self.teacher)
-        resp = self.client.get(reverse("admin:schools_teacherassignment_changelist"))
-        self.assertEqual(resp.status_code, 302)  # redirected to the admin login, not served
+        self.assertEqual(self.client.get(reverse("admin:schools_school_changelist")).status_code, 302)
 
     def test_school_add_and_delete_are_superuser_only_and_code_is_locked(self):
         """REQ: P2-REQ-05"""

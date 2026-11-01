@@ -55,6 +55,7 @@ Minimal changes, ahead of everything else: (A) authenticate + role-gate Django v
 ## Security Baseline Exit Criteria (Phase 3)
 Authorization matrix implemented and tested · object/school scoping on every student-data endpoint · service-to-service auth · secrets from env only, rotated · audit log for student-data access and exports · upload validation (size, type, scan policy) · production settings hardened · dependency audit · permission tests green in CI.
 Dependency audit status: done 2026-11-01 (`changes/0029-dependency-audit-REPORT.md`): Django-side and FastAPI web-stack advisories fixed by upgrades; **CURRENT RISK — NOT YET FIXED:** the FastAPI ML/RAG stack (torch, transformers, langchain, chromadb) keeps known advisories until its P7 replacement; the FastAPI service stays on loopback only.
+Django admin status: closed 2026-11-01 (C-A, S9): `admin.site.has_permission` = superuser or PlatformAdmin; school-data models unregistered; user list excludes school-only accounts; staff + school role refused (`schools/test_admin_closure.py`, mutation-checked).
 Production settings status: hardened 2026-11-01 (C-H; `DEPLOYMENT.md` §3/§3a): secure cookies, HTTPS redirect behind a TLS proxy, staged HSTS, nosniff/DENY/same-origin, console-only logging, `check --deploy --fail-level WARNING` as release gate with project checks eip.E001-E005 (hosts, https origins, proxy header, no external assets, DB password). Real host/certificate values: at deployment.
 
 ## Required review topics for every significant change

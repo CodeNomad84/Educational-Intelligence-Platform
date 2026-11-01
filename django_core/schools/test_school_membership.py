@@ -486,7 +486,10 @@ class SchoolMembershipAdminTests(TestCase):
         sa = make_user("sa", ADMIN, is_staff=True)
         sa = self.grant(sa, "view")
         self.client.force_login(sa)
-        self.assertEqual(self.client.get("/admin/schools/schoolmembership/").status_code, 403)
+        # C-A: a SchoolAdmin (even one wrongly marked staff) is refused by the admin site itself, before any model check
+        response = self.client.get("/admin/schools/schoolmembership/")
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/admin/login/", response["Location"])
 
 
 class OrphanRowLifecycleTests(TestCase):
