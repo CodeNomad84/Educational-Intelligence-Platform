@@ -47,7 +47,8 @@ if not model_path.exists() or not scaler_path.exists():
 scaler = joblib.load(scaler_path)
 input_dim = len(scaler.mean_)
 risk_model = StudentRiskModel(input_dim=input_dim)
-risk_model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')))
+# weights_only: tensors only, no pickled code (S-11); supported since torch 1.13
+risk_model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu'), weights_only=True))
 risk_model.eval()
 logger.info("✅ مدل پیش‌بینی ریسک با موفقیت بارگذاری شد.")
 

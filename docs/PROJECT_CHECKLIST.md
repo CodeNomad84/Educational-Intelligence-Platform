@@ -110,7 +110,7 @@ Test status at `8435a0e`: 1150 tests on SQLite and on PostgreSQL 16, 57 `demo_in
 - [ ] Audit log completeness review (list pages, exports, admin actions) (RUNBOOK).
 - [ ] Test-container overlay misses files replaced mid-run (RUNBOOK; avoid reseeding the demo while tests run).
 - [x] FastAPI suite re-run 2026-10-25: 28 tests OK in the fastapi image (`docs/TESTING.md`); still not part of CI.
-- [ ] Dependency audit and the tracked pickle/joblib model files (S-11 in `SECURITY.md`).
+- [~] Dependency audit done 2026-11-01 (C-D, `docs/changes/0029-dependency-audit-REPORT.md`): Django 5.2.18, DRF 3.18.3, SimpleJWT 5.5.1, requests 2.34.2; FastAPI web stack 0.162/starlette 1.7/PyJWT 2.15.1; `.pth` loaded `weights_only`. Open: FastAPI ML/RAG stack (torch, transformers, langchain, chromadb) until P7; `scaler.joblib` pickle; S-11 untracking stays with the owner.
 - [ ] Full `/security-review` of the whole branch, not only of single changes.
 - [!] Legal, consent and retention policy for children's data (owner and legal; gates questionnaires, surveys, referral consent, real data).
 - [ ] Real-data readiness gate (P3 exit criteria in `SECURITY.md`): authorization matrix tested, scoping everywhere, secrets rotated, upload validation, hardened production settings, dependency audit, permission tests green in CI.
@@ -172,4 +172,4 @@ Test status at `8435a0e`: 1150 tests on SQLite and on PostgreSQL 16, 57 `demo_in
 ## Resume note (Phase 3 autonomous mode, CLAUDE.md §6a-bis, started 2026-11-01)
 - Owner decisions OW-1..OW-7 (Iran hosting shared/dedicated, mandatory backups, `.ir` HTTPS, provider-agnostic server-side controls, no real data, demo goal, two AI provider classes, push except `main`) and the decision pack: `docs/changes/0028-p3-p8-decision-pack-PROPOSAL.md`.
 - Order: C-B `create_school` > C-D dependency audit > C-H production hardening + self-hosted assets > C-K backups > C-L audit completeness > STOP before C-A (Tier C).
-- **Next step:** C-D dependency audit (C-B done).
+- **Next step:** C-H production hardening + self-hosted assets (C-B, C-D done).

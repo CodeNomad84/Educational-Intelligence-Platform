@@ -47,13 +47,14 @@ Matrix cells above are interim containment, not approved policy: DECISION REQUIR
 | S-08 | FastAPI writes shared DB; `readonly` arg ignored | MEDIUM | PARTIAL: FastAPI now connects as least-privilege `fastapi_user` (SELECT, DELETE on `documents`; see `FASTAPI_DB_ROLE.md`); the `readonly` argument is still unused dead code |
 | S-09 | Upload validation weak (FastAPI no size cap, extension only) | MEDIUM | MITIGATED: ingestion routes are disabled for every role; validation itself not changed |
 | S-10 | No production hardening (SECURE_*, CSRF origins, CORS, static serving) | MEDIUM | NOT FIXED |
-| S-11 | Pickle model files committed | MEDIUM | PARTIAL: they are still pickle-based and loaded with `torch.load`. NOTE 2026-10-13: three artifacts are still tracked in the index (`fastapi_core/models/scaler.joblib`, `fastapi_core/models/student_risk_model.pth`, `fastapi_core/student_model.joblib`); see the deferred decision below |
+| S-11 | Pickle model files committed | MEDIUM | PARTIAL: since 2026-11-01 (`changes/0029`) the `.pth` is loaded with `torch.load(..., weights_only=True)` (tensors only, verified on the real file); `scaler.joblib` is still a pickle (repository-controlled file; JSON replacement proposed for P7). NOTE 2026-10-13: three artifacts are still tracked in the index (`fastapi_core/models/scaler.joblib`, `fastapi_core/models/student_risk_model.pth`, `fastapi_core/student_model.joblib`); see the deferred decision below |
 
 ## Critical Security Containment (Phase 1)
 Minimal changes, ahead of everything else: (A) authenticate + role-gate Django views and FastAPI routes, (B) block public exposure of FastAPI and data-store ports, (C) remove default secrets / require env config, (D) rotate any exposed secret (never rewrite history). Each is an L3 change needing approval.
 
 ## Security Baseline Exit Criteria (Phase 3)
 Authorization matrix implemented and tested · object/school scoping on every student-data endpoint · service-to-service auth · secrets from env only, rotated · audit log for student-data access and exports · upload validation (size, type, scan policy) · production settings hardened · dependency audit · permission tests green in CI.
+Dependency audit status: done 2026-11-01 (`changes/0029-dependency-audit-REPORT.md`): Django-side and FastAPI web-stack advisories fixed by upgrades; **CURRENT RISK — NOT YET FIXED:** the FastAPI ML/RAG stack (torch, transformers, langchain, chromadb) keeps known advisories until its P7 replacement; the FastAPI service stays on loopback only.
 
 ## Required review topics for every significant change
 AuthN · AuthZ · object-level access · school isolation · SQL injection · XSS · CSRF · SSRF · file upload · secret leakage · PII exposure · prompt injection · unauthorized RAG retrieval · unsafe exports · audit logging · dependency vulnerabilities.
