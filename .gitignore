@@ -45,3 +45,6 @@ __pycache__/
 
 # Screenshots of UI slices (desktop + mobile), kept locally only
 /var/screenshots/
+
+# Owner material, kept local (2026-11-02)
+/docs/marketing/

@@ -83,9 +83,9 @@ services:
   fastapi:
     build: ./fastapi_core
     container_name: fastapi_core
-    ports:
-      # Loopback only: Django reaches FastAPI over the compose network ("fastapi:8001").
-      - "127.0.0.1:8001:8001"
+    # NO published port (owner 2026-11-02): FastAPI, including /llm/complete/, is reachable only over the internal compose network
+    # ("fastapi:8001"), by Django with the signed service token. For local debugging use `docker compose exec fastapi ...`.
+    # A test (fastapi_core/tests/test_exposure.py) fails if a port is published here or nginx proxies to it.
     volumes:
       - ./fastapi_core:/app
       - ./data:/data
