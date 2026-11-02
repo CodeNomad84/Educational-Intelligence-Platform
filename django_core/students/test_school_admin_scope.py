@@ -155,6 +155,13 @@ class ApiAndDashboardScopeTests(Base):
         for suffix in ('', 'features/', 'predict/'):
             self.assertEqual(self.client.get(f'/api/students/{foreign.pk}/{suffix}').status_code, 404, suffix)
 
+    def test_write_responses_mask_the_national_id(self):
+        """Review L-2 (decision 48): PATCH/POST responses carry the mask."""
+        self.client.force_login(self.admin('one', self.a))
+        res = self.client.patch(f'/api/students/{self.students["a1"].pk}/', {'phone_number': '09120000000'}, content_type='application/json')
+        self.assertEqual(res.status_code, 200)
+        self.assertTrue(res.json()['national_id'].startswith('******'), res.json())
+
     def test_api_list_of_an_admin_without_a_membership_is_empty(self):
         self.client.force_login(self.admin('none'))
         body = self.client.get('/api/students/').json()

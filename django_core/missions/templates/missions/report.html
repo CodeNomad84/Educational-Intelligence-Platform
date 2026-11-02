@@ -60,7 +60,7 @@
     <div class="col-md-2"><select name="p{{ n }}_branch" class="form-select"><option value="">— شاخه —</option>{% for b in branch_choices %}<option value="{{ b.pk }}">{{ b.name_fa }}</option>{% endfor %}</select></div>
     <div class="col-md-4"><input name="p{{ n }}_experience" class="form-control" maxlength="300" placeholder="تجربهٔ عملی"></div>
     <div class="col-md-4"><input name="p{{ n }}_goal" class="form-control" maxlength="300" placeholder="هدف رشد"></div>
-    <div class="col-md-2"><input type="date" name="p{{ n }}_review" class="form-control" min="{{ today|jdate }}"></div></div>{% endfor %}
+    <div class="col-md-2"><input type="date" name="p{{ n }}_review" class="form-control" min="{{ today|date:'Y-m-d' }}"></div></div>{% endfor %}
   <button class="btn btn-success">ثبت مسیرهای پیشنهادی</button>
 </form>{% endif %}
 {% endif %}

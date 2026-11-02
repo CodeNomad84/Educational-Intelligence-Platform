@@ -9,8 +9,9 @@
   <div class="row g-2 mb-3">
     <div class="col-md-4"><label>درس</label><select name="scope" class="form-select" {% if exam %}disabled{% endif %}>{% for key, label in scopes %}<option value="{{ key }}" {% if exam and key == scope_key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
     <div class="col-md-8"><label>عنوان</label><input name="title" class="form-control" maxlength="120" value="{{ state.title }}"></div>
-    <div class="col-md-3"><label>از تاریخ (اختیاری)</label><input type="date" name="opens_on" class="form-control" value="{{ state.opens_on|jdate }}"></div>
-    <div class="col-md-3"><label>تا تاریخ (اختیاری)</label><input type="date" name="closes_on" class="form-control" value="{{ state.closes_on|jdate }}"></div>
+    <div class="col-md-3"><label>از تاریخ (اختیاری)</label><input type="date" name="opens_on" class="form-control" value="{{ state.opens_on|date:'Y-m-d' }}"></div>
+    <div class="col-md-3"><label>تا تاریخ (اختیاری)</label><input type="date" name="closes_on" class="form-control" value="{{ state.closes_on|date:'Y-m-d' }}"></div>
+    {% if exam and state.opens_on or exam and state.closes_on %}<div class="col-md-3 pt-4"><label><input type="checkbox" name="clear_window"> حذف بازهٔ زمانی</label></div>{% endif %}
     <div class="col-md-3 pt-4"><label><input type="checkbox" name="published" {% if state.published %}checked{% endif %}> منتشر شود</label></div>
   </div>
   <h6>کلاس‌ها</h6>

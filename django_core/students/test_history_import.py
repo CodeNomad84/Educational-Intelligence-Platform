@@ -38,6 +38,19 @@ class Base(TestCase):
         return list(Student.objects.order_by('pk').values())
 
 
+class MaxScoreOptionTests(Base):
+    def test_max_score_must_be_an_integer_between_1_and_1000(self):
+        """Review L-3 (decision 48): nan, inf, fractions and out-of-range values are refused with a clear error."""
+        from django.core.management.base import CommandError
+        path = self.write(['national_id', 'subject', 'exam_type', 'score', 'date'], [])
+        for bad in ('nan', 'inf', '20.5', 'abc'):
+            with self.assertRaises(CommandError, msg=bad):
+                self.run_cmd('grades', '1404-1405', path, '--max-score', bad)
+        for bad in ('0', '1001'):
+            with self.assertRaisesMessage(CommandError, '1 to 1000'):
+                self.run_cmd('grades', '1404-1405', path, '--max-score', bad)
+
+
 class RosterTests(Base):
     HEADER = ['national_id', 'grade', 'status', 'class']
 

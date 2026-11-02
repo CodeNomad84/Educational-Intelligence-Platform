@@ -236,6 +236,10 @@ def _exam_form(request, exam=None):
             errors.append('عنوان لازم است.')
         if opens is False or closes is False or (opens and closes and closes < opens):
             errors.append('بازهٔ تاریخ نامعتبر است.')
+        # an existing window is only removed on purpose (checkbox), never by an empty field (decision 48)
+        if exam is not None and not request.POST.get('clear_window') and (
+                (exam.opens_on and not opens) or (exam.closes_on and not closes)) and opens is not False and closes is not False:
+            errors.append('برای حذف بازهٔ زمانی، گزینهٔ «حذف بازه» را تیک بزنید.')
         questions = classes = []
         if pair is not None:
             classes = list(SchoolClass.objects.filter(pk__in=set(picked_c) & teacher_class_ids(request.user, *pair)))

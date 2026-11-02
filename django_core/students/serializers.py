@@ -80,8 +80,8 @@ class StudentSerializer(serializers.ModelSerializer):
         if not getattr(instance, 'full_tier', False):
             for name in self.LIMITED_OMIT:
                 data.pop(name, None)
-        elif 'national_id' in data and getattr(self.context.get('view'), 'action', None) == 'list':
-            data['national_id'] = mask_national_id(data['national_id'])   # lists are masked; the detail read is audited (decision 44)
+        elif 'national_id' in data and getattr(self.context.get('view'), 'action', None) in ('list', 'create', 'update', 'partial_update'):
+            data['national_id'] = mask_national_id(data['national_id'])   # lists and write responses are masked; the detail read is audited (decisions 44, 48)
         return data
 
 class FileUploadSerializer(serializers.Serializer):

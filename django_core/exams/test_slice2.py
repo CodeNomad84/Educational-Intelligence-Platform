@@ -186,6 +186,21 @@ class ExamEditTests(SliceBase):
         data.update(over)
         return data
 
+    def test_the_edit_form_keeps_the_window_as_iso_and_an_empty_field_does_not_clear_it(self):
+        """M-1 (decision 48): the date inputs carry Gregorian ISO values; an empty field never silently removes the window."""
+        self.assertEqual(self.post(self.t1, self.url, self.data()).status_code, 302)
+        page = self.get(self.t1, self.url)
+        self.assertContains(page, 'name="opens_on" class="form-control" value="2030-01-01"')
+        self.assertContains(page, 'name="closes_on" class="form-control" value="2030-02-01"')
+        refused = self.post(self.t1, self.url, self.data(opens_on='', closes_on=''))
+        self.assertEqual(refused.status_code, 200)
+        self.exam1.refresh_from_db()
+        self.assertEqual(self.exam1.opens_on.isoformat(), '2030-01-01')
+        self.assertEqual(self.post(self.t1, self.url, self.data(opens_on='', closes_on='', clear_window='on')).status_code, 302)
+        self.exam1.refresh_from_db()
+        self.assertIsNone(self.exam1.opens_on)
+        self.assertIsNone(self.exam1.closes_on)
+
     def test_creator_edits_everything_before_the_first_session(self):
         page = self.get(self.t1, self.url)
         self.assertContains(page, 'value="Fractions"')
