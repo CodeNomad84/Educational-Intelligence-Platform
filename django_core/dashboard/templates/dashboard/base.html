@@ -66,8 +66,8 @@
             {# DEMO SCOPE begin — chat/library are disabled in Phase 1 (403); hidden in the demo #}
             {% if not DEMO_MODE %}
             <div class="eip-nav-section">دستیار و منابع</div>
-            {% nav_link 'dashboard:chat' 'chat-dots' 'چت با هوش مصنوعی' %}
-            {% nav_link 'dashboard:library' 'book' 'کتابخانه' %}
+            <span class="eip-nav-link is-disabled" aria-disabled="true"><i class="bi bi-chat-dots" aria-hidden="true"></i><span>چت با هوش مصنوعی</span><small class="eip-soon">به‌زودی</small></span>
+            <span class="eip-nav-link is-disabled" aria-disabled="true"><i class="bi bi-book" aria-hidden="true"></i><span>کتابخانه</span><small class="eip-soon">به‌زودی</small></span>
             {% endif %}
             {# DEMO SCOPE end #}
 

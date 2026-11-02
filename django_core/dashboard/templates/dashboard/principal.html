@@ -101,5 +101,5 @@
 {% block scripts %}{% if overview.total %}
 <script src="{% static 'dashboard/vendor/chartjs-4.4.1/chart.umd.js' %}"></script>
 <script src="{% static 'dashboard/js/eip-charts.js' %}"></script>
-<script>EipCharts.line('chart-attendance', 'd-attendance', {suffix: '٪', min: 50, max: 100}); EipCharts.line('chart-grades', 'd-grades', {min: 0, max: 20});</script>
+<script>EipCharts.line('chart-attendance', 'd-attendance', {suffix: '٪', min: 0, max: 100, fit: true}); EipCharts.line('chart-grades', 'd-grades', {min: 0, max: 20, fit: true});</script>
 {% endif %}{% endblock %}

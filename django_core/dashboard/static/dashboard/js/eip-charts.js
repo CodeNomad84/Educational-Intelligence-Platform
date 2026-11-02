@@ -22,6 +22,13 @@
       ? { data: d.values, borderColor: color, backgroundColor: color + '1f', fill: true, tension: .3, pointRadius: 3, pointBackgroundColor: color }
       : { data: d.values, backgroundColor: color, borderRadius: 6, maxBarThickness: 42 };
     const suffix = opts.suffix || '';
+    if (opts.fit) {   // y axis fitted to the data range (with padding), never beyond the natural bounds
+      const v = d.values.filter(x => x !== null);
+      if (v.length) {
+        const pad = Math.max(1, (Math.max(...v) - Math.min(...v)) * 0.25);
+        opts = Object.assign({}, opts, { min: Math.max(opts.min ?? -Infinity, Math.floor(Math.min(...v) - pad)), max: Math.min(opts.max ?? Infinity, Math.ceil(Math.max(...v) + pad)) });
+      }
+    }
     return new Chart(el, {
       type, data: { labels: d.labels.map(label), datasets: [ds] },
       options: {

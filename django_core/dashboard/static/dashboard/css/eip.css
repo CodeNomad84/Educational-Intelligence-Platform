@@ -158,3 +158,13 @@ a.eip-stat:hover { border-color: var(--eip-border-strong); color: inherit; }
     .eip-sidebar, .eip-topbar, .eip-demo-banner, .eip-page-actions, .btn { display: none !important; }
     body { background: #fff; } .eip-content { padding: 0; max-width: none; } .card, .eip-stat { box-shadow: none; }
 }
+
+/* Not-yet-usable menu entries: visible, not clickable, no route behind them */
+.eip-nav-link.is-disabled { opacity: .55; cursor: not-allowed; pointer-events: none; }
+.eip-soon { margin-inline-start: auto; font-size: .7rem; background: var(--eip-border, #e3e8ef); color: var(--eip-muted, #6b7686); border-radius: 999px; padding: .1rem .5rem; }
+
+/* Wide tables scroll inside their card on small screens instead of widening the page */
+@media (max-width: 767.98px) {
+  .eip-content .card-body, .eip-content .card { overflow-x: auto; }
+  .eip-content table { min-width: 34rem; }
+}

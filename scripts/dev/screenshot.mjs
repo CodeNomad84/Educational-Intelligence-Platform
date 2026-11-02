@@ -1,10 +1,11 @@
 // node --experimental-websocket shoot.mjs <base> <user> <pass> <outdir> <width> <path>...  (headless Chromium over CDP; real login form)
-import { spawn } from 'node:child_process'; import { mkdirSync, writeFileSync, readdirSync } from 'node:fs'; import { join } from 'node:path'; import { homedir } from 'node:os';
+import { spawn } from 'node:child_process'; import { mkdirSync, writeFileSync, readdirSync, mkdtempSync, rmSync } from 'node:fs'; import { join } from 'node:path'; import { homedir, tmpdir } from 'node:os';
 const [base, user, pass, out, width, ...paths] = process.argv.slice(2); mkdirSync(out, { recursive: true });
 const root = join(homedir(), '.cache/ms-playwright'); const d = readdirSync(root).find(x => x.startsWith('chromium_headless_shell'));
 const bin = join(root, d, readdirSync(join(root, d)).find(x => x.startsWith('chrome')), 'chrome-headless-shell');
+const profile = mkdtempSync(join(tmpdir(), 'eip-shot-'));   // temporary browser profile (cookies) outside the screenshots folder, removed at the end
 const port = 9300 + Math.floor(Math.random() * 500);
-const proc = spawn(bin, [`--remote-debugging-port=${port}`, '--no-sandbox', '--disable-gpu', `--user-data-dir=${out}/.p${port}`, '--hide-scrollbars', 'about:blank'], { stdio: 'ignore' });
+const proc = spawn(bin, [`--remote-debugging-port=${port}`, '--no-sandbox', '--disable-gpu', `--user-data-dir=${profile}`, '--hide-scrollbars', 'about:blank'], { stdio: 'ignore' });
 const sleep = ms => new Promise(r => setTimeout(r, ms)); let t;
 for (let i = 0; i < 50; i++) { try { t = await (await fetch(`http://127.0.0.1:${port}/json`)).json(); if (t.length) break; } catch {} await sleep(200); }
 const ws = new WebSocket(t.find(x => x.type === 'page').webSocketDebuggerUrl); await new Promise(r => ws.addEventListener('open', r, { once: true }));
@@ -23,4 +24,4 @@ for (const p of paths) {
   const s = await send('Page.captureScreenshot', { format: 'png' }); const f = join(out, `${user}${p.replace(/[^a-z0-9]+/gi, '_')}${w}.png`);
   writeFileSync(f, Buffer.from(s.result.data, 'base64')); console.log(f); await size(mob ? 800 : 900);
 }
-ws.close(); proc.kill();
+ws.close(); proc.kill(); await sleep(300); rmSync(profile, { recursive: true, force: true });
