@@ -3,6 +3,7 @@ from .models import AuditEvent
 
 # Action names (fixed vocabulary).
 VIEW_360 = 'view_student_360'
+NATIONAL_ID_REVEAL = 'national_id_reveal'   # explicit click on the masked id; object = the Student; no value stored
 VIEW_DETAIL = 'view_student_detail'
 VIEW_CASE = 'view_counselor_case'
 COUNSELOR_NOTE_VIEW = 'counselor_note_view'    # detail = n<count of notes shown>; written only when note text is displayed; never the text

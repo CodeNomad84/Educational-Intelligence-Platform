@@ -5,18 +5,21 @@ full-detail scope (``visible_students(...).filter(full_tier=True)``), so another
 from collections import OrderedDict
 
 from django.db.models import Count
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
+from django.views.decorators.http import require_POST
 
 from students.access import (
-    ADMIN, GRADE_LEAD, PARENT, roles_for, visible_alerts, visible_plans, visible_attendances, visible_counselor_notes, counselor_note_metadata, visible_grades,
+    ADMIN, COUNSELOR, GRADE_LEAD, PARENT, roles_for, visible_alerts, visible_plans, visible_attendances, visible_counselor_notes, counselor_note_metadata, visible_grades,
     visible_recommendations, visible_referrals, visible_students)
+from schools.vocabulary import SUBJECT_CHOICES
 from students.models import Enrollment
 
 from schools import audit
 
 from .decorators import role_required
 
-UNKNOWN_YEAR = 'بدون سال'
+UNKNOWN_YEAR = 'سال نامشخص'
 
 
 def grades_by_year(grades):
@@ -24,7 +27,7 @@ def grades_by_year(grades):
     years = OrderedDict()
     rows = grades.select_related('enrollment__academic_year').order_by('-date')
     for grade in rows:
-        year = grade.enrollment.academic_year.code if grade.enrollment_id else UNKNOWN_YEAR
+        year = (grade.enrollment.academic_year.label or grade.enrollment.academic_year.code) if grade.enrollment_id else UNKNOWN_YEAR
         years.setdefault(year, {}).setdefault(grade.get_subject_display(), []).append(grade.score)
     result = []
     for year in sorted(years, reverse=True):
@@ -38,19 +41,41 @@ def attendance_summary(attendances):
     counts = {row['status']: row['n'] for row in attendances.values('status').annotate(n=Count('pk'))}
     total = sum(counts.values())
     labels = dict(attendances.model.STATUS_CHOICES) if hasattr(attendances.model, 'STATUS_CHOICES') else {}
-    return {'total': total, 'rows': [(labels.get(k, k), v) for k, v in sorted(counts.items())],
+    css = {'present': 'bg-success', 'absent': 'bg-danger', 'late': 'bg-warning', 'sick': 'bg-info'}
+    bars = [(labels.get(k, k), v, round(100 * v / total), css.get(k, 'bg-secondary')) for k, v in sorted(counts.items())] if total else []
+    return {'total': total, 'bars': bars, 'rows': [(labels.get(k, k), v) for k, v in sorted(counts.items())],
             'present_rate': round(100 * counts.get('present', 0) / total) if total else None}
+
+
+def key_signals(grade_years, attendance, trend_subjects=None):
+    """Top-of-page facts for the 360: latest year average, attendance rate and the biggest drop between the two most
+    recent grade periods (staff only: ``trend_subjects`` is None for a Parent). Derived on the fly, nothing stored."""
+    labels = dict(SUBJECT_CHOICES)
+    drop = None
+    for code, avgs in (trend_subjects or {}).items():
+        last, prev = avgs[-1], next((a for a in reversed(avgs[:-1]) if a is not None), None)
+        if last is not None and prev is not None and prev - last > 0 and (drop is None or prev - last > drop[1]):
+            drop = (labels.get(code, code), round(prev - last, 1))
+    return {'average': grade_years[0][2] if grade_years else None, 'year': grade_years[0][0] if grade_years else '',
+            'present_rate': attendance['present_rate'], 'drop': drop}
+
+
+def mask_national_id(value):
+    return '******' + value[-4:] if value and len(value) > 4 else value
 
 
 def summary_context(request, student):
     """The read-only summary shared by the Student 360 page and the counselor's case page (all through the access layer)."""
     enrollments = (Enrollment.objects.filter(student=student).select_related('academic_year', 'school_class')
                    .order_by('-academic_year__start_date'))
+    grade_years = grades_by_year(visible_grades(request.user).filter(student=student))
+    attendance = attendance_summary(visible_attendances(request.user).filter(student=student))
     return {
+        'signals': key_signals(grade_years, attendance),
         'student': student,
         'enrollments': enrollments,
-        'grade_years': grades_by_year(visible_grades(request.user).filter(student=student)),
-        'attendance': attendance_summary(visible_attendances(request.user).filter(student=student)),
+        'grade_years': grade_years,
+        'attendance': attendance,
         'recommendations': visible_recommendations(request.user).filter(student=student).select_related('author'),
     }
 
@@ -76,6 +101,9 @@ def student_360(request, pk):
         today = timezone.localdate()
         context['trend_weeks'] = trends.weekly_absence(visible_attendances(request.user).filter(student=student), today)
         context['trend_subjects'] = trends.subject_period_averages(visible_grades(request.user).filter(student=student), today)
+        labels = dict(SUBJECT_CHOICES)
+        context['trend_rows'] = [(labels.get(c, c), a) for c, a in context['trend_subjects'].items()]
+        context['signals'] = key_signals(context['grade_years'], context['attendance'], context['trend_subjects'])
         # Intervention loop tile: metadata only (counts, type, status, dates, owner, outcome code). The scoped querysets give a
         # Parent nothing, and the tile is not rendered for them at all.
         context['loop_alerts'] = visible_alerts(request.user).filter(student=student).select_related('risk_event')[:10]
@@ -96,3 +124,12 @@ def student_360(request, pk):
     context['behavior_notes'] = visible_behavior_notes(request.user).filter(student=student)[:30]
     context['behavior_form'] = BehaviorNoteForm() if behavior_writable_students(request.user).filter(pk=student.pk).exists() else None
     return render(request, 'dashboard/student_360.html', context)
+
+
+@role_required(ADMIN, GRADE_LEAD, PARENT, COUNSELOR)
+@require_POST
+def reveal_national_id(request, pk):
+    """Full national id on an explicit click; same scope as the pages that show the masked value; audit-logged."""
+    student = get_object_or_404(visible_students(request.user).filter(full_tier=True), pk=pk)
+    audit.record(request.user, audit.NATIONAL_ID_REVEAL, student)
+    return JsonResponse({'national_id': student.national_id})

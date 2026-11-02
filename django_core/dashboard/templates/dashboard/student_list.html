@@ -19,7 +19,7 @@
             {% for student in students %}
                 <tr>
                     <td>{{ student.first_name }} {{ student.last_name }}</td>
-                    <td class="ltr">{% if student.full_tier %}{{ student.national_id }}{% else %}—{% endif %}</td>
+                    <td class="ltr">{% if student.full_tier %}{{ student.national_id|mask_nid }}{% else %}—{% endif %}</td>
                     <td>{{ student.get_grade_display }}</td>
                     <td>{{ student.class_name|default:"—" }}</td>
                     {% if show_support %}<td>{% if student.support %}<span class="eip-tier tier-{{ student.support.level }}">{{ student.support.label }}</span>{% else %}<span class="eip-tier tier-1">سطح ۱</span>{% endif %}</td>{% endif %}

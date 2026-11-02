@@ -1,29 +1,38 @@
+{% load eip_ui %}
+<div class="row g-3 mb-3">
+  <div class="col-6 col-lg-3"><div class="card h-100"><div class="card-body"><div class="small text-muted">میانگین{% if signals.year %} ({{ signals.year }}){% endif %}</div><div class="fs-3 fw-bold">{{ signals.average|default_if_none:"—" }}</div></div></div></div>
+  <div class="col-6 col-lg-3"><div class="card h-100"><div class="card-body"><div class="small text-muted">نرخ حضور</div><div class="fs-3 fw-bold">{% if signals.present_rate is not None %}{{ signals.present_rate }}٪{% else %}—{% endif %}</div></div></div></div>
+  {% if signals.drop %}<div class="col-12 col-lg-6"><div class="card h-100 border-warning"><div class="card-body"><div class="small text-muted">بیشترین افت اخیر (محاسبهٔ خودکار)</div><div class="fs-5 fw-bold">{{ signals.drop.0 }}: {{ signals.drop.1 }} نمره کمتر از دورهٔ قبل</div></div></div></div>{% endif %}
+</div>
 <div class="row g-3">
-  <div class="col-md-4"><div class="card h-100"><div class="card-header">هویت</div><div class="card-body">
+  <div class="col-lg-4"><div class="card h-100"><div class="card-header">هویت</div><div class="card-body">
     <p><strong>نام:</strong> {{ student.first_name }} {{ student.last_name }}</p>
-    <p><strong>کد ملی:</strong> {{ student.national_id }}</p>
+    <p><strong>کد ملی:</strong> <span dir="ltr" data-nid data-url="{% url 'dashboard:reveal_national_id' student.pk %}">{{ student.national_id|mask_nid }}</span> <button type="button" class="btn btn-sm btn-link p-0 ms-1" data-nid-btn>نمایش کامل</button></p>
     <p><strong>پایه:</strong> {{ student.get_grade_display }}</p>
     <p><strong>کلاس:</strong> {{ student.class_name|default:"—" }}</p>
     <p class="mb-0"><strong>مدرسه:</strong> {{ student.school.name }}</p>
   </div></div></div>
-  <div class="col-md-8"><div class="card h-100"><div class="card-header">مسیر تحصیلی (ثبت‌نام‌ها)</div><div class="card-body p-0">
+  <div class="col-lg-8"><div class="card h-100"><div class="card-header">مسیر تحصیلی (ثبت‌نام‌ها)</div><div class="card-body p-0"><div class="table-responsive">
     <table class="table table-sm mb-0"><thead><tr><th>سال</th><th>کلاس</th><th>پایه</th><th>وضعیت</th></tr></thead><tbody>
-    {% for e in enrollments %}<tr><td>{{ e.academic_year.code }}</td><td>{{ e.school_class|default:"—" }}</td><td>{{ e.get_grade_display }}</td><td>{{ e.get_status_display }}</td></tr>
+    {% for e in enrollments %}<tr><td>{{ e.academic_year.label|default:e.academic_year.code }}</td><td>{{ e.school_class|default:"—" }}</td><td>{{ e.get_grade_display }}</td><td>{{ e.get_status_display }}</td></tr>
     {% empty %}<tr><td colspan="4" class="text-muted">ثبت‌نامی وجود ندارد.</td></tr>{% endfor %}
-    </tbody></table></div></div></div>
+    </tbody></table></div></div></div></div>
 </div>
 <h5 class="mt-4">نمرات به تفکیک سال و درس</h5>
 {% for year, subjects, year_average in grade_years %}
-<div class="card mb-3"><div class="card-header">{{ year }} — میانگین کل: <strong>{{ year_average }}</strong></div><div class="card-body p-0">
+<div class="card mb-3"><div class="card-header">{{ year }} — میانگین کل: <strong>{{ year_average }}</strong></div><div class="card-body p-0"><div class="table-responsive">
   <table class="table table-sm mb-0"><thead><tr><th>درس</th><th>تعداد نمره</th><th>میانگین</th></tr></thead><tbody>
   {% for name, count, avg in subjects %}<tr><td>{{ name }}</td><td>{{ count }}</td><td>{{ avg }}</td></tr>{% endfor %}
-  </tbody></table></div></div>
+  </tbody></table></div></div></div>
 {% empty %}<p class="text-muted">نمره‌ای ثبت نشده است.</p>{% endfor %}
 <h5 class="mt-4">حضور و غیاب</h5>
 {% if attendance.total %}
-<p>{{ attendance.total }} روز ثبت شده{% if attendance.present_rate is not None %} — حضور: <strong>{{ attendance.present_rate }}٪</strong>{% endif %}</p>
-<ul>{% for label, n in attendance.rows %}<li>{{ label }}: {{ n }}</li>{% endfor %}</ul>
+<div class="card"><div class="card-body">
+  <p class="mb-2">{{ attendance.total }} روز ثبت شده{% if attendance.present_rate is not None %} — حضور: <strong>{{ attendance.present_rate }}٪</strong>{% endif %}</p>
+  <div class="progress-stacked" style="height:1.25rem" role="img" aria-label="خلاصهٔ حضور و غیاب">{% for label, n, pct, css in attendance.bars %}<div class="progress" style="width:{{ pct }}%"><div class="progress-bar {{ css }}"></div></div>{% endfor %}</div>
+  <div class="d-flex flex-wrap gap-3 mt-2 small">{% for label, n, pct, css in attendance.bars %}<span><span class="badge {{ css }}">&nbsp;</span> {{ label }}: {{ n }}</span>{% endfor %}</div>
+</div></div>
 {% else %}<p class="text-muted">حضور و غیابی ثبت نشده است.</p>{% endif %}
 <h5 class="mt-4">توصیه‌های معلمان</h5>
-{% for r in recommendations %}<div class="border rounded p-2 mb-2 bg-white"><small class="text-muted">{{ r.created_at|date:"Y-m-d" }}{% if r.subject %} — {{ r.get_subject_display }}{% endif %}{% if r.visible_to_student %} — قابل نمایش به دانش‌آموز{% else %} — فقط کادر مدرسه{% endif %}{% if r.author %} — {{ r.author.first_name }} {{ r.author.last_name }}{% endif %}</small><div>{{ r.text|linebreaksbr }}</div></div>
+{% for r in recommendations %}<div class="border rounded p-2 mb-2 bg-white"><small class="text-muted">{{ r.created_at|jdate }}{% if r.subject %} — {{ r.get_subject_display }}{% endif %}{% if r.visible_to_student %} — قابل نمایش به دانش‌آموز{% else %} — فقط کادر مدرسه{% endif %}{% if r.author %} — {{ r.author.first_name }} {{ r.author.last_name }}{% endif %}</small><div>{{ r.text|linebreaksbr }}</div></div>
 {% empty %}<p class="text-muted">توصیه‌ای ثبت نشده است.</p>{% endfor %}

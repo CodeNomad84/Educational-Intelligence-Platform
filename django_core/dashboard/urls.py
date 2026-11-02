@@ -11,6 +11,7 @@ urlpatterns = [
     path('students/', views.student_list_view, name='student_list'),
     path('students/<int:pk>/', views.student_detail_view, name='student_detail'),
     path('students/<int:pk>/360/', student360.student_360, name='student_360'),
+    path('students/<int:pk>/national-id/', student360.reveal_national_id, name='reveal_national_id'),
     path('chat/', views.chat_view, name='chat'),
     path('library/', views.library_view, name='library'),
     path('upload-document/', views.upload_document_view, name='upload_document'),

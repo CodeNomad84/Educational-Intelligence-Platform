@@ -1,0 +1,11 @@
+<script>
+document.querySelectorAll('[data-nid-btn]').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    var el = btn.parentNode.querySelector('[data-nid]');
+    var csrf = '{{ csrf_token }}';
+    fetch(el.dataset.url, {method: 'POST', headers: {'X-CSRFToken': csrf}, credentials: 'same-origin'})
+      .then(function (r) { return r.json(); })
+      .then(function (d) { el.textContent = d.national_id; btn.remove(); });
+  });
+});
+</script>

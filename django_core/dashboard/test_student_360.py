@@ -7,7 +7,7 @@ from django.contrib.auth.models import Group
 from django.test import TestCase
 from django.urls import reverse
 
-from schools.models import AcademicYear, GradeLeadAssignment, School, SchoolClass, SchoolMembership, TeacherAssignment
+from schools.models import AuditEvent, AcademicYear, GradeLeadAssignment, School, SchoolClass, SchoolMembership, TeacherAssignment
 from students.enrollment_sync import ensure_current_enrollment
 from students.models import Attendance, Grade, Recommendation, Student
 
@@ -77,7 +77,11 @@ class HappyPathTests(Base):
             resp = self.client.get(self.url(self.child))
             self.assertEqual(resp.status_code, 200, user.username)
             body = resp.content.decode()
-            self.assertIn(self.child.national_id, body)        # full-detail roles see the identity
+            self.assertNotIn(self.child.national_id, body)     # masked by default
+            self.assertIn('******' + self.child.national_id[-4:], body)
+            reveal = self.client.post(reverse('dashboard:reveal_national_id', args=[self.child.pk]))
+            self.assertEqual(reveal.json()['national_id'], self.child.national_id)
+            self.assertTrue(AuditEvent.objects.filter(action='national_id_reveal', user=user).exists())
             self.assertIn('1404-1405', body)                   # enrollment path / grades per year
             self.assertIn('17.0', body)                        # math average of 16 and 18
             self.assertIn('Keep practising fractions', body)   # the teacher's recommendation

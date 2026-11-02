@@ -16,3 +16,4 @@
 <form method="post" action="{% url 'dashboard:counselor_close' referral.pk %}" onsubmit="return confirm('با بستن پرونده دسترسی شما به این دانش‌آموز پایان می‌یابد. ادامه؟')">{% csrf_token %}
   <button class="btn btn-outline-secondary">بستن پرونده</button></form>
 {% endblock %}
+{% block scripts %}{% include 'dashboard/_nid_script.html' %}{% endblock %}

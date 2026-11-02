@@ -79,3 +79,10 @@ def jdate(value, style='short'):
     if style == 'month':
         return f'{MONTHS_FA[jm - 1]} {jy}'
     return f'{jy}/{jm:02d}/{jd:02d}'
+
+
+@register.filter
+def mask_nid(value):
+    """National id with all but the last four digits hidden; the full value is fetched by an audited click."""
+    value = str(value or '')
+    return '******' + value[-4:] if len(value) > 4 else value

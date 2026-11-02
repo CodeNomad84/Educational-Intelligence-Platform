@@ -133,7 +133,7 @@ class CounselorAccessTests(Base):
         self.client.force_login(self.counselor)
         page = self.client.get(reverse('dashboard:counselor_case', args=[self.referral.pk]))
         self.assertContains(page, 'Frequent absences')
-        self.assertContains(page, self.s7.national_id)
+        self.assertContains(page, '******' + self.s7.national_id[-4:])
         self.assertEqual(self.client.get(reverse('dashboard:student_360', args=[self.s7.pk])).status_code, 403)
 
     def test_notes_are_visible_to_the_counselor_the_grade_lead_and_the_school_admin_only(self):
