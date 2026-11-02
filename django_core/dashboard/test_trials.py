@@ -78,7 +78,7 @@ class LockedVisibleTests(ModuleBase):
         self.assertNotContains(info, 'Seven')                  # no school data
         built = self.get(self.admin, reverse('dashboard:module_info', args=['exams']))       # exams is built since Slice 1
         self.assertContains(built, 'تماس بگیرید')
-        self.assertNotContains(built, 'به‌زودی')
+        self.assertEqual(built.content.decode().count('به‌زودی'), 2)   # only the two disabled menu items (chat, library), no module is 'soon'
         with mock.patch('dashboard.module_info.BUILT', ('advisor_ai', 'tutor_ai', 'mission')):   # a module not built yet
             soon = self.get(self.admin, reverse('dashboard:module_info', args=['exams']))
         self.assertContains(soon, 'به‌زودی')

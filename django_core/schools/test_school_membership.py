@@ -307,7 +307,7 @@ class MembershipScopeTests(TestCase):
         from pathlib import Path
 
         root = Path(__file__).resolve().parents[1]
-        writers = {"students/management/commands/seed_demo.py"}   # demo seed WRITES memberships for its synthetic admins
+        writers = {"students/management/commands/seed_demo.py", "students/management/commands/seed_demo_school.py"}   # demo seed WRITES memberships for its synthetic admins
         offenders = []
         for path in sorted(root.rglob("*.py")):
             rel = path.relative_to(root).as_posix()

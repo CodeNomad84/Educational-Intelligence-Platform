@@ -338,7 +338,7 @@ class DashboardHtmlTests(Base):
         self.client.force_login(self.lead())
         resp = self.client.get(reverse("dashboard:student_detail", args=[self.s10a.pk]))
         self.assertEqual(resp.status_code, 200)
-        self.assertIn(self.s10a.national_id, resp.content.decode())
+        self.assertIn('******' + self.s10a.national_id[-4:], resp.content.decode())   # masked by default
         self.assertEqual(len(resp.context["attendances"]), 1)
         self.assertEqual({g.subject for g in resp.context["grades"]}, {"math", "physics"})
         self.assertEqual(self.client.get(reverse("dashboard:student_detail", args=[self.s11a.pk])).status_code, 404)
