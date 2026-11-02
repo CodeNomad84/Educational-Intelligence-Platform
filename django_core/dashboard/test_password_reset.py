@@ -290,3 +290,21 @@ class SelfCheckUnitTest(TestCase):
         user = make_user('p1', 'Parent')
         self.assertEqual(_ineligible_for_gradelead(user, user), 'self')
         self.assertEqual(_ineligible_for_gradelead(make_user('x', 'GradeLead'), user), '')
+
+
+class MenuLinkTests(TestCase):
+    """The page audit found a menu entry that led to a 403: the grade lead's reset link is shown only where resets are allowed."""
+
+    def test_the_menu_entry_follows_the_school_setting(self):
+        from django.urls import reverse
+        from schools.models import GradeLeadAssignment, School
+        from dashboard.test_counselor import make_user
+        school = School.objects.create(name='MenuSchool', code='menu-school')
+        lead = make_user('menu-lead', 'GradeLead', school)
+        GradeLeadAssignment.objects.create(user=lead, school=school, grade=7, academic_year='1404-1405')
+        self.client.force_login(lead)
+        url = reverse('dashboard:grade_resets')
+        self.assertNotContains(self.client.get(reverse('dashboard:grade_dashboard')), f'href="{url}"')
+        self.assertEqual(self.client.get(url).status_code, 403)
+        School.objects.filter(pk=school.pk).update(grade_leads_may_reset_passwords=True)
+        self.assertContains(self.client.get(reverse('dashboard:grade_dashboard')), f'href="{url}"')

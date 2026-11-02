@@ -61,7 +61,7 @@
             {% nav_link 'dashboard:school_accounts' 'upload' 'ثبت گروهی از اکسل' also='dashboard:school_accounts_preview' %}
             {% nav_link 'dashboard:quickstart' 'signpost-split' 'راهنمای شروع سریع' %}
             {% endif %}
-            {% if IS_GRADE_LEAD %}{% nav_link 'dashboard:grade_resets' 'key' 'بازنشانی رمز' %}{% endif %}
+            {% if IS_GRADE_LEAD and GRADE_RESETS_ENABLED %}{% nav_link 'dashboard:grade_resets' 'key' 'بازنشانی رمز' %}{% endif %}
 
             {# DEMO SCOPE begin — chat/library are disabled in Phase 1 (403); hidden in the demo #}
             {% if not DEMO_MODE %}

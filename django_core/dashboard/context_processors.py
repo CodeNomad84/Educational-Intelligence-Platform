@@ -36,11 +36,15 @@ def role_names(request):
     enabled = enabled_modules_for_user(user)
     school_ids = user_school_ids(user) if ADMIN in roles else set()
     own_schools = school_ids or (user_school_ids(user) if roles else set())
+    resets_on = False
+    if GRADE_LEAD in roles:     # the menu entry only exists where the SchoolAdmin allowed it (otherwise the page is a 403)
+        from schools.models import School
+        resets_on = School.objects.filter(pk__in=user_school_ids(user), grade_leads_may_reset_passwords=True).exists()
     notif = 0
     if roles & {ADMIN, GRADE_LEAD, COUNSELOR}:
         from risk.notifications import unread_count      # P6-2: only rows still inside the user's alert / plan scope
         notif = unread_count(user)
-    return {'NOTIF_COUNT': notif, 'ADMIN_ROLE': ADMIN, 'IS_SCHOOL_ADMIN': ADMIN in roles, 'IS_TEACHER': TEACHER in roles,
+    return {'GRADE_RESETS_ENABLED': resets_on, 'NOTIF_COUNT': notif, 'ADMIN_ROLE': ADMIN, 'IS_SCHOOL_ADMIN': ADMIN in roles, 'IS_TEACHER': TEACHER in roles,
             'IS_GRADE_LEAD': GRADE_LEAD in roles, 'IS_PARENT': PARENT in roles, 'IS_COUNSELOR': COUNSELOR in roles,
             'IS_STUDENT': STUDENT in roles, 'IS_PLATFORM_OPERATOR': is_platform_operator(user),
             # Top bar only: the user's own school (from the schools the user already belongs to) and role label.
