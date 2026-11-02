@@ -41,7 +41,8 @@
     [y, m, d].forEach(s => { s.className = 'form-select'; });
     y.setAttribute('aria-label', 'سال'); m.setAttribute('aria-label', 'ماه'); d.setAttribute('aria-label', 'روز');
     if (!input.required) { opt(y, '', 'سال', !sel); opt(m, '', 'ماه', !sel); opt(d, '', 'روز', !sel); }
-    for (let i = cur[0] - 6; i <= cur[0] + 3; i++) opt(y, i, fa(i), sel && sel[0] === i);
+    const lo = Math.min(cur[0] - 6, sel ? sel[0] : 9999), hi = Math.max(cur[0] + 3, sel ? sel[0] : 0);   // an existing date outside the window stays selectable
+    for (let i = lo; i <= hi; i++) opt(y, i, fa(i), sel && sel[0] === i);
     MONTHS.forEach((n, i) => opt(m, i + 1, n, sel && sel[1] === i + 1));
     for (let i = 1; i <= 31; i++) opt(d, i, fa(i), sel && sel[2] === i);
     if (input.required && !sel) { y.value = cur[0]; m.value = cur[1]; d.value = cur[2]; }
@@ -55,7 +56,7 @@
     wrap.append(d, m, y);
     input.type = 'hidden';
     input.parentNode.insertBefore(wrap, input.nextSibling);
-    sync();
+    if (!sel) sync();   // an existing value is never rewritten until the user changes a select
   }
   document.addEventListener('DOMContentLoaded', () => document.querySelectorAll('input[type=date]').forEach(enhance));
 })();

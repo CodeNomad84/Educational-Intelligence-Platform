@@ -11,6 +11,23 @@ from .school_views import _render, school_page
 
 
 class StrategyForm(forms.ModelForm):
+    def __init__(self, *args, school=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.school = school
+
+    def clean_title(self):
+        title = self.cleaned_data['title'].strip()
+        same = Strategy.objects.filter(school=self.school, title=title).exclude(pk=self.instance.pk)
+        if same.exists():
+            raise forms.ValidationError('راهبردی با این عنوان وجود دارد.')
+        return title
+
+    def clean_typical_days(self):
+        days = self.cleaned_data['typical_days']
+        if not 1 <= days <= 365:
+            raise forms.ValidationError('عددی بین ۱ تا ۳۶۵ وارد کنید.')
+        return days
+
     class Meta:
         model = Strategy
         fields = ['title', 'intervention_type', 'tier', 'typical_days', 'description']
@@ -24,7 +41,7 @@ class StrategyForm(forms.ModelForm):
 @school_page
 def strategies(request, school, pk=None):
     instance = get_object_or_404(Strategy, pk=pk, school=school) if pk else None
-    form = StrategyForm(request.POST or None, instance=instance)
+    form = StrategyForm(request.POST or None, instance=instance, school=school)
     if request.method == 'POST' and form.is_valid():
         obj = form.save(commit=False)
         obj.school = school

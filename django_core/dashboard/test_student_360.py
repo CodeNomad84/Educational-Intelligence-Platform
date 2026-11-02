@@ -176,3 +176,20 @@ class GradeDashboardTests(Base):
         resp = self.client.get(reverse('dashboard:grade_dashboard'))
         self.assertEqual(resp.status_code, 200)
         self.assertNotIn('Child', resp.content.decode())
+
+
+class RevealNegativeTests(Base):
+    """Locks in the scope of the national-id reveal (review L-5)."""
+
+    def reveal(self, user, student):
+        self.client.force_login(user)
+        return self.client.post(reverse('dashboard:reveal_national_id', args=[student.pk]))
+
+    def test_method_scope_and_roles(self):
+        self.client.force_login(self.admin)
+        self.assertEqual(self.client.get(reverse('dashboard:reveal_national_id', args=[self.child.pk])).status_code, 405)
+        self.assertEqual(self.reveal(self.parent, self.foreign).status_code, 404)       # another school's student
+        self.assertEqual(self.reveal(self.parent, self.grade8).status_code, 404)        # not their child
+        self.client.logout()
+        self.assertIn(self.client.post(reverse('dashboard:reveal_national_id', args=[self.child.pk])).status_code, (302, 403))
+        self.assertFalse(AuditEvent.objects.filter(action='national_id_reveal').exists())

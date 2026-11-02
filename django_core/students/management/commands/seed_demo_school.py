@@ -12,6 +12,7 @@ import random
 import secrets
 from datetime import date, timedelta
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.core.management import call_command
@@ -54,6 +55,11 @@ class Command(BaseCommand):
     def handle(self, *args, **opts):
         if not opts['confirmed']:
             raise CommandError('Pass --i-know-this-is-synthetic to confirm.')
+        User = get_user_model()
+        if not (settings.DEBUG or getattr(settings, 'DEMO_MODE', False)) and User.objects.filter(is_superuser=False).exists():
+            raise CommandError('Refusing: accounts already exist and this is not a DEBUG/DEMO_MODE environment.')
+        if opts['password'] and len(opts['password']) < 8:
+            raise CommandError('--password must be at least 8 characters.')
         if Student.objects.exists():
             raise CommandError('Refusing: the student table is not empty.')
         rng = random.Random(14051102)
@@ -66,7 +72,6 @@ class Command(BaseCommand):
         school = School.objects.create(name=SCHOOL, code='sepehr-demo')
         AcademicYear.objects.create(school=school, code=YEAR, label='سال تحصیلی ۱۴۰۵-۱۴۰۶', start_date=start,
                                     end_date=start + timedelta(days=270), is_current=True)
-        User = get_user_model()
         staff_names = iter(STAFF * 3)
 
         def user(username, group):

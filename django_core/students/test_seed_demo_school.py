@@ -25,7 +25,7 @@ class SeedDemoSchoolTests(TestCase):
     def test_as_of_fixes_the_dates_and_a_bad_value_is_refused(self):
         with self.assertRaises(CommandError):
             call_command('seed_demo_school', '--i-know-this-is-synthetic', '--as-of=nope', stdout=StringIO())
-        call_command('seed_demo_school', '--i-know-this-is-synthetic', '--password=x', '--scale=0.2', '--as-of=2026-11-02', stdout=StringIO())
+        call_command('seed_demo_school', '--i-know-this-is-synthetic', '--password=x-demo-pass', '--scale=0.2', '--as-of=2026-11-02', stdout=StringIO())
         from datetime import date
         from students.models import Attendance
         self.assertEqual(Attendance.objects.order_by('-date').first().date, date(2026, 11, 1))
