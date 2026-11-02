@@ -39,16 +39,42 @@ services:
       - .env
       - .env.service   # SERVICE_JWT_SECRET (gitignored); shared with FastAPI only
     depends_on:
-      - postgres
-      - redis
-      - fastapi
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_started
+      redis:
+        condition: service_started
+      fastapi:
+        condition: service_started
+    # R-04: the runtime connects as the least-privilege role school_app (DML only). Schema changes run in the one-shot `migrate` service.
     command: >
-      sh -c "python manage.py migrate &&
-      python manage.py collectstatic --noinput &&
-      gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 3000"
+      sh -c "gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 3000"
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.production
       - USE_POSTGRES=True
+      - DB_USER=school_app
+      - DB_PASSWORD=${DB_APP_PASSWORD:?DB_APP_PASSWORD is required}
+
+  # ========== Migrations (one-shot, the only service that may change the schema) ==========
+  migrate:
+    build: ./django_core
+    container_name: django_migrate
+    volumes:
+      - ./django_core:/app
+      - ./data/static:/app/staticfiles
+    env_file:
+      - .env
+      - .env.service
+    depends_on:
+      - postgres
+    restart: "no"
+    command: sh -c "python manage.py migrate --noinput && python manage.py collectstatic --noinput"
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.production
+      - USE_POSTGRES=True
+      - DB_USER=school_owner
+      - DB_PASSWORD=${DB_OWNER_PASSWORD:?DB_OWNER_PASSWORD is required}
 
   # ========== Celery Worker (پردازش پس‌زمینه) ==========
   celery:
@@ -63,6 +89,8 @@ services:
     command: celery -A config worker -l info
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.production
+      - DB_USER=school_app
+      - DB_PASSWORD=${DB_APP_PASSWORD:?DB_APP_PASSWORD is required}
 
   # ========== Celery Beat (زمان‌بندی کارها) ==========
   celery_beat:
@@ -78,6 +106,8 @@ services:
     command: celery -A config beat -l info
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.production
+      - DB_USER=school_app
+      - DB_PASSWORD=${DB_APP_PASSWORD:?DB_APP_PASSWORD is required}
 
   # ========== FastAPI ==========
   fastapi:
@@ -108,14 +138,19 @@ services:
     container_name: postgres_db
     environment:
       POSTGRES_DB: school_db
-      POSTGRES_USER: school_user
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      # R-04: the bootstrap superuser is used for maintenance only (never by the application). On the FIRST start of an empty data
+      # directory deploy/postgres/10-roles.sh creates school_owner (DDL) and school_app (DML). Existing data: docs/DEPLOYMENT.md 4a.
+      POSTGRES_USER: school_admin
+      POSTGRES_PASSWORD: ${DB_ADMIN_PASSWORD:?DB_ADMIN_PASSWORD is required}
+      DB_OWNER_PASSWORD: ${DB_OWNER_PASSWORD:?DB_OWNER_PASSWORD is required}
+      DB_APP_PASSWORD: ${DB_APP_PASSWORD:?DB_APP_PASSWORD is required}
     # No host port: only Django/Celery/FastAPI reach it over the compose network.
-    # Admin access: docker compose exec postgres psql -U school_user -d school_db
+    # Admin access: docker compose exec postgres psql -U school_admin -d school_db
     # No env_file: the server needs only the three POSTGRES_* values above (interpolated from
     # .env by Compose), not Django's SECRET_KEY or the service-token secret.
     volumes:
       - ./data/postgres:/var/lib/postgresql/data
+      - ./deploy/postgres:/docker-entrypoint-initdb.d:ro
 
   # ========== Redis (کش و بروکر Celery) ==========
   redis:

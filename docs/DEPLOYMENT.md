@@ -1,4 +1,6 @@
-# DEPLOYMENT — DRAFT PROPOSAL
+# DEPLOYMENT — PREPARED, NOT DEPLOYED (P9, 2026-11-02)
+
+> **P9 status.** Everything needed for a first deployment exists as files and rehearsals (`CURRENT` in the repository): least-privilege database roles (R-04, section 4a), two profiles (`deploy/profiles/`), a preflight check (`scripts/preflight.py`), HTTPS settings and an nginx example (section 3/3a), encrypted backups (`RUNBOOK.md` section 3), FastAPI with no published port (`SECURITY.md`). **Nothing is deployed to a real server, no real data is loaded, no real LLM key is configured, and pricing, legal, consent and retention are not decided here** (owner tasks, section 11).
 
 Status: **PROPOSED / DRAFT** (2026-10-15; §3/§3a updated 2026-11-01 by P3 C-H, owner decisions OW-1..OW-4 in `changes/0028`). Nothing here is implemented unless marked `CURRENT`. Created on the owner's instruction (R-03 decision); not an approved design.
 
@@ -63,7 +65,7 @@ Release gate: `DJANGO_SETTINGS_MODULE=config.settings.production python manage.p
 
 ## 4. Prerequisites (blockers)
 
-1. **R-04: `school_user` is a PostgreSQL superuser** (`SECURITY.md`, deferred). Must be fixed before any web-server deployment: a least-privilege application role owning only its schema (no `SUPERUSER`, `CREATEDB`, `CREATEROLE`), plus a separate migration role if needed. Requires a migration runbook and PostgreSQL verification (L3, own proposal).
+1. **R-04 — BUILT AND REHEARSED, not applied to any real database (section 4a).** The application no longer uses a superuser: `school_app` (DML only) at runtime, `school_owner` (DDL) in the one-shot `migrate` service, `school_admin` (bootstrap superuser) for maintenance only.
 2. R-03 closed for Dev/Demo (loopback). A web server needs the proxy + HTTPS above.
 3. Redis has no authentication: acceptable only while unpublished and internal; add `requirepass` or ACL if the network is shared.
 4. Phase 3 security baseline exit criteria met (also gates real data).
@@ -125,3 +127,16 @@ Release gate: `DJANGO_SETTINGS_MODULE=config.settings.production python manage.p
 4. Security review per `SECURITY.md` before any hostname goes live.
 
 This file is a draft; it does not authorise changes to compose, settings or infrastructure.
+
+## 4a. R-04: least-privilege database roles (P9; `CURRENT` in the repository, `NOT VERIFIED` on a real server)
+- **Fresh install:** `docker-compose.yml` starts PostgreSQL with `POSTGRES_USER=school_admin` and mounts `deploy/postgres/10-roles.sh`; on the first start of an empty data directory it creates `school_owner` and `school_app` (no SUPERUSER, CREATEDB, CREATEROLE, BYPASSRLS), makes `school_owner` the owner of the database and schema, removes `CREATE` on schema `public` from PUBLIC, and sets default privileges so that every table `school_owner` creates later is usable by `school_app`. The `vector` extension is created once by the bootstrap role. Passwords come from `DB_ADMIN_PASSWORD`, `DB_OWNER_PASSWORD`, `DB_APP_PASSWORD` (compose refuses to start without them; the script refuses passwords under 16 characters or equal).
+- **Services:** `migrate` (one-shot, `school_owner`, runs `migrate` and `collectstatic`) must finish before `django` starts; `django`, `celery`, `celery_beat` use `school_app`. FastAPI keeps its own role `fastapi_user` (`FASTAPI_DB_ROLE.md`).
+- **Existing database (superuser-owned):** after a verified backup, in a maintenance window, as a superuser: `psql -v ON_ERROR_STOP=1 -d school_db -v owner_pw=... -v app_pw=... -v old_role=school_user -f deploy/postgres-maintenance/r04-convert-existing.sql` (changes the owner of every relation in `public` explicitly: `REASSIGN OWNED` cannot be used when the old role is the bootstrap superuser). Do not drop the old role until the application has run for a while. Rollback is described in the file header.
+- **Proof:** `scripts/test_db_roles.sh` (CI job `dbroles`; throw-away containers without network): both roles are plain roles; `school_app` can read, insert, update and delete but cannot create, alter, drop or truncate, create roles or extensions, read `pg_authid` or promote itself; `school_owner` cannot create roles or read `pg_authid`; PUBLIC cannot create in `public`; weak or equal passwords are refused; a superuser-owned legacy database converts with its data intact; and (locally, when the Django test image exists) Django `migrate` works as the owner, DML works as the app role, DDL as the app role is refused.
+- **Open:** Django ORM features that need DDL at runtime do not exist today (tests pass as `school_app` DML); a future migration always goes through the `migrate` service. Redis authentication (item 3 above) is still open.
+
+## 11. Profiles, preflight and the first deployment (P9)
+1. Pick a profile: `deploy/profiles/shared-iranian-server.env.example` (several schools on the platform's shared server) or `dedicated-school-server.env.example` (one school on its own server, the school names its operator). Copy it OUTSIDE the repository and fill every `CHANGE_ME` with long random values.
+2. `scripts/preflight.py <file> --profile shared|dedicated` must print `READY` (it never executes the file, never prints a value, never touches a server). It checks placeholders, secret lengths and distinctness, DEBUG off, HTTPS settings on, real host names and `https://` origins only, a backup key, and that the database user is not a superuser role.
+3. Then (owner/ops, not done here): install Docker, put the file where compose reads it, `docker compose up -d`; nginx + certificate (`deploy/nginx/eip.conf.example`, section 3a); scheduled backups and a restore rehearsal on the real server (`RUNBOOK.md` section 3); an external port scan showing only 80/443 (FastAPI, PostgreSQL, Redis unreachable); `manage.py check --deploy`; `create_school`.
+**Owner-only tasks (not done, not decided here):** the real server and domain; real certificates; real secrets (generated by the owner/ops, never by this repository); the off-site backup target and the offline backup private key; a real LLM provider and key (and the legal/consent decisions before any student data reaches any AI class); pricing and trial length; legal text, consent and data retention; the choice between S7 options (`changes/0020`); a staff DR/rollback drill.

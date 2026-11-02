@@ -25,7 +25,7 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': os.environ.get('DB_NAME', 'school_db'),
-        'USER': os.environ.get('DB_USER', 'school_user'),
+        'USER': os.environ.get('DB_USER', 'school_app'),     # R-04: never a superuser; `migrate` runs as school_owner
         'PASSWORD': os.environ.get('DB_PASSWORD', ''),
         'HOST': os.environ.get('DB_HOST', 'postgres'),
         'PORT': os.environ.get('DB_PORT', '5432'),
