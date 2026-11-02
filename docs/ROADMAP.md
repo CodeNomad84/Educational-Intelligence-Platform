@@ -2,7 +2,7 @@
 
 > **Current status lives in `docs/PROJECT_CHECKLIST.md`** (start-to-finish list with evidence). This file keeps the phase definitions and history; where the two disagree, the checklist and git win. Since 2026-10-19 the product modules `mission` (slices 1-3) and `exams` (slice 1) were built on top of Phase 2.
 
-Current phase: **Phase 3 — security baseline, started 2026-11-01** (code track of `changes/0026`; owner decisions OW-1..OW-7 and the P3-P8 decision pack in `changes/0028`). Previous: **Phase 2 — MVP productization (compressed roadmap approved by the owner 2026-10-13), Django-first.** Phase 1 is closed on `phase-1/boot-security` at `4c096de` (`PHASE1_FINAL_STATUS.md`, `PHASE1_DEFERRED_ITEMS.md`); baseline `3404a1a` is resolvable in this repository's history. Sub-phases 2.1, 2.1m (multi-school) and 2.2a are largely built; what is done and what is open is tracked item by item in `PROJECT_CHECKLIST.md`. Each phase starts only on owner approval.
+Current phase: **Demo track (P5/P6/P8 slices) ahead of P4, P7, P9, autonomous run approved 2026-11-02 through Phase 9; Phase 3 code track done 2026-11-01** (code track of `changes/0026`; owner decisions OW-1..OW-7 and the P3-P8 decision pack in `changes/0028`). Previous: **Phase 2 — MVP productization (compressed roadmap approved by the owner 2026-10-13), Django-first.** Phase 1 is closed on `phase-1/boot-security` at `4c096de` (`PHASE1_FINAL_STATUS.md`, `PHASE1_DEFERRED_ITEMS.md`); baseline `3404a1a` is resolvable in this repository's history. Sub-phases 2.1, 2.1m (multi-school) and 2.2a are largely built; what is done and what is open is tracked item by item in `PROJECT_CHECKLIST.md`. Each phase starts only on owner approval.
 
 **Phase 2 is Django-first**: no RAG/LLM, no React, no FastAPI changes. PostgreSQL and FastAPI verification: `TESTING.md` (Django 1174 tests on SQLite and PostgreSQL, FastAPI 28; 2026-10-25). CI: `.github/workflows/ci.yml` exists (Django only; not yet run on GitHub). Phase 2 absorbs the MVP slice of P2, P4, P5 and P6 below; their full scope remains in the table.
 
@@ -25,12 +25,12 @@ Current phase: **Phase 3 — security baseline, started 2026-11-01** (code track
 | P0 | CCOS installation (docs/config only) | committed on `ccos/phase-0` in the owner's previous repository history (that branch is not present here); owner accepted |
 | P1 | Bootable Baseline + Critical Security Containment | CLOSED 2026-10-13 at `4c096de`; PostgreSQL/FastAPI re-verification deferred (`PHASE1_DEFERRED_ITEMS.md`) |
 | P2 | Test harness + Authorization Matrix decisions | Test harness DONE (`scripts/run_tests.sh`, CI workflow); matrix decided in ADR-0003/0005/0010, some cells still DECISION REQUIRED (`SECURITY.md`) |
-| P3 | Security baseline (exit criteria in SECURITY.md) | STARTED 2026-11-01 (owner): code tasks C-B, C-D, C-H, C-K backups, C-L in Phase 3 autonomous mode (`CLAUDE.md` §6a-bis); open decisions in `changes/0028-p3-p8-decision-pack-PROPOSAL.md` |
-| P4 | Core domain architecture (data layers; React foundation slice at end) | NOT STARTED |
-| P5 | Student 360 + analytics | NOT STARTED |
-| P6 | Rules / Risk / Alerts / Interventions | NOT STARTED |
-| P7 | RAG + AI assistants | NOT STARTED |
-| P8 | React completion | NOT STARTED |
-| P9 | Production + multi-school readiness | NOT STARTED |
+| P3 | Security baseline (exit criteria in SECURITY.md) | CODE TRACK DONE 2026-11-01 (C-A Django admin closure, C-B, C-D, C-H, C-K, C-L); open: owner/ops/legal tasks O1-O9 and the real-data readiness gate (`PROJECT_CHECKLIST.md`); C-R and P3-9 stay LEGAL |
+| P4 | Core domain architecture (data layers, grading scale/attendance vocabulary, import formats; `DATA_MODEL.md` written at start) | NOT STARTED. Per ADR-0013 the former "React foundation slice" is replaced by Django pages + Bootstrap RTL + small JS islands; no SPA |
+| P5 | Student 360 + analytics | P5-1 principal dashboard, P5-2 derived support levels, P5-3 behavior log (parents see positive entries only), P5-4 printable report card DONE (`37e1c3c`); P5-3 behavior-as-rule-signal open; Student 360 rework in progress (demo track) |
+| P6 | Rules / Risk / Alerts / Interventions | Rule engine and intervention loop built in Phase 2 (changes 0022, 0025); open: P6-1 strategy library, P6-2 in-app notifications, P6-3 effectiveness per strategy; P6-4 referral consent stays LEGAL |
+| P7 | RAG + AI assistants | NOT STARTED. One OpenAI-compatible adapter, two provider classes (external API / local), both OFF by default; external class never called with real keys during development (tests use mocks/local) |
+| P8 | Frontend (redefined by ADR-0013: Django templates + Bootstrap 5 RTL + islands; SPA DEFERRED) | P8-3 design system DONE (`77d841a`); open: demo-track polish of every page, mobile tables, Jalali date picker, charts, then completion pass |
+| P9 | Production + multi-school readiness | NOT STARTED. Scope: R-04, deployment profiles (shared Iranian server / school-owned server), `DEPLOYMENT.md`, S7-S10 multi-school readiness as far as possible without real data. Owner-only: real deployment, real data, real LLM keys, pricing/legal/consent/retention |
 
 Interim rule: NO REAL STUDENT DATA until P3 exit (Phase 1 does not lift it). Deferred docs created at their phase: DATA_MODEL (P4), API_MAP (P2/P4), RULE_ENGINE (P6), DEPLOYMENT (P9/P1 if needed).
