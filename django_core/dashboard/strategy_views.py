@@ -50,8 +50,28 @@ def strategies(request, school, pk=None):
         audit.record(request.user, audit.STRATEGY_SAVE, obj, school=school, detail='edited' if instance else 'created')
         messages.success(request, 'ذخیره شد.')
         return redirect('dashboard:school_strategies')
-    return _render(request, school, 'strategies.html', form=form, editing=instance,
-                   rows=Strategy.objects.filter(school=school).order_by('-is_active', 'tier', 'title'))
+    return _render(request, school, 'strategies.html', form=form, editing=instance, rows=_rows_with_effect(request.user, school))
+
+
+def _rows_with_effect(user, school):
+    """P6-3: per strategy, the outcomes of its COMPLETED plans, from the plans the user's own scope returns. A strategy with fewer
+    than ``MIN_GROUP`` completed plans shows no breakdown (small groups are withheld, like every aggregate)."""
+    from collections import Counter, defaultdict
+
+    from risk.rules import MIN_GROUP
+    from students.access import visible_plans
+
+    counts = defaultdict(Counter)
+    done = visible_plans(user).filter(school_id=school.pk, strategy__isnull=False, status='completed').order_by()
+    for strategy_id, outcome in done.values_list('strategy_id', 'outcome'):
+        counts[strategy_id][outcome] += 1
+    rows = list(Strategy.objects.filter(school=school).order_by('-is_active', 'tier', 'title'))
+    for row in rows:
+        c = counts.get(row.pk, Counter())
+        total = sum(c.values())
+        row.completed = total
+        row.effect = {'improved': c['improved'], 'no_change': c['no_change'], 'worse': c['worse'], 'not_assessable': c['not_assessable']} if total >= MIN_GROUP else None
+    return rows
 
 
 @school_page

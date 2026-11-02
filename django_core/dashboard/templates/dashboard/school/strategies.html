@@ -5,7 +5,7 @@
 <div class="row g-3">
   <div class="col-lg-7"><div class="card"><div class="card-body p-0"><div class="table-responsive"><table class="table table-sm mb-0 eip-fit">
     <thead><tr><th>عنوان</th><th>نوع</th><th>سطح</th></tr></thead><tbody>
-    {% for s in rows %}<tr class="{% if not s.is_active %}text-muted{% endif %}"><td>{{ s.title }} <small class="text-muted">({{ s.typical_days }} روز)</small><div class="small"><a href="{% url 'dashboard:school_strategy_edit' s.pk %}">ویرایش</a> ·
+    {% for s in rows %}<tr class="{% if not s.is_active %}text-muted{% endif %}"><td>{{ s.title }} <small class="text-muted">({{ s.typical_days }} روز)</small>{% if s.completed %}<div class="small text-muted">{% if s.effect %}نتیجهٔ {{ s.completed }} برنامهٔ پایان‌یافته: بهبود {{ s.effect.improved }} · بدون تغییر {{ s.effect.no_change }} · بدتر {{ s.effect.worse }} · ارزیابی‌ناپذیر {{ s.effect.not_assessable }}{% else %}کمتر از ۵ برنامهٔ پایان‌یافته؛ نتیجه نمایش داده نمی‌شود{% endif %}</div>{% endif %}<div class="small"><a href="{% url 'dashboard:school_strategy_edit' s.pk %}">ویرایش</a> ·
         <form method="post" action="{% url 'dashboard:school_strategy_toggle' s.pk %}" class="d-inline">{% csrf_token %}<button class="btn btn-link btn-sm p-0">{% if s.is_active %}غیرفعال{% else %}فعال{% endif %}</button></form></div></td><td>{{ s.get_intervention_type_display }}</td><td>{{ s.tier }}</td></tr>
     {% empty %}<tr><td colspan="3" class="text-muted">راهبردی نیست. با دستور seed_strategies فهرست پایه ساخته می‌شود یا از فرم کناری اضافه کنید.</td></tr>{% endfor %}
   </tbody></table></div></div></div></div>

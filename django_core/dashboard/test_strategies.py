@@ -48,3 +48,23 @@ class StrategyTests(LoopBase):
         obj = Strategy.objects.get(title='T1')
         self.client.post(reverse('dashboard:school_strategy_toggle', args=[obj.pk]))
         self.assertEqual(set(AuditEvent.objects.filter(action='strategy_save').values_list('detail', flat=True)), {'created', 'off'})
+
+    def test_effectiveness_is_withheld_below_five_completed_plans(self):
+        """P6-3: outcomes per strategy appear only from MIN_GROUP completed plans."""
+        from datetime import date
+
+        from interventions.models import InterventionPlan
+        s = Strategy.objects.create(school=self.a, title='eff', intervention_type='academic', description='d')
+        def plan(outcome):
+            return InterventionPlan.objects.create(
+                school=self.a, student=self.s7, owner=self.lead, created_by=self.lead, intervention_type='academic', goal='g',
+                action_plan='a', start_date=date(2026, 10, 1), due_date=date(2026, 11, 1), status='completed', outcome=outcome, strategy=s)
+        self.client.force_login(self.admin)
+        for _ in range(4):
+            plan('improved')
+        page = self.client.get(reverse('dashboard:school_strategies')).content.decode()
+        self.assertIn('کمتر از ۵ برنامهٔ پایان‌یافته', page)
+        self.assertNotIn('بهبود 4', page)
+        plan('worse')
+        page = self.client.get(reverse('dashboard:school_strategies')).content.decode()
+        self.assertIn('بهبود 4 · بدون تغییر 0 · بدتر 1', page)
