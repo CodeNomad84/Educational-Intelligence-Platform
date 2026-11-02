@@ -55,6 +55,7 @@ def service_headers(user, with_school=None):
         'roles': sorted(roles_for(user)),
         # SchoolAdmin scope (FastAPI filters documents by it, ACL before retrieval); empty for every other role
         'schools': schools,
+        **({'scope': 'ai'} if with_school is not None else {}),      # valid on FastAPI's /llm routes only
         'iat': now,
         'exp': now + TTL_SECONDS,
     }

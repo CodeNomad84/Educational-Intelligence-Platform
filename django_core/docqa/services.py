@@ -18,6 +18,7 @@ from .screen import normalize, screen_text
 
 FASTAPI = 'http://fastapi:8001'
 CHUNK_CHARS, TOP_K, MAX_QUESTION = 900, 4, 500
+MAX_DOCS, MAX_CHUNKS = 50, 5000
 STOP = {'و', 'در', 'به', 'از', 'که', 'را', 'این', 'آن', 'با', 'برای', 'است', 'شد', 'شود', 'می', 'یا', 'تا', 'بر', 'هم', 'یک', 'های', 'ها'}
 TOKEN = re.compile(r'[\w]+', re.U)
 CITE = re.compile(r'\[(\d{1,2})\]')
@@ -63,7 +64,10 @@ def tokens(text):
 def add_document(user, school_id, title, filename, data):
     """Create a document from an upload. Raises ``ExtractError`` / ``AskRefused('screen:...')`` with fixed codes."""
     text = extract_text(filename, data)
-    reasons = screen_text(text, school_id)
+    if (SchoolDocument.objects.filter(school_id=school_id).count() >= MAX_DOCS
+            or DocumentChunk.objects.filter(school_id=school_id).count() >= MAX_CHUNKS):
+        raise AskRefused('school_full')
+    reasons = screen_text(f'{title}\n{text}', school_id)         # the title goes into prompts and onto pages: screened too
     if reasons:
         raise AskRefused('screen:' + ','.join(reasons))
     doc = SchoolDocument.objects.create(school_id=school_id, title=title, source_name=(filename or '')[:200], char_count=len(text),
@@ -101,8 +105,9 @@ def retrieve(school_id, question, k=TOP_K):
 def _local_provider_active(headers):
     try:
         r = requests.get(f'{FASTAPI}/llm/status/', headers=headers, timeout=3)
-        return r.status_code == 200 and r.json().get('enabled') and r.json().get('class') == 'local'
-    except (requests.RequestException, ValueError):
+        body = r.json() if r.status_code == 200 else None
+        return isinstance(body, dict) and body.get('enabled') is True and body.get('class') == 'local'
+    except (requests.RequestException, ValueError, AttributeError):
         return False
 
 

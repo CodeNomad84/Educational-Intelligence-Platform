@@ -1,11 +1,13 @@
 // (crawler variant, see page_audit.mjs)
 // node --experimental-websocket shoot.mjs <base> <user> <pass> <outdir> <width> <path>...  (headless Chromium over CDP; real login form)
 import { spawn } from 'node:child_process'; import { mkdirSync, writeFileSync, readdirSync, mkdtempSync, rmSync } from 'node:fs'; import { join } from 'node:path'; import { homedir, tmpdir } from 'node:os';
-const [base, user, pass, out, width, maxPages = '60'] = process.argv.slice(2); mkdirSync(out, { recursive: true });
+const [base, user, passArg, out, width, maxPages = '60'] = process.argv.slice(2);
+const pass = passArg === '@env' ? (process.env.EIP_AUDIT_PASS || '') : passArg;   // '@env' keeps the password out of the process list mkdirSync(out, { recursive: true });
 const root = join(homedir(), '.cache/ms-playwright'); const d = readdirSync(root).find(x => x.startsWith('chromium_headless_shell'));
 const bin = join(root, d, readdirSync(join(root, d)).find(x => x.startsWith('chrome')), 'chrome-headless-shell');
 const profile = mkdtempSync(join(tmpdir(), 'eip-shot-'));   // temporary browser profile (cookies) outside the screenshots folder, removed at the end
 const port = 9300 + Math.floor(Math.random() * 500);
+process.on('exit', () => { try { rmSync(profile, { recursive: true, force: true }); } catch {} });   // also after a crash
 const proc = spawn(bin, [`--remote-debugging-port=${port}`, '--no-sandbox', '--disable-gpu', `--user-data-dir=${profile}`, '--hide-scrollbars', 'about:blank'], { stdio: 'ignore' });
 const sleep = ms => new Promise(r => setTimeout(r, ms)); let t;
 for (let i = 0; i < 50; i++) { try { t = await (await fetch(`http://127.0.0.1:${port}/json`)).json(); if (t.length) break; } catch {} await sleep(200); }

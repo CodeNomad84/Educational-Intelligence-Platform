@@ -32,6 +32,15 @@ class ExposureTests(unittest.TestCase):
         self.assertNotRegex(text, r'(?m)^\s+network_mode\s*:\s*["\']?host', 'FastAPI must not use host networking')
         self.assertNotRegex(text, r'(?m)^\s+-\s*["\']?(\d{1,3}\.){3}\d{1,3}:\d+:8001')
 
+    def test_no_compose_override_or_extra_compose_file_exists(self):
+        extra = [p.name for p in REPO.glob('docker-compose*.y*ml') if p.name != 'docker-compose.yml'] + \
+                [p.name for p in REPO.glob('compose*.y*ml')]
+        self.assertEqual(extra, [], 'an override file could publish a port: review it and extend this test')
+        text = (REPO / 'docker-compose.yml').read_text(encoding='utf-8')
+        live = '\n'.join(l for l in text.splitlines() if not l.lstrip().startswith('#'))
+        self.assertNotRegex(live, r'network_mode\s*:\s*["\']?(host|service:fastapi)')
+        self.assertNotRegex(live, r'(?m)^\s+extends\s*:')
+
     def test_no_other_service_publishes_8001(self):
         text = (REPO / 'docker-compose.yml').read_text(encoding='utf-8')
         live = '\n'.join(l for l in text.splitlines() if not l.lstrip().startswith('#'))

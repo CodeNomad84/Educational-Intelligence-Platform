@@ -163,7 +163,7 @@ LLM_ROLES = (ADMIN, TEACHER, "GradeLead", "Counselor")      # staff only; Django
 
 
 @app.get("/llm/status/")
-def llm_status(payload: dict = Depends(require_roles_with_schools(*LLM_ROLES))):
+def llm_status(payload: dict = Depends(require_roles_with_schools(*LLM_ROLES, ai_scope_ok=True))):
     """Which provider CLASS (if any) is active for the caller's one school; no URL, model or key."""
     school = _single_school(payload)
     try:
@@ -174,7 +174,7 @@ def llm_status(payload: dict = Depends(require_roles_with_schools(*LLM_ROLES))):
 
 
 @app.post("/llm/complete/")
-def llm_complete(request: LLMRequest, http: Request, payload: dict = Depends(require_roles_with_schools(*LLM_ROLES))):
+def llm_complete(request: LLMRequest, http: Request, payload: dict = Depends(require_roles_with_schools(*LLM_ROLES, ai_scope_ok=True))):
     """P7 staff assistant call (provider-agnostic, OFF unless an operator maps the school to a provider). The caller's school comes from
     the signed token, never from the body; Django applies ACL BEFORE building the messages and enforces the licensed per-school caps."""
     school = _single_school(payload)

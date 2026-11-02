@@ -98,10 +98,16 @@ def disabled_in_phase1(payload: dict = Depends(verify_jwt)) -> dict:
     raise HTTPException(status_code=403, detail="This feature is disabled in Phase 1.")
 
 
-def require_roles(*allowed: str) -> Callable[[dict], dict]:
-    """Dependency factory: authenticated caller must hold at least one of ``allowed`` roles."""
+AI_SCOPE = "ai"      # a token minted by Django for ONE AI call carries scope "ai": valid only on routes that opt in (review F8)
+
+
+def require_roles(*allowed: str, ai_scope_ok: bool = False) -> Callable[[dict], dict]:
+    """Dependency factory: authenticated caller must hold at least one of ``allowed`` roles. A token with ``scope == "ai"`` is refused
+    unless the route opts in with ``ai_scope_ok=True`` (only the /llm routes do), so it can never widen access to other routes."""
 
     def dependency(payload: dict = Depends(verify_jwt)) -> dict:
+        if payload.get("scope") == AI_SCOPE and not ai_scope_ok:
+            raise HTTPException(status_code=403, detail="Not permitted.")
         if not set(payload["roles"]) & set(allowed):
             raise HTTPException(status_code=403, detail="Not permitted.")
         return payload
@@ -118,9 +124,9 @@ def school_ids(payload: dict) -> list:
     return sorted(set(value))
 
 
-def require_roles_with_schools(*allowed: str) -> Callable[[dict], dict]:
+def require_roles_with_schools(*allowed: str, ai_scope_ok: bool = False) -> Callable[[dict], dict]:
     """Like ``require_roles`` and additionally validates the ``schools`` claim; the payload carries the validated list."""
-    base = require_roles(*allowed)
+    base = require_roles(*allowed, ai_scope_ok=ai_scope_ok)
 
     def dependency(payload: dict = Depends(base)) -> dict:
         return {**payload, "schools": school_ids(payload)}

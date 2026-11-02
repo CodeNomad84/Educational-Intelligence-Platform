@@ -21,6 +21,11 @@ def normalize(text):
 def student_names(school_id):
     """Full names (and last names of 3+ letters) of the school's students, normalised; read through the access layer by the caller's
     scope is not needed here: this is a screening list inside one school, never shown."""
+    from django.core.cache import cache
+    key = f'docqa-names:{school_id}'
+    cached = cache.get(key)
+    if cached is not None:
+        return cached
     from students.models import Student
     names = set()
     for first, last in Student.objects.filter(school_id=school_id).values_list('first_name', 'last_name'):
@@ -29,6 +34,7 @@ def student_names(school_id):
             names.add(full)
         if len(normalize(last).strip()) >= 3:
             names.add(normalize(last).strip())
+    cache.set(key, names, 60)           # a screening list is rebuilt at most once a minute per school (review F3)
     return names
 
 

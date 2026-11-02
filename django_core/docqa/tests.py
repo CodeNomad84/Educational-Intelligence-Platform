@@ -250,11 +250,12 @@ class AskTests(Base):
         from config.service_auth import service_headers
         token = service_headers(self.teacher, with_school=self.a.pk)['Authorization'].split()[1]
         claims = jwt.decode(token, SECRET, algorithms=['HS256'], audience='school-fastapi')
-        self.assertEqual((claims['roles'], claims['schools']), (['Teacher'], [self.a.pk]))
+        self.assertEqual((claims['roles'], claims['schools'], claims['scope']), (['Teacher'], [self.a.pk], 'ai'))
         with self.assertRaises(Exception):
             service_headers(self.teacher, with_school=self.b.pk)
         plain = jwt.decode(service_headers(self.teacher)['Authorization'].split()[1], SECRET, algorithms=['HS256'], audience='school-fastapi')
         self.assertEqual(plain['schools'], [])
+        self.assertNotIn('scope', plain)
 
 
 class PageAccessTests(Base):
@@ -284,3 +285,57 @@ class PageAccessTests(Base):
     def test_demo_documents_are_synthetic_and_pass_the_screen(self):
         for title, text in demo_docs.DOCS.items():
             self.assertEqual(screen_text(text, self.a.pk), [], title)
+
+
+class ReviewFixTests(Base):
+    """Review of P7-5 (decision 64): F1 UTF-16 XML, F2 caps and question throttle, F3 name cache, F4 title screening, F5 control
+    characters, F6 non-dict status, F7 staff schools only."""
+
+    def test_a_utf16_docx_with_a_dtd_is_refused_and_control_characters_are_stripped(self):
+        xml = ('<?xml version="1.0" encoding="UTF-16"?><!DOCTYPE a [<!ENTITY e "boom">]>'
+               '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>&e;</w:t></w:r></w:p></w:body></w:document>').encode('utf-16')
+        out = io.BytesIO()
+        with zipfile.ZipFile(out, 'w') as z:
+            z.writestr('word/document.xml', xml)
+        with self.assertRaises(ExtractError):
+            extract_text('x.docx', out.getvalue())
+        self.assertEqual(extract_text('x.txt', b'abc\x00def\x07 ghi'), 'abcdef ghi')
+
+    def test_school_caps_and_the_question_throttle(self):
+        with mock.patch('docqa.services.MAX_DOCS', 1):
+            with self.assertRaises(services.AskRefused) as ctx:
+                services.add_document(self.admin, self.a.pk, 'Third', 'x.txt', b'more policy text')
+            self.assertEqual(ctx.exception.code, 'school_full')
+        self.client.force_login(self.teacher)
+        for _ in range(30):
+            self.client.post(reverse('docqa:home'), {'question': 'ساعت شروع'})
+        page = self.client.post(reverse('docqa:home'), {'question': 'ساعت شروع'})
+        self.assertContains(page, 'بیش از حد مجاز')
+
+    def test_the_title_is_screened_and_the_name_list_is_cached(self):
+        with self.assertRaises(services.AskRefused):
+            services.add_document(self.admin, self.a.pk, f'{self.s7.first_name} {self.s7.last_name}', 'x.txt', b'clean policy words')
+        screen_text('x', self.a.pk)
+        with self.assertNumQueries(0):
+            screen_text('another text', self.a.pk)
+
+    @override_settings(SERVICE_JWT_SECRET=SECRET)
+    def test_a_non_dict_status_answer_falls_back_to_search(self):
+        self.enable_ai()
+        class R:
+            status_code = 200
+            def json(self): return ['unexpected']
+        with mock.patch('docqa.services.requests.get', lambda *a, **k: R()), mock.patch('docqa.services.requests.post') as post:
+            self.assertEqual(services.ask(self.teacher, self.a, 'ساعت شروع کلاس‌ها')['mode'], 'search')
+        post.assert_not_called()
+
+    def test_a_parent_link_to_another_school_does_not_open_its_documents(self):
+        # the teacher is staff of school A and the PARENT of a student of school B: B's documents stay closed
+        from django.contrib.auth.models import Group
+        from students.models import Student
+        self.teacher.groups.add(Group.objects.get_or_create(name='Parent')[0])
+        Student.objects.filter(pk=self.sb.pk).update(parent_user=self.teacher)
+        self.client.force_login(self.teacher)
+        page = self.client.post(reverse('docqa:home') + f'?school={self.b.pk}', {'question': 'ساعت شروع کلاس‌ها'})
+        self.assertNotContains(page, 'BHandbook')
+        self.assertContains(page, 'Handbook')

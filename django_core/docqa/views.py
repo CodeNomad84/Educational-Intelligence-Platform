@@ -18,17 +18,20 @@ from .models import AssistantSettings, SchoolDocument
 
 STAFF = (ADMIN, GRADE_LEAD, TEACHER, COUNSELOR)
 MODULE = 'advisor_ai'
-REASONS = {'bad_question': 'سؤال خالی یا بیش از ۵۰۰ نویسه است.',
+REASONS = {'rate': 'تعداد پرسش‌ها بیش از حد مجاز است؛ چند دقیقه بعد دوباره تلاش کنید.', 'bad_question': 'سؤال خالی یا بیش از ۵۰۰ نویسه است.',
            'screen': 'سؤال نباید نام یا شناسهٔ دانش‌آموز، شمارهٔ تلفن یا نشانی ایمیل داشته باشد.'}
 UPLOAD_ERRORS = {'file_too_large': 'فایل بزرگ‌تر از حد مجاز است.', 'unsupported_type': 'فقط txt، md و docx پذیرفته می‌شود.',
                  'not_utf8': 'فایل متنی باید UTF-8 باشد.', 'empty': 'فایل متنی ندارد.', 'too_long': 'متن بیش از حد طولانی است.',
                  'not_docx': 'فایل docx معتبر نیست.'}
-UPLOADS_PER_WINDOW, WINDOW = 10, 600
+UPLOADS_PER_WINDOW, QUESTIONS_PER_WINDOW, WINDOW = 10, 30, 600
 
 
 def _school(request, admin_only=False):
     """The caller's own school with the module on (``?school=`` only picks among the user's own schools)."""
-    mine = sorted(s for s in user_school_ids(request.user) if module_enabled(s, MODULE))
+    from schools.models import SchoolStaff
+    from students.access import school_ids_for_admin
+    staff_schools = set(school_ids_for_admin(request.user)) | set(SchoolStaff.objects.filter(user=request.user).values_list('school_id', flat=True))
+    mine = sorted(s for s in user_school_ids(request.user) & staff_schools if module_enabled(s, MODULE))     # parent/student links never count
     if admin_only:
         from students.access import school_ids_for_admin
         mine = [s for s in mine if s in school_ids_for_admin(request.user)]
@@ -48,7 +51,11 @@ def home(request):
     if request.method == 'POST':
         question = request.POST.get('question', '')
         context['question'] = question
+        key = f'docqa-ask:{request.user.pk}'
+        cache.add(key, 0, WINDOW)
         try:
+            if cache.incr(key) > QUESTIONS_PER_WINDOW:
+                raise services.AskRefused('rate')
             context['result'] = services.ask(request.user, school, question)
         except services.AskRefused as exc:
             messages.error(request, REASONS.get(exc.code, 'درخواست انجام نشد.'))
@@ -79,6 +86,9 @@ def documents(request):
             except ExtractError as exc:
                 messages.error(request, UPLOAD_ERRORS.get(exc.code, 'فایل پذیرفته نشد.'))
             except services.AskRefused as exc:
+                if exc.code == 'school_full':
+                    messages.error(request, 'سقف تعداد یا حجم اسناد مدرسه پر شده است؛ سندی را حذف کنید.')
+                    return redirect('docqa:documents')
                 messages.error(request, 'سند دادهٔ شخصی (شناسه، تلفن، ایمیل یا نام دانش‌آموز) دارد و پذیرفته نشد.')
             except IntegrityError:
                 messages.error(request, 'سندی با این عنوان وجود دارد.')

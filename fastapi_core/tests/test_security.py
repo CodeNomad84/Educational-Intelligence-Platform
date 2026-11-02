@@ -429,6 +429,20 @@ class LLMStaffAndStatusTests(BaseCase):
                 self.assertEqual((refused.status_code, refused.json()['detail']), (422, 'purpose_refused'))
 
 
+class AIScopeTokenTests(BaseCase):
+    """Review F8: a token minted for one AI call (scope 'ai') works on /llm only, never on documents, predict or anything else."""
+
+    def test_ai_scope_token_is_refused_everywhere_except_llm(self):
+        headers = bearer([ADMIN_ROLE], schools=[1], scope='ai')
+        for method, path, kw in STAFF_READS + MUTATIONS:
+            resp = getattr(self.client, method)(path, headers=headers, **kw)
+            self.assertEqual(resp.status_code, 403, path)
+        with mock.patch.dict(os.environ, {'LLM_PROVIDERS': '', 'LLM_SCHOOL_MAP': ''}):
+            self.assertEqual(self.client.get('/llm/status/', headers=headers).status_code, 200)
+        plain = bearer([ADMIN_ROLE], schools=[1])
+        self.assertEqual(self.client.get('/documents/list/', headers=plain).status_code, 200)       # the normal admin token still works
+
+
 class LLMRouteExternalTests(BaseCase):
     """The EXTERNAL class through the route: the roster names sent by Django are enforced; body shape and size are bounded."""
 
