@@ -113,3 +113,5 @@ Unauthenticated FastAPI calls rejected; parent cannot read other students; non-s
 
 ## Rules
 Report real output only. A change touching auth/permissions needs a permission test. Synthetic data only.
+
+**Update 2026-11-02.** The label list now also has `docqa` (the P7-5 app; it was missing from the gate until the independent review round noticed the unchanged test count). FastAPI: `fastapi_core/tests` (64 tests incl. exposure and AI-scope checks).
