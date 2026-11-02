@@ -1,5 +1,5 @@
 from django.urls import path
-from . import behavior_views, module_info, report_card, operator_page, quickstart, account_views, bulk_views, password_reset, counselor_views, loop_views, plan_views, grade_dashboard, school_views, student360, student_views, teacher_views, views
+from . import behavior_views, module_info, report_card, operator_page, quickstart, account_views, bulk_views, password_reset, counselor_views, loop_views, plan_views, grade_dashboard, school_views, strategy_views, student360, student_views, teacher_views, views
 
 app_name = 'dashboard'
 
@@ -74,6 +74,9 @@ urlpatterns = [
 
     # SchoolAdmin pages (Slice 1)
     path('school/', school_views.home, name='school_home'),
+    path('school/strategies/', strategy_views.strategies, name='school_strategies'),
+    path('school/strategies/<int:pk>/', strategy_views.strategies, name='school_strategy_edit'),
+    path('school/strategies/<int:pk>/toggle/', strategy_views.strategy_toggle, name='school_strategy_toggle'),
     path('school/years/', school_views.years, name='school_years'),
     path('school/years/<int:pk>/current/', school_views.year_set_current, name='school_year_current'),
     path('school/audit/', school_views.audit_log, name='school_audit'),

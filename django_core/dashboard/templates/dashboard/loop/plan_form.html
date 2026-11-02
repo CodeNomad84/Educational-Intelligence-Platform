@@ -4,6 +4,9 @@
 {% if alert %}<p class="small text-muted">بر پایهٔ هشدار پذیرفته‌شده{% if not alert.text_hidden %}: {{ alert.message }}{% endif %}</p>{% endif %}
 <form method="post" class="bg-white p-3 border rounded" style="max-width:40rem">{% csrf_token %}
   {% if alert %}<input type="hidden" name="alert" value="{{ alert.pk }}">{% endif %}
+  {% if strategies %}<div class="mb-3"><label class="form-label">شروع از کتابخانهٔ راهبردها (اختیاری)</label>
+    <select name="strategy" id="strategy" class="form-select"><option value="">—</option>{% for s in strategies %}<option value="{{ s.pk }}" data-type="{{ s.intervention_type }}" data-days="{{ s.typical_days }}" data-text="{{ s.description }}">سطح {{ s.tier }} · {{ s.title }}</option>{% endfor %}</select>
+    <div class="form-text">فقط متن پیشنهادی را پر می‌کند؛ پیش از ثبت می‌توانید آن را ویرایش کنید.</div></div>{% endif %}
   {% for field in form %}{% if field.name != 'owner' %}<div class="mb-3"><label class="form-label">{{ field.label }}</label>{{ field }}{% for e in field.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}</div>{% endif %}{% endfor %}
   {% if is_admin %}<div class="mb-3"><label class="form-label">مسئول (پیش‌فرض: خودتان)</label>
     <select name="owner" class="form-select"><option value="">—</option>{% for u in owners %}<option value="{{ u.pk }}">{{ u.get_full_name|default:u.username }}</option>{% endfor %}</select>
@@ -11,3 +14,11 @@
   <button class="btn btn-primary">ثبت</button> <a class="btn btn-link" href="{% url 'dashboard:plan_list' %}">بازگشت</a>
 </form>
 {% endblock %}
+{% block scripts %}<script>
+var sel = document.getElementById('strategy');
+if (sel) sel.addEventListener('change', function () {
+  var o = sel.selectedOptions[0]; if (!o || !o.value) return;
+  var f = sel.form.elements;
+  f.intervention_type.value = o.dataset.type; f.goal.value = f.goal.value || o.text.split('·').pop().trim(); f.action_plan.value = o.dataset.text;
+});
+</script>{% endblock %}

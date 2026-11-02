@@ -1,0 +1,37 @@
+"""P6-1 strategy library: SchoolAdmin only, own school only, plan creation accepts only an active same-school entry."""
+from django.core.management import call_command
+from django.urls import reverse
+
+from interventions.models import InterventionPlan, Strategy
+from risk.loop_testing import LoopBase
+from schools.models import School
+
+
+class StrategyTests(LoopBase):
+    def test_seed_is_idempotent_and_roles(self):
+        call_command('seed_strategies', stdout=open('/dev/null', 'w'))
+        n = Strategy.objects.filter(school=self.a).count()
+        self.assertGreaterEqual(n, 30)
+        call_command('seed_strategies', stdout=open('/dev/null', 'w'))
+        self.assertEqual(Strategy.objects.filter(school=self.a).count(), n)
+        url = reverse('dashboard:school_strategies')
+        self.client.force_login(self.admin)
+        self.assertEqual(self.client.get(url).status_code, 200)
+        for user in (self.lead, self.teacher, self.parent, self.counselor):
+            self.client.force_login(user)
+            self.assertEqual(self.client.get(url).status_code, 403, user.username)
+
+    def test_other_school_row_is_404_and_plan_ignores_foreign_strategy(self):
+        other = School.objects.create(name='Other school')
+        foreign = Strategy.objects.create(school=other, title='x', intervention_type='academic', description='d')
+        own = Strategy.objects.create(school=self.a, title='y', intervention_type='academic', description='d')
+        self.client.force_login(self.admin)
+        self.assertEqual(self.client.get(reverse('dashboard:school_strategy_edit', args=[foreign.pk])).status_code, 404)
+        self.assertEqual(self.client.post(reverse('dashboard:school_strategy_toggle', args=[foreign.pk])).status_code, 404)
+        data = {'intervention_type': 'academic', 'goal': 'g', 'action_plan': 'a', 'start_date': '2026-10-26', 'due_date': '2026-11-20'}
+        self.client.force_login(self.lead)
+        self.client.post(reverse('dashboard:plan_new', args=[self.s7.pk]), {**data, 'strategy': foreign.pk})
+        self.assertIsNone(InterventionPlan.objects.get().strategy)
+        InterventionPlan.objects.all().delete()
+        self.client.post(reverse('dashboard:plan_new', args=[self.s7.pk]), {**data, 'strategy': own.pk})
+        self.assertEqual(InterventionPlan.objects.get().strategy, own)

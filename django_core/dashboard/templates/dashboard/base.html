@@ -57,7 +57,7 @@
 
             {% if IS_SCHOOL_ADMIN or IS_GRADE_LEAD %}<div class="eip-nav-section">مدیریت</div>{% endif %}
             {% if IS_SCHOOL_ADMIN %}
-            {% nav_link 'dashboard:school_home' 'building' 'مدیریت مدرسه' also='dashboard:school_years dashboard:school_classes dashboard:school_class_new dashboard:school_class_edit dashboard:school_staff dashboard:school_staff_detail dashboard:school_audit dashboard:school_resets dashboard:school_staff_roles rules:index' %}
+            {% nav_link 'dashboard:school_home' 'building' 'مدیریت مدرسه' also='dashboard:school_years dashboard:school_classes dashboard:school_class_new dashboard:school_class_edit dashboard:school_staff dashboard:school_staff_detail dashboard:school_audit dashboard:school_resets dashboard:school_staff_roles dashboard:school_strategies dashboard:school_strategy_edit rules:index' %}
             {% nav_link 'dashboard:school_accounts' 'upload' 'ثبت گروهی از اکسل' also='dashboard:school_accounts_preview' %}
             {% nav_link 'dashboard:quickstart' 'signpost-split' 'راهنمای شروع سریع' %}
             {% endif %}

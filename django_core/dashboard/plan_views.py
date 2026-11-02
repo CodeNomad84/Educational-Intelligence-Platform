@@ -11,7 +11,7 @@ from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
-from interventions.models import InterventionFollowUp, InterventionPlan
+from interventions.models import InterventionFollowUp, InterventionPlan, Strategy
 from interventions.reeval import due_for_reevaluation
 from interventions.services import (add_followup, cancel_plan, complete_plan, create_plan, reassign_plan, start_plan)
 from risk.services import LoopError
@@ -105,10 +105,15 @@ def plan_new(request, pk):
             except LoopError as error:
                 _fail(request, error)
             else:
+                picked = request.POST.get('strategy', '')
+                if picked.isdigit():     # optional library entry of the SAME school; unknown / foreign id is ignored
+                    plan.strategy = Strategy.objects.filter(pk=int(picked), school=student.school, is_active=True).first()
+                    plan.save(update_fields=['strategy'])
                 messages.success(request, 'برنامهٔ مداخله ثبت شد.')
                 return redirect('dashboard:plan_detail', pk=plan.pk)
     return render(request, 'dashboard/loop/plan_form.html', {
         'form': form, 'student': student, 'alert': alert, 'is_admin': is_admin,
+        'strategies': Strategy.objects.filter(school=student.school, is_active=True),
         'owners': _owner_candidates(student.school, student, 'academic') if is_admin else []})
 
 

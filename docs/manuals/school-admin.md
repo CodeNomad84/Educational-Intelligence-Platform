@@ -52,3 +52,6 @@ Parent notifications, a parent view of alerts or interventions, a scheduler for 
 ## Principal dashboard, support levels, behavior log, report card (since 2026-11-02)
 **Steps:** `/dashboard/` shows one school (choose it at the top if you have several): students, attendance (30 days), average grade (45 days), unreviewed alerts, support levels, a weekly attendance chart, the students who need attention, the intervention loop (open, due, overdue, without follow-up, ready for re-evaluation) and a table per class. On the student list and Student 360 each student shows a **support level** (1 universal, 2 targeted, 3 intensive); it is calculated from open plans and unreviewed alerts and is not a label or diagnosis. On Student 360: **behavior notes** (positive or concern; add one at the bottom) and **کارنامه** (printable report card per term).
 **You do not see:** rates of a class or group under 5 students ("—"); alert or plan text on the dashboard. **Ask:** the platform operator if the school selector is empty.
+
+## راهبردهای مداخله
+مدیریت مدرسه ← «راهبردهای مداخله»: فهرست پیشنهادی که هنگام ثبت برنامهٔ مداخله انتخاب می‌شود (افزودن، ویرایش، فعال/غیرفعال). شامل هیچ داده‌ای دربارهٔ دانش‌آموز نیست؛ فهرست پایه با دستور seed_strategies ساخته می‌شود.

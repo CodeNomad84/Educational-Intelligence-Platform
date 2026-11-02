@@ -9,6 +9,28 @@ from django.conf import settings
 from django.db import models
 
 
+class Strategy(models.Model):
+    """P6-1: a school-editable library entry (generic intervention idea) that a plan can be started from. Configuration, not
+    student data; deactivated rather than deleted so past plans keep their reference."""
+    TIER_CHOICES = [(1, "سطح ۱ — پیشگیری عمومی"), (2, "سطح ۲ — حمایت هدفمند"), (3, "سطح ۳ — حمایت فشرده")]
+
+    school = models.ForeignKey("schools.School", on_delete=models.PROTECT, related_name="+")
+    title = models.CharField(max_length=120, verbose_name="عنوان")
+    intervention_type = models.CharField(max_length=20, choices=[("academic", "آموزشی"), ("behavioral", "رفتاری"),
+                                                                 ("emotional", "عاطفی"), ("social", "اجتماعی")], verbose_name="نوع")
+    tier = models.PositiveSmallIntegerField(choices=TIER_CHOICES, default=1, verbose_name="سطح")
+    description = models.TextField(max_length=1000, verbose_name="شرح")
+    typical_days = models.PositiveSmallIntegerField(default=30, verbose_name="مدت معمول (روز)")
+    is_active = models.BooleanField(default=True, verbose_name="فعال")
+
+    class Meta:
+        ordering = ["tier", "intervention_type", "title"]
+        constraints = [models.UniqueConstraint(fields=["school", "title"], name="strategy_unique_title_per_school")]
+
+    def __str__(self):
+        return self.title
+
+
 class InterventionPlan(models.Model):
     ACADEMIC, BEHAVIORAL, EMOTIONAL, SOCIAL = "academic", "behavioral", "emotional", "social"
     TYPE_CHOICES = [(ACADEMIC, "آموزشی"), (BEHAVIORAL, "رفتاری"), (EMOTIONAL, "عاطفی"), (SOCIAL, "اجتماعی")]
@@ -33,6 +55,7 @@ class InterventionPlan(models.Model):
     outcome_note = models.TextField(max_length=500, blank=True)
     closed_at = models.DateTimeField(null=True, blank=True)
     reevaluate_on = models.DateField(null=True, blank=True)
+    strategy = models.ForeignKey(Strategy, on_delete=models.SET_NULL, null=True, blank=True, related_name="plans", editable=False)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     class Meta:
