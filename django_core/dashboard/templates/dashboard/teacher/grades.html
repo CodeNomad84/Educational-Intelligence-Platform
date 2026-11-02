@@ -2,7 +2,7 @@
 {% block title %}نمرات {{ assignment.get_subject_display }} — {{ assignment.school_class }}{% endblock %}
 {% block content %}
 <a class="btn btn-link" href="{% url 'dashboard:teacher_home' %}">← کلاس‌های من</a>
-<div class="card mb-4"><div class="card-header">ثبت نمره (حداکثر ۲۰) — فقط ردیف‌های پر شده ثبت می‌شوند</div><div class="card-body">
+<div class="card mb-4"><div class="card-header">ثبت نمره (حداکثر {{ scale }}) — فقط ردیف‌های پر شده ثبت می‌شوند</div><div class="card-body">
   <form method="post">{% csrf_token %}
     <div class="row mb-3"><div class="col-md-4">{{ form.exam_type.label_tag }}{{ form.exam_type }}{{ form.exam_type.errors }}</div>
       <div class="col-md-4">{{ form.date.label_tag }}{{ form.date }}{{ form.date.errors }}</div></div>

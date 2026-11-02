@@ -116,6 +116,7 @@ class Grade(models.Model):
     subject = models.CharField(max_length=20, choices=SUBJECT_CHOICES, verbose_name="درس")
     exam_type = models.CharField(max_length=20, choices=EXAM_TYPE_CHOICES, verbose_name="نوع آزمون")
     score = models.FloatField(verbose_name="نمره")
+    scale_max = models.PositiveSmallIntegerField(default=20, editable=False, verbose_name="سقف مقیاس نمره (هنگام ثبت)")
     date = models.DateField(verbose_name="تاریخ آزمون")
     created_at = models.DateTimeField(auto_now_add=True)
 

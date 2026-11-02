@@ -20,9 +20,10 @@ from students.models import Enrollment, Grade, Recommendation
 from schools import audit
 
 from .behavior_views import BehaviorNoteForm
+from students.scale import school_scale
+
 from .decorators import role_required
 
-MAX_SCORE = 20
 
 
 def _my_assignments(user):
@@ -74,6 +75,7 @@ def home(request):
 def grade_sheet(request, pk):
     assignment = _assignment(request, pk)
     students = list(_class_students(request.user, assignment))
+    scale = school_scale(assignment.school_class.school_id)
     form = GradeSheetForm(request.POST or None)
     errors = {}
     scores = {}
@@ -84,10 +86,10 @@ def grade_sheet(request, pk):
                 continue
             try:
                 value = float(raw.replace(',', '.'))
-                if not 0 <= value <= MAX_SCORE:
+                if not 0 <= value <= scale:
                     raise ValueError
             except ValueError:
-                errors[student.pk] = f'نمره باید بین ۰ و {MAX_SCORE} باشد.'
+                errors[student.pk] = f'نمره باید بین ۰ و {scale} باشد.'
                 continue
             scores[student.pk] = value
         if form.is_valid() and not errors and scores:
@@ -95,7 +97,7 @@ def grade_sheet(request, pk):
                 if student.pk in scores:
                     grade = Grade.objects.create(
                         student=student, enrollment=_current_enrollment(student), subject=assignment.subject,
-                        exam_type=form.cleaned_data['exam_type'], score=scores[student.pk], date=form.cleaned_data['date'])
+                        exam_type=form.cleaned_data['exam_type'], score=scores[student.pk], scale_max=scale, date=form.cleaned_data['date'])
                     audit.record(request.user, audit.GRADE_ADD, grade)
             messages.success(request, f'{len(scores)} نمره ثبت شد.')
             return redirect('dashboard:teacher_grades', pk=assignment.pk)
@@ -106,6 +108,7 @@ def grade_sheet(request, pk):
     rows = [{'student': s, 'value': request.POST.get(f'score_{s.pk}', '') if request.method == 'POST' else '',
              'error': errors.get(s.pk, '')} for s in students]
     return render(request, 'dashboard/teacher/grades.html', {
+        'scale': scale,
         'assignment': assignment, 'rows': rows, 'form': form, 'recent': recent})
 
 

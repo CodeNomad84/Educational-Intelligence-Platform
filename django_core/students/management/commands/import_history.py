@@ -28,7 +28,7 @@ class Command(BaseCommand):
         parser.add_argument('--year', help='academic year, e.g. 1403-1404 (variants accepted)')
         parser.add_argument('--file', help='CSV or XLSX file')
         parser.add_argument('--school-code', help='School.code; optional when only one school has that year')
-        parser.add_argument('--max-score', type=float, default=20.0, help='highest valid score (default 20)')
+        parser.add_argument('--max-score', type=float, default=None, help="highest valid score (default: the school's grade scale, 20 if unset)")
         parser.add_argument('--apply', action='store_true', help='write (default is a dry-run)')
         parser.add_argument('--revert-batch', type=int, help='ImportBatch id to remove')
         parser.add_argument('--json', action='store_true')
@@ -67,6 +67,9 @@ class Command(BaseCommand):
             rows, sha = history_import.read_rows(opts['file'], opts['kind'])
         except history_import.FileError as exc:
             raise CommandError(str(exc))
+        if opts['max_score'] is None:
+            from students.scale import school_scale
+            opts['max_score'] = float(school_scale(year.school_id))
         with transaction.atomic():
             batch = None
             if opts['apply']:

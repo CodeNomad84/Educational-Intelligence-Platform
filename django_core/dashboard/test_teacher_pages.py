@@ -78,6 +78,18 @@ class GradeTests(Base):
         self.assertEqual((grade.student_id, grade.subject, grade.score, grade.exam_type), (self.s1.pk, 'math', 17.5, 'quiz'))
         self.assertIsNotNone(grade.enrollment_id)
 
+    def test_the_school_scale_limits_the_score_and_is_stored_on_the_grade(self):
+        from risk.models import RuleSettings
+        self.assertEqual(self.client.post(self.grades_url(), {'exam_type': 'quiz', 'date': '2026-01-10', f'score_{self.s1.pk}': '19'}).status_code, 302)
+        self.assertEqual(Grade.objects.get().scale_max, 20)                     # default scale
+        Grade.objects.all().delete()
+        RuleSettings.objects.create(school=self.s1.school, grade_scale_max=100)
+        self.assertEqual(self.client.post(self.grades_url(), {'exam_type': 'quiz', 'date': '2026-01-10', f'score_{self.s1.pk}': '101'}).status_code, 200)
+        self.assertFalse(Grade.objects.exists())
+        self.assertEqual(self.client.post(self.grades_url(), {'exam_type': 'quiz', 'date': '2026-01-10', f'score_{self.s1.pk}': '87'}).status_code, 302)
+        grade = Grade.objects.get()
+        self.assertEqual((grade.score, grade.scale_max), (87.0, 100))
+
     def test_invalid_scores_save_nothing(self):
         for bad in ('25', '-1', 'abc'):
             resp = self.client.post(self.grades_url(), {'exam_type': 'quiz', 'date': '2026-01-10',
@@ -171,3 +183,4 @@ class AccessTests(Base):
     def test_an_inactive_class_closes_the_page(self):
         SchoolClass.objects.filter(pk=self.class_a.pk).update(is_active=False)
         self.assertEqual(self.client.get(self.grades_url()).status_code, 404)
+

@@ -280,7 +280,7 @@ def _grades(known, academic_year, counts, reject, *, apply, batch, max_score):
             counts['created' if apply else 'would_create'] += 1
             if apply:
                 Grade.objects.create(student_id=sid, enrollment=enrollment, subject=subject, exam_type=exam,
-                                     score=score, date=day, import_batch=batch)
+                                     score=score, scale_max=int(max_score), date=day, import_batch=batch)
 
 
 def _attendance(known, academic_year, counts, reject, *, apply, batch, max_score):
