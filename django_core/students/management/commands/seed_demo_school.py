@@ -1,16 +1,16 @@
 """Demo school for presentations to principals: a believable Persian school with ~200 SYNTHETIC students.
 
-    manage.py seed_demo_school --i-know-this-is-synthetic [--password P] [--scale 1.0]
+    manage.py seed_demo_school --i-know-this-is-synthetic [--password P] [--scale 1.0] [--as-of YYYY-MM-DD]
 
 Refuses unless the student table is empty. Names are fictional, national ids are in the 9001xxxxxx range, phone numbers are
-fake. Dates are RELATIVE to the day of seeding (the academic year is stamped to start 150 days earlier so the 12-week
+fake. Dates are RELATIVE to the day of seeding (``--as-of`` fixes that day for reproducible screenshots and tests) (the academic year is stamped to start 150 days earlier so the 12-week
 attendance trend and the three grade periods of the 360 are filled). Patterns: most students steady; some with a grade
 drop, a long absence run, behavior concerns, or strong improvement; alerts and intervention plans are created through the
 normal services so the three support levels, review states and plan outcomes all appear. Deterministic (fixed seed).
 """
 import random
 import secrets
-from datetime import timedelta
+from datetime import date, timedelta
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
@@ -48,6 +48,7 @@ class Command(BaseCommand):
         parser.add_argument('--i-know-this-is-synthetic', action='store_true', dest='confirmed')
         parser.add_argument('--password', help='password for every demo login (default: random, printed once)')
         parser.add_argument('--scale', type=float, default=1.0)
+        parser.add_argument('--as-of', help='the "today" of the seed, YYYY-MM-DD (default: the real today)')
 
     @transaction.atomic
     def handle(self, *args, **opts):
@@ -57,7 +58,10 @@ class Command(BaseCommand):
             raise CommandError('Refusing: the student table is not empty.')
         rng = random.Random(14051102)
         password = opts['password'] or secrets.token_urlsafe(9)
-        today = timezone.localdate()
+        try:
+            today = date.fromisoformat(opts['as_of']) if opts['as_of'] else timezone.localdate()
+        except ValueError:
+            raise CommandError('--as-of must be YYYY-MM-DD') from None
         start = today - timedelta(days=150)
         school = School.objects.create(name=SCHOOL, code='sepehr-demo')
         AcademicYear.objects.create(school=school, code=YEAR, label='سال تحصیلی ۱۴۰۵-۱۴۰۶', start_date=start,
