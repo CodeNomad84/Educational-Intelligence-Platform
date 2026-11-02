@@ -12,3 +12,6 @@ Who this is: a parent or guardian with an account linked to your child (the scho
 **You do not see:** other children; recommendations the teacher kept staff-only; counseling notes; alerts, intervention plans, mission or exam analytics (no parent view exists for them); who referred whom.
 **PENDING POLICY:** how much of the individual record a parent should see (open item C5a-R3 / C6 in `docs/SECURITY.md`); consent screens; notifications and parent-teacher messaging are **NOT BUILT**.
 **Ask:** the school (class teacher or grade lead) for anything not shown here.
+
+## Behavior notes and report card (since 2026-11-02)
+On your child's page you see the **positive** notes teachers wrote, and **کارنامه**: a printable summary of grades and attendance per term (not the official report card). **You do not see:** concern notes; ask the school if you want to discuss them.

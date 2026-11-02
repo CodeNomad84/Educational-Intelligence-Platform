@@ -356,7 +356,7 @@ class HardeningViewAndAssistantTests(TestCase):
         self.client.force_login(get_user_model().objects.get(username="demo_admin"))
         reza = Student.objects.get(first_name="رضا", last_name="کاظمی")
         pages = [self.client.get(f"/students/{reza.id}/"), self.client.get("/demo/counselor/"),
-                 self.client.get("/dashboard/"),
+                 self.client.get("/demo/school/"),   # the demo engine page (the principal dashboard took /dashboard/)
                  self.client.post("/demo/assistant/", {"query": "چرا رضا کاظمی در معرض خطر است؟"})]
         for r in pages:
             html = r.content.decode()

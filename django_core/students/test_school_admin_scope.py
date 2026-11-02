@@ -162,19 +162,22 @@ class ApiAndDashboardScopeTests(Base):
 
 
 class DashboardAggregateScopeTests(Base):
-    def counts(self, user):
+    def total(self, user, school=None):
+        """P5-1: the principal dashboard shows ONE school, chosen among the user's memberships (``?school=``)."""
         self.client.force_login(user)
-        context = self.client.get('/dashboard/').context
-        return context['total_students'], context['total_grades'], context['total_attendances'], context['avg_grade_all']
+        overview = self.client.get('/dashboard/', {'school': school.pk} if school else {}).context['overview']
+        return overview['total'] if overview else 0
 
     def test_aggregates_cover_the_memberships_schools_only(self):
-        self.assertEqual(self.counts(self.admin('one', self.a)), (2, 2, 2, 15))
-        self.assertEqual(self.counts(self.admin('other', self.b)), (1, 1, 1, 15))
-        self.assertEqual(self.counts(self.admin('both', self.a, self.b)), (3, 3, 3, 15))
+        self.assertEqual(self.total(self.admin('one', self.a)), 2)
+        self.assertEqual(self.total(self.admin('other', self.b)), 1)
+        both = self.admin('both', self.a, self.b)
+        self.assertEqual((self.total(both, self.a), self.total(both, self.b)), (2, 1))
+        self.assertEqual(self.total(self.admin('one-asks-b', self.a), self.b), 2)   # a foreign school id falls back to its own
 
     def test_an_empty_school_set_gives_zero_aggregates(self):
-        self.assertEqual(self.counts(self.admin('none')), (0, 0, 0, 0))
-        self.assertEqual(self.counts(self.admin('off', self.a, active=False)), (0, 0, 0, 0))
+        self.assertEqual(self.total(self.admin('none')), 0)
+        self.assertEqual(self.total(self.admin('off', self.a, active=False)), 0)
 
     def test_the_superuser_gets_no_aggregates_and_is_sent_to_the_django_admin(self):
         self.client.force_login(self.admin('root', superuser=True))

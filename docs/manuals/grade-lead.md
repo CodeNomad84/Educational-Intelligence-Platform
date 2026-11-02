@@ -34,3 +34,6 @@ Some alerts are raised by an **alert rule** your school activated: the alert say
 
 ## Exams overview (if licensed)
 **Steps:** `/exams/lead/`: your grade's students per subject, name order, figures only from 5 solved questions. **You do not see:** time compared between students.
+
+## Support levels, behavior notes, report card (since 2026-11-02)
+On your student list and Student 360 each student of your grade shows a support level (calculated from open plans and unreviewed alerts; not a diagnosis). On Student 360 you read and add behavior notes (positive or concern) and open the printable report card per term. **You do not see:** students outside your grade.

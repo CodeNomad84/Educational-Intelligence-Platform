@@ -60,8 +60,10 @@ RULE_SIMULATE = 'rule_simulate'                # detail = counts only
 RULE_RUN = 'rule_run'                          # detail = counts only; actor 'system' for the runner
 RULE_SETTINGS = 'rule_settings'                # detail = changed keys only
 STAFF_ROLES_CHANGE = 'staff_roles_change'  # detail = resulting roles, e.g. T,G
+BEHAVIOR_NOTE_CREATE = 'behavior_note_create'  # detail = positive | concern; object = the BehaviorNote
+REPORT_CARD_VIEW = 'report_card_view'      # detail = term:<code>; object = the Student
 LIST_VIEW = 'list_view'                    # detail = <page>:n<rows shown>; one event per school among the rows; no row ids
-LIST_PAGES = ('students', 'referrals', 'plans', 'alerts', 'api_students')
+LIST_PAGES = ('students', 'referrals', 'plans', 'alerts', 'api_students', 'attention')
 SCHOOL_CREATE = 'school_create'            # detail = cmd | admin (which path created it); object = the School
 
 

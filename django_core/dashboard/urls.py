@@ -1,5 +1,5 @@
 from django.urls import path
-from . import module_info, operator_page, quickstart, account_views, bulk_views, password_reset, counselor_views, loop_views, plan_views, grade_dashboard, school_views, student360, student_views, teacher_views, views
+from . import behavior_views, module_info, report_card, operator_page, quickstart, account_views, bulk_views, password_reset, counselor_views, loop_views, plan_views, grade_dashboard, school_views, student360, student_views, teacher_views, views
 
 app_name = 'dashboard'
 
@@ -28,6 +28,8 @@ urlpatterns = [
 
     # Referral and Counselor pages (Slice 4a)
     path('students/<int:pk>/refer/', counselor_views.student_refer, name='student_refer'),
+    path('students/<int:pk>/behavior/new/', behavior_views.behavior_new, name='behavior_new'),
+    path('students/<int:pk>/report-card/', report_card.report_card, name='report_card'),
     path('alerts/', loop_views.alert_list, name='alert_list'),
     path('students/<int:pk>/alert/', loop_views.alert_new, name='alert_new'),
     path('alerts/<int:pk>/review/', loop_views.alert_review, name='alert_review'),
@@ -90,6 +92,7 @@ from django.conf import settings as _demo_settings
 if getattr(_demo_settings, 'DEMO_MODE', False):
     from demo_intel import views as demo_views
     urlpatterns += [
+        path('demo/school/', demo_views.school_dashboard_page, name='demo_school'),
         path('demo/counselor/', demo_views.counselor_view, name='demo_counselor'),
         path('demo/students/', demo_views.demo_student_list, name='demo_students'),
         path('demo/assistant/', demo_views.assistant_view, name='demo_assistant'),

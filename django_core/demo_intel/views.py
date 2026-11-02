@@ -22,8 +22,14 @@ def _all(user):
     return today, students, analyze_students(students, today)
 
 
+@role_required(ADMIN)
+def school_dashboard_page(request):
+    """The demo engine's school view on its own route (the principal dashboard, P5-1, took /dashboard/)."""
+    return school_dashboard(request)
+
+
 def school_dashboard(request):
-    """Called from dashboard.views.dashboard_view (DEMO SCOPE hook); caller has verified the Admin role."""
+    """Caller has verified the Admin role (``school_dashboard_page``)."""
     today, students, results = _all(request.user)
     overview = school_overview(students, results, today)
     top = [{"student": s, "r": results[s.id]} for s in overview["attention"][:8]]

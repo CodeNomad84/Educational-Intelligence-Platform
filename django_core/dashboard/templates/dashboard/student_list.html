@@ -1,41 +1,40 @@
 {% extends 'dashboard/base.html' %}
-{% block title %}لیست دانش‌آموزان{% endblock %}
+{% load eip_ui %}
+{% block title %}{% if IS_PARENT and not IS_SCHOOL_ADMIN and not IS_GRADE_LEAD and not IS_TEACHER %}فرزندان من{% else %}دانش‌آموزان{% endif %}{% endblock %}
+{% block subtitle %}<p class="eip-subtitle">{{ students|length }} دانش‌آموز</p>{% endblock %}
+{% block page_actions %}{% if IS_SCHOOL_ADMIN %}<a href="{% url 'dashboard:student_add' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> افزودن دانش‌آموز</a>{% endif %}{% endblock %}
 {% block content %}
-<div class="card">
+<div class="card eip-table-card">
     <div class="card-header">
-        <h5>لیست دانش‌آموزان</h5>
-        {% if IS_SCHOOL_ADMIN %}
-        <a href="{% url 'dashboard:student_add' %}" class="btn btn-success btn-sm">
-            <i class="bi bi-plus-circle"></i> افزودن دانش‌آموز
-        </a>
-        {% endif %}
-    </div>
-    <div class="card-body">
-        <form method="get" class="mb-3">
-            <div class="input-group">
-                <input type="text" name="search" class="form-control" placeholder="جست‌وجو ...">
-                <button class="btn btn-outline-secondary" type="submit">🔍</button>
-            </div>
+        <form method="get" class="d-flex gap-2" role="search">
+            <input type="search" name="search" value="{{ search }}" class="form-control" placeholder="جست‌وجوی نام یا کد ملی" aria-label="جست‌وجو">
+            <button class="btn btn-outline-secondary" type="submit"><i class="bi bi-search"></i><span class="visually-hidden">جست‌وجو</span></button>
         </form>
-        <table class="table table-striped">
-            <thead>
-                <tr><th>نام</th><th>کد ملی</th><th>پایه</th><th>کلاس</th><th>عملیات</th></tr>
-            </thead>
+    </div>
+    {% if students %}
+    <div class="table-responsive">
+        <table class="table table-hover">
+            <thead><tr><th>نام</th><th>کد ملی</th><th>پایه</th><th>کلاس</th>{% if show_support %}<th>سطح حمایت</th>{% endif %}<th></th></tr></thead>
             <tbody>
-                {% for student in students %}
+            {% for student in students %}
                 <tr>
                     <td>{{ student.first_name }} {{ student.last_name }}</td>
-                    <td>{% if student.full_tier %}{{ student.national_id }}{% else %}—{% endif %}</td>
+                    <td class="ltr">{% if student.full_tier %}{{ student.national_id }}{% else %}—{% endif %}</td>
                     <td>{{ student.get_grade_display }}</td>
-                    <td>{{ student.class_name }}</td>
-                    <td><a href="{% url 'dashboard:student_detail' student.id %}" class="btn btn-sm btn-info">مشاهده</a>
-                        {% if student.full_tier %}<a href="{% url 'dashboard:student_360' student.id %}" class="btn btn-sm btn-primary">پرونده ۳۶۰</a>{% endif %}</td>
+                    <td>{{ student.class_name|default:"—" }}</td>
+                    {% if show_support %}<td>{% if student.support %}<span class="eip-tier tier-{{ student.support.level }}">{{ student.support.label }}</span>{% else %}<span class="eip-tier tier-1">سطح ۱</span>{% endif %}</td>{% endif %}
+                    <td class="text-nowrap text-end">
+                        <a href="{% url 'dashboard:student_detail' student.id %}" class="btn btn-sm btn-light">مشاهده</a>
+                        {% if student.full_tier %}<a href="{% url 'dashboard:student_360' student.id %}" class="btn btn-sm btn-primary">پرونده ۳۶۰</a>{% endif %}
+                    </td>
                 </tr>
-                {% empty %}
-                <tr><td colspan="5" class="text-center">دانش‌آموزی ثبت نشده است.</td></tr>
-                {% endfor %}
+            {% endfor %}
             </tbody>
         </table>
     </div>
+    {% if show_support %}<div class="card-footer eip-note">سطح حمایت از هشدارها و برنامه‌های باز محاسبه می‌شود؛ برچسب یا تشخیص نیست.</div>{% endif %}
+    {% else %}
+    {% if search %}{% empty_state 'نتیجه‌ای پیدا نشد' 'نام یا کد ملی دیگری را امتحان کنید.' 'search' %}{% else %}{% empty_state 'دانش‌آموزی ثبت نشده است' '' 'people' %}{% endif %}
+    {% endif %}
 </div>
 {% endblock %}

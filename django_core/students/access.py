@@ -309,6 +309,33 @@ def _review_q(user, roles):
     return _any([_school_admin_q(user, roles), _grade_lead_q(user, roles), _counselor_q(user, roles)])
 
 
+def visible_behavior_notes(user):
+    """Behavior log (0028 P5-3). SchoolAdmin and Grade Lead: every entry of their students. Subject Teacher: the entries they
+    recorded, for students still in their classes. Parent: POSITIVE entries of own children only (owner decision 2026-11-01).
+    Counselor and Student: nothing. Fail closed."""
+    from .models import BehaviorNote
+
+    roles = roles_for(user)
+    parts = []
+    staff = _any([_school_admin_q(user, roles), _grade_lead_q(user, roles)])
+    if staff is not None:
+        parts.append(Q(student__in=Student.objects.filter(staff)))
+    teacher = _teacher_q(user, roles)
+    if teacher is not None:
+        parts.append(Q(recorded_by=user, student__in=Student.objects.filter(teacher)))
+    if PARENT in roles and user.is_active:
+        parts.append(Q(kind=BehaviorNote.POSITIVE, student__parent_user=user))
+    scope = _any(parts)
+    return BehaviorNote.objects.none() if scope is None else BehaviorNote.objects.filter(scope)
+
+
+def behavior_writable_students(user):
+    """Students an entry may be recorded for: SchoolAdmin and Grade Lead scope, and a Subject Teacher's classes."""
+    roles = roles_for(user)
+    scope = _any([_school_admin_q(user, roles), _grade_lead_q(user, roles), _teacher_q(user, roles)])
+    return Student.objects.none() if scope is None else Student.objects.filter(scope)
+
+
 def raisable_students(user):
     """Students an alert may be raised about: the review scope plus a Subject Teacher's own classes."""
     roles = roles_for(user)

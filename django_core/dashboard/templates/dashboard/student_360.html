@@ -2,7 +2,9 @@
 {% block title %}پرونده ۳۶۰: {{ student.first_name }} {{ student.last_name }}{% endblock %}
 {% block content %}
 <a class="btn btn-link" href="{% url 'dashboard:student_list' %}">← فهرست دانش‌آموزان</a>
+<a class="btn btn-sm btn-outline-primary mb-2" href="{% url 'dashboard:report_card' student.pk %}"><i class="bi bi-printer"></i> کارنامه</a>
 {% if IS_SCHOOL_ADMIN or IS_GRADE_LEAD %}<a class="btn btn-sm btn-outline-primary mb-2" href="{% url 'dashboard:alert_new' student.pk %}">ثبت نگرانی</a>{% endif %}
+{% if support %}<div class="alert alert-warning d-flex flex-wrap gap-2 align-items-center"><span class="eip-tier tier-{{ support.level }}">{{ support.label }}</span><span>{{ support.open_plans }} برنامهٔ باز · {{ support.new_alerts }} هشدار بررسی‌نشده</span><span class="eip-note">{{ support_note }}</span></div>{% endif %}
 {% include 'dashboard/_student_summary.html' %}
 {% if loop_alerts or loop_plans %}
 <h5 class="mt-3">هشدارها و مداخله‌ها</h5>
@@ -46,4 +48,5 @@
   {% else %}<p class="text-muted mb-0">مشاوری برای این مدرسه تعریف نشده است (مدیریت مدرسه ← مشاوران).</p>{% endif %}
 </div></div>
 {% endif %}
+{% include 'dashboard/_behavior.html' %}
 {% endblock %}

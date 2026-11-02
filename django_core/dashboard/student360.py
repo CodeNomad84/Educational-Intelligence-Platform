@@ -80,10 +80,19 @@ def student_360(request, pk):
         # Parent nothing, and the tile is not rendered for them at all.
         context['loop_alerts'] = visible_alerts(request.user).filter(student=student).select_related('risk_event')[:10]
         context['loop_plans'] = visible_plans(request.user).filter(student=student).select_related('owner')[:10]
+        # P5-2 support level: derived from the same review-scope alerts/plans, never stored (interventions/support.py)
+        from interventions.support import NOTE, reviewable_alerts_and_plans_level
+        context['support'] = reviewable_alerts_and_plans_level(request.user, student)
+        context['support_note'] = NOTE
         from .counselor_views import ReferralForm
         context['referral_form'] = ReferralForm(student=student)
     if ADMIN in roles:
         from .student_views import StudentAccountForm
         context['account_form'] = None if student.student_user_id else StudentAccountForm(student=student)
         context['student_account'] = student.student_user
+    # P5-3 behavior log: the read scope decides (a Parent sees positive entries only); the form only for writers
+    from students.access import behavior_writable_students, visible_behavior_notes
+    from .behavior_views import BehaviorNoteForm
+    context['behavior_notes'] = visible_behavior_notes(request.user).filter(student=student)[:30]
+    context['behavior_form'] = BehaviorNoteForm() if behavior_writable_students(request.user).filter(pk=student.pk).exists() else None
     return render(request, 'dashboard/student_360.html', context)

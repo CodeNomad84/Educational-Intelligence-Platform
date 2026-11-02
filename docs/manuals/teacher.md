@@ -25,3 +25,6 @@ You do not see alerts raised by alert rules (only alerts you raised yourself) an
 
 ## Not built
 Attendance entry by teachers (**TO VERIFY**: no teacher attendance page exists in `dashboard/urls.py`), parent messaging.
+
+## Behavior notes (since 2026-11-02)
+On a student's page in your class (`/teacher/...`) you can add a short positive or concern note at the bottom. **You see:** only the notes you wrote yourself. **You do not see:** notes by other staff, support levels, report cards.

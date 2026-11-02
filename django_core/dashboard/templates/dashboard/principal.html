@@ -1,0 +1,105 @@
+{% extends 'dashboard/base.html' %}
+{% load static eip_ui %}
+{% block title %}داشبورد مدرسه{% endblock %}
+{% block subtitle %}{% if school %}<p class="eip-subtitle">{{ school.name }}{% if year %} · سال تحصیلی {{ year.code }}{% endif %} · به‌روز تا {{ today|jdate:'long' }}</p>{% endif %}{% endblock %}
+{% block page_actions %}
+{% if my_schools|length > 1 %}<form method="get"><select name="school" class="form-select form-select-sm" onchange="this.form.submit()" aria-label="انتخاب مدرسه">{% for s in my_schools %}<option value="{{ s.pk }}" {% if s.pk == school.pk %}selected{% endif %}>{{ s.name }}</option>{% endfor %}</select></form>{% endif %}
+<a class="btn btn-outline-primary btn-sm" href="{% url 'dashboard:alert_list' %}"><i class="bi bi-bell"></i> هشدارها</a>
+<a class="btn btn-primary btn-sm" href="{% url 'dashboard:plan_list' %}"><i class="bi bi-clipboard2-pulse"></i> برنامه‌های مداخله</a>
+{% endblock %}
+{% block content %}
+{% if no_school %}
+<div class="card">{% empty_state 'هنوز مدرسه‌ای به حساب شما وصل نشده است' 'از مدیر پلتفرم بخواهید عضویت شما را در مدرسه ثبت کند.' 'building' %}</div>
+{% else %}
+{% with o=overview %}
+{% if not o.total %}
+<div class="card">{% url 'dashboard:quickstart' as qs %}{% empty_state 'هنوز دانش‌آموزی ثبت نشده است' 'برای دیدن آمار مدرسه، سال تحصیلی، کلاس‌ها و دانش‌آموزان را از راهنمای شروع سریع وارد کنید.' 'people' qs 'راهنمای شروع سریع' %}</div>
+{% else %}
+<div class="row g-3 mb-3">
+  <div class="col-6 col-xl-3"><a class="eip-stat is-primary" href="{% url 'dashboard:student_list' %}"><span class="eip-stat-icon"><i class="bi bi-people"></i></span>
+    <span class="eip-stat-label">دانش‌آموزان</span><span class="eip-stat-value">{{ o.total }}</span><span class="eip-stat-hint">{{ o.classes|length }} کلاس</span></a></div>
+  <div class="col-6 col-xl-3"><div class="eip-stat {% if o.attendance is not None and o.attendance < 90 %}is-warning{% else %}is-success{% endif %}"><span class="eip-stat-icon"><i class="bi bi-calendar-check"></i></span>
+    <span class="eip-stat-label">حضور، ۳۰ روز اخیر</span><span class="eip-stat-value">{% if o.attendance is not None %}{{ o.attendance }}٪{% else %}—{% endif %}</span>
+    <span class="eip-stat-hint">{% if o.attendance_before is not None %}۳۰ روز قبل: {{ o.attendance_before }}٪{% else %}دادهٔ کافی نیست{% endif %}</span></div></div>
+  <div class="col-6 col-xl-3"><div class="eip-stat is-info"><span class="eip-stat-icon"><i class="bi bi-graph-up"></i></span>
+    <span class="eip-stat-label">میانگین نمره، ۴۵ روز اخیر</span><span class="eip-stat-value">{% if o.average is not None %}{{ o.average }}{% else %}—{% endif %}</span>
+    <span class="eip-stat-hint">{% if o.average_before is not None %}۴۵ روز قبل: {{ o.average_before }}{% else %}دادهٔ کافی نیست{% endif %}</span></div></div>
+  <div class="col-6 col-xl-3"><a class="eip-stat {% if o.alerts.urgent %}is-danger{% elif o.alerts.new %}is-warning{% endif %}" href="{% url 'dashboard:alert_list' %}?status=new"><span class="eip-stat-icon"><i class="bi bi-bell"></i></span>
+    <span class="eip-stat-label">هشدارهای بررسی‌نشده</span><span class="eip-stat-value">{{ o.alerts.new }}</span><span class="eip-stat-hint">{{ o.alerts.urgent }} مورد نیازمند مداخله</span></a></div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-lg-4"><div class="card h-100">
+    <div class="card-header eip-card-head"><span>سطح حمایت دانش‌آموزان</span><span class="eip-card-hint">محاسبه از هشدارها و برنامه‌ها</span></div>
+    <div class="card-body">
+      {% widthratio o.levels.universal o.total 100 as p1 %}{% widthratio o.levels.targeted o.total 100 as p2 %}{% widthratio o.levels.intensive o.total 100 as p3 %}
+      <div class="d-flex justify-content-between mb-1"><span class="eip-tier tier-1">سطح ۱ · همگانی</span><strong>{{ o.levels.universal }}</strong></div><div class="eip-meter is-success mb-3"><span style="width:{{ p1 }}%"></span></div>
+      <div class="d-flex justify-content-between mb-1"><span class="eip-tier tier-2">سطح ۲ · هدفمند</span><strong>{{ o.levels.targeted }}</strong></div><div class="eip-meter is-warning mb-3"><span style="width:{{ p2 }}%"></span></div>
+      <div class="d-flex justify-content-between mb-1"><span class="eip-tier tier-3">سطح ۳ · فشرده</span><strong>{{ o.levels.intensive }}</strong></div><div class="eip-meter is-danger mb-3"><span style="width:{{ p3 }}%"></span></div>
+      <p class="eip-note mb-0">{{ support_note }}</p>
+    </div></div></div>
+  <div class="col-lg-8"><div class="card h-100">
+    <div class="card-header eip-card-head"><span>روند حضور هفتگی</span><span class="eip-card-hint">۱۲ هفتهٔ اخیر، درصد حضور</span></div>
+    <div class="card-body"><div class="eip-chart"><canvas id="chart-attendance" role="img" aria-label="نمودار روند حضور هفتگی"></canvas></div></div></div></div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-xl-8"><div class="card h-100 eip-table-card">
+    <div class="card-header eip-card-head"><span>دانش‌آموزان نیازمند توجه</span><span class="eip-card-hint">{{ o.attention_total }} نفر در سطح ۲ یا ۳</span></div>
+    {% if o.attention %}<div class="table-responsive"><table class="table table-hover">
+      <thead><tr><th>دانش‌آموز</th><th>کلاس</th><th>سطح حمایت</th><th>هشدار بررسی‌نشده</th><th>برنامهٔ باز</th><th>حضور ۳۰ روز</th><th>میانگین</th></tr></thead>
+      <tbody>{% for a in o.attention %}<tr>
+        <td><a href="{% url 'dashboard:student_360' a.student.pk %}">{{ a.student.first_name }} {{ a.student.last_name }}</a></td>
+        <td>{% if a.student.school_class %}{{ a.student.school_class.title }}{% else %}{{ a.student.class_name|default:"—" }}{% endif %}</td>
+        <td><span class="eip-tier tier-{{ a.level }}">{{ a.label }}</span></td>
+        <td>{{ a.new_alerts }}{% if a.urgent_alerts %} <span class="eip-badge is-danger">{{ a.urgent_alerts }} فوری</span>{% endif %}</td>
+        <td>{{ a.open_plans }}</td>
+        <td>{% if a.attendance is not None %}{{ a.attendance }}٪{% else %}—{% endif %}</td>
+        <td>{% if a.average is not None %}{{ a.average }}{% else %}—{% endif %}</td></tr>{% endfor %}</tbody></table></div>
+    {% else %}{% empty_state 'فعلاً دانش‌آموزی در سطح ۲ یا ۳ نیست' 'وقتی هشداری ثبت شود یا برنامهٔ مداخله‌ای باز شود، اینجا نمایش داده می‌شود.' 'emoji-smile' %}{% endif %}
+  </div></div>
+  <div class="col-xl-4">
+    <div class="card mb-3"><div class="card-header eip-card-head"><span>چرخهٔ مداخله</span><a class="eip-card-hint" href="{% url 'dashboard:plan_list' %}">همهٔ برنامه‌ها</a></div>
+      <ul class="list-group list-group-flush">
+        <li class="list-group-item d-flex justify-content-between"><span>برنامه‌های باز</span><strong>{{ o.plans.open }}</strong></li>
+        <li class="list-group-item d-flex justify-content-between"><span>سررسید در ۷ روز آینده</span><strong>{{ o.plans.due_soon }}</strong></li>
+        <li class="list-group-item d-flex justify-content-between"><span>گذشته از سررسید</span>{% if o.plans.overdue %}<span class="eip-badge is-danger">{{ o.plans.overdue }}</span>{% else %}<strong>۰</strong>{% endif %}</li>
+        <li class="list-group-item d-flex justify-content-between"><span>بدون پیگیری در ۱۴ روز</span>{% if o.plans.stale %}<span class="eip-badge is-warning">{{ o.plans.stale }}</span>{% else %}<strong>۰</strong>{% endif %}</li>
+        <li class="list-group-item d-flex justify-content-between"><span>آمادهٔ ارزیابی دوباره</span><strong>{{ o.plans.reevaluate }}</strong></li>
+      </ul></div>
+    <div class="card"><div class="card-header">هشدارهای بررسی‌نشده بر اساس نوع</div>
+      {% if o.alerts.by_type %}<ul class="list-group list-group-flush">{% for t in o.alerts.by_type %}<li class="list-group-item d-flex justify-content-between"><span>{{ t.label }}</span><strong>{{ t.n }}</strong></li>{% endfor %}</ul>
+      {% else %}{% empty_state 'هشدار بررسی‌نشده‌ای نیست' '' 'check2-circle' %}{% endif %}
+      <div class="card-footer eip-note">۳۰ روز اخیر: {{ o.alerts.accepted_30 }} پذیرفته، {{ o.alerts.dismissed_30 }} رد · {{ o.rule_hits_30 }} هشدار از قواعد خودکار</div></div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-xl-7"><div class="card eip-table-card h-100">
+    <div class="card-header eip-card-head"><span>کلاس‌ها</span><span class="eip-card-hint">نرخ‌ها برای کلاس‌های کمتر از {{ o.min_group }} نفر نمایش داده نمی‌شود</span></div>
+    <div class="table-responsive"><table class="table">
+      <thead><tr><th>کلاس</th><th>پایه</th><th>دانش‌آموزان</th><th>حضور ۳۰ روز</th><th>میانگین ۴۵ روز</th><th>سطح ۲</th><th>سطح ۳</th></tr></thead>
+      <tbody>{% for c in o.classes %}<tr><td>{{ c.title }}</td><td>{{ c.grade|default:"—" }}</td><td>{{ c.students }}</td>
+        <td>{% if c.attendance is not None %}{{ c.attendance }}٪{% else %}—{% endif %}</td><td>{% if c.average is not None %}{{ c.average }}{% else %}—{% endif %}</td>
+        <td>{% if c.targeted %}<span class="eip-tier tier-2">{{ c.targeted }}</span>{% else %}۰{% endif %}</td>
+        <td>{% if c.intensive %}<span class="eip-tier tier-3">{{ c.intensive }}</span>{% else %}۰{% endif %}</td></tr>{% endfor %}</tbody></table></div>
+  </div></div>
+  <div class="col-xl-5"><div class="card h-100">
+    <div class="card-header eip-card-head"><span>میانگین ماهانهٔ نمره</span><span class="eip-card-hint">۶ ماه اخیر</span></div>
+    <div class="card-body">
+      <div class="eip-chart"><canvas id="chart-grades" role="img" aria-label="نمودار میانگین ماهانهٔ نمره"></canvas></div>
+      {% if o.subjects %}<hr><div class="row g-2">{% for s in o.subjects %}<div class="col-6"><div class="d-flex justify-content-between border-bottom py-1 px-1"><span class="text-muted">{{ s.label }}</span><strong>{{ s.average }}</strong></div></div>{% endfor %}</div>{% endif %}
+      {% if o.plans.outcomes %}<hr><div class="eip-note mb-1">نتیجهٔ {{ o.plans.completed }} برنامهٔ پایان‌یافته</div>
+        <div class="d-flex flex-wrap gap-2">{% for x in o.plans.outcomes %}{% status_badge x.code x.label %}<span class="small">{% if x.n is not None %}{{ x.n }}{% else %}—{% endif %}</span>{% endfor %}</div>{% endif %}
+    </div></div></div>
+</div>
+{{ o.weekly_attendance|json_script:"d-attendance" }}{{ o.monthly_average|json_script:"d-grades" }}
+{% endif %}
+{% endwith %}
+{% endif %}
+{% endblock %}
+{% block scripts %}{% if overview.total %}
+<script src="{% static 'dashboard/vendor/chartjs-4.4.1/chart.umd.js' %}"></script>
+<script src="{% static 'dashboard/js/eip-charts.js' %}"></script>
+<script>EipCharts.line('chart-attendance', 'd-attendance', {suffix: '٪', min: 50, max: 100}); EipCharts.line('chart-grades', 'd-grades', {min: 0, max: 20});</script>
+{% endif %}{% endblock %}

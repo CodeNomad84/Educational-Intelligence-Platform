@@ -62,28 +62,10 @@ def dashboard_view(request):
             # Aggregates are SchoolAdmin only; every other role lands on its own home.
             return redirect(home_url_for(request.user))
         raise PermissionDenied
-    # DEMO SCOPE begin — demo school dashboard (only when config.settings.demo is active)
-    from django.conf import settings as _demo_settings
-    if getattr(_demo_settings, 'DEMO_MODE', False):
-        from demo_intel.views import school_dashboard
-        return school_dashboard(request)
-    # DEMO SCOPE end
-    # access: SchoolAdmin only (ADMIN in roles was checked above); S3: the aggregates cover the schools of the
-    # user's memberships only, through the same access layer as the lists
-    visible_grade_rows = visible_grades(request.user)
-    total_students = visible_students(request.user).count()
-    total_grades = visible_grade_rows.count()
-    total_attendances = visible_attendances(request.user).count()
-    avg_grade_all = visible_grade_rows.aggregate(avg=models.Avg('score'))['avg'] or 0
-        
-    context = {
-        'total_students': total_students,
-        'total_grades': total_grades,
-        'total_attendances': total_attendances,
-        'avg_grade_all': round(avg_grade_all, 2),
-        'user': request.user,
-    }
-    return render(request, 'dashboard/dashboard.html', context)
+    # P5-1 principal dashboard: one school chosen among the user's memberships, every number from the user's own visible_*
+    # scopes (dashboard/principal.py). The demo engine's school view moved to /demo/school/ (DEMO SCOPE).
+    from .principal import principal_dashboard
+    return principal_dashboard(request)
 
 # لیست دانش‌آموزان
 @role_required(ADMIN, GRADE_LEAD, TEACHER, PARENT)
@@ -93,7 +75,17 @@ def student_list_view(request):
     if grade.isdigit():   # a Grade Lead lands on the list of the own grade (?grade=N); the scope itself is unchanged
         students = students.filter(grade=int(grade))
     audit.record_list(request.user, 'students', students)
-    return render(request, 'dashboard/student_list.html', {'students': students})
+    roles = roles_for(request.user)
+    # P5-2: support levels only for the review scope (SchoolAdmin, Grade Lead); a Teacher or Parent gets none
+    levels = {}
+    if roles & {ADMIN, GRADE_LEAD}:
+        from interventions.support import levels_for_user
+        levels = levels_for_user(request.user)
+    rows = list(students)
+    for student in rows:
+        student.support = levels.get(student.pk)
+    return render(request, 'dashboard/student_list.html', {'students': rows, 'show_support': bool(roles & {ADMIN, GRADE_LEAD}),
+                                                            'search': request.GET.get('search', '')})
 
 # جزئیات یک دانش‌آموز + نمایش نتیجه‌ی پیش‌بینی
 # dashboard/views.py (قسمت student_detail_view)

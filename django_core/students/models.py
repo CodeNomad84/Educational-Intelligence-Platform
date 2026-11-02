@@ -325,3 +325,31 @@ class CounselorNote(models.Model):
 
     class Meta:
         ordering = ['-created_at', '-pk']
+
+
+class BehaviorNote(models.Model):
+    """Behavior log (decision pack 0028 P5-3): a short positive or concern entry by school staff. Never a label of the student.
+    School copied from the student; PROTECT (students are deactivated, never deleted). Read scope: ``visible_behavior_notes``
+    (SchoolAdmin and Grade Lead: all entries of their students; Subject Teacher: own entries; Parent: POSITIVE entries of own
+    children only, owner decision 2026-11-01). Nothing is deleted automatically (retention waits for the legal policy)."""
+    POSITIVE, CONCERN = 'positive', 'concern'
+    KIND_CHOICES = [(POSITIVE, 'مثبت'), (CONCERN, 'نگرانی')]
+    CATEGORY_CHOICES = [('participation', 'مشارکت'), ('effort', 'تلاش'), ('kindness', 'همدلی و کمک'),
+                        ('responsibility', 'مسئولیت‌پذیری'), ('conduct', 'رفتار کلاسی'), ('other', 'سایر')]
+
+    school = models.ForeignKey('schools.School', on_delete=models.PROTECT, related_name='+', editable=False)
+    student = models.ForeignKey(Student, on_delete=models.PROTECT, related_name='behavior_notes')
+    kind = models.CharField(max_length=10, choices=KIND_CHOICES, verbose_name='نوع')
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, verbose_name='موضوع')
+    note = models.TextField(max_length=300, verbose_name='شرح کوتاه')
+    occurred_on = models.DateField(verbose_name='تاریخ')
+    recorded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='+', editable=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-occurred_on', '-pk']
+        indexes = [models.Index(fields=['student', '-occurred_on'])]
+
+    def save(self, *args, **kwargs):
+        self.school_id = self.student.school_id
+        super().save(*args, **kwargs)

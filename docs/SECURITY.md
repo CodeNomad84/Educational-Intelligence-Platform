@@ -118,6 +118,16 @@ Roles use the real groups (the generic matrix above predates them). Base module:
 
 Rules: SchoolAdmin and Grade Lead can accept or dismiss a sensitive alert on its metadata alone (`other` still needs a note, which the reviewer writes without reading the message). Every display of a sensitive alert's message is audit-logged (`alert_text_view`, detail = risk type; no text). Every read of a plan page is audit-logged (`intervention_view`, detail `text` or `meta`); audit rows hold ids and codes only. Closing a referral ends the Counselor's access at once. No export, no parent or student view, no AI. Alerts and plans protect their student (`PROTECT`): students are deactivated, never deleted (the API answers 409). Retention: no period decided, no automatic deletion; risk events 3 years per doc 12 is not enforced. `Referral` and `CounselorNote` still use `CASCADE` (open item).
 
+### Demo track P5 (CURRENT since 2026-11-02; decision pack 0028 P5-1..P5-4, owner approval 2026-11-01)
+| Feature | SchoolAdmin | Grade Lead | Subject Teacher | Counselor | Parent | Student |
+|---|---|---|---|---|---|---|
+| Principal dashboard `/dashboard/` (aggregates of ONE school among the memberships; rates of groups under 5 withheld; attention list audit-logged as `list_view attention`) | yes | redirected home | redirected home | redirected home | redirected home | redirected home |
+| Support level (derived from `reviewable_alerts` + `visible_plans`, never stored) on the student list and Student 360 | yes | yes (own grade) | no | — (no list/360) | no | no |
+| Behavior log: record (`behavior_writable_students`, audit `behavior_note_create`) | own schools | own grade | own classes | no | no | no |
+| Behavior log: read (`visible_behavior_notes`) | all entries | all entries | own entries only | no | **positive entries of own children only** | no |
+| Report card `/students/<pk>/report-card/` (full tier, audit `report_card_view`) | yes | own grade | no | no | own children | no |
+Tests: `dashboard/test_principal.py`, `test_behavior.py`, `test_report_card.py`; mutation-checked: support-level gate, parent positive-only filter, teacher own-entries filter.
+
 ## Deterministic rules and the system read path (CURRENT since change 0025, owner approval 2026-10-27)
 * **Who:** rules are authored, simulated, approved, paused, archived and run by the **SchoolAdmin of the school only** (`risk/lifecycle.py` re-checks `school_ids_for_admin` on every move; the pages `/rules/` use `role_required(ADMIN)` and the membership-derived school). Grade Lead, Teacher, Counselor, Parent, Student, superuser and PlatformAdmin have no rules page (403). They see only the **alerts** a rule raised (normal `visible_alerts`; evidence numbers are in the alert text for the review scope: SchoolAdmin, Grade Lead, Counselor via an open referral; a Teacher never sees rule alerts because `raised_by` is empty).
 * **Rule content:** a rule is data (clauses over a closed metric catalog, `risk/signals.py`); nothing is evaluated from text. Risk types: academic, attendance, behavioral only, refused in validation AND by a database CHECK (`rule_risk_type_not_sensitive`). No composite score or level. Seeded rules are drafts, labelled "first proposal, not validated"; activation is a human step; `low_average` cannot be saved or activated while the school has no grade scale (fail closed).

@@ -13,12 +13,13 @@ from django.views.decorators.http import require_POST
 
 from schools.models import TeacherAssignment
 from schools.vocabulary import SUBJECT_KEYS
-from students.access import TEACHER, visible_grades, visible_recommendations, visible_students
+from students.access import TEACHER, visible_behavior_notes, visible_grades, visible_recommendations, visible_students
 from students.enrollment_sync import CURRENT_STATUSES
 from students.models import Enrollment, Grade, Recommendation
 
 from schools import audit
 
+from .behavior_views import BehaviorNoteForm
 from .decorators import role_required
 
 MAX_SCORE = 20
@@ -138,4 +139,6 @@ def student_page(request, pk, student_pk):
     return render(request, 'dashboard/teacher/student.html', {
         'assignment': assignment, 'student': student, 'form': form, 'grades': grades,
         'average': round(average, 2) if average is not None else None,
-        'recommendations': visible_recommendations(request.user).filter(student=student)})
+        'recommendations': visible_recommendations(request.user).filter(student=student),
+        # P5-3: the teacher's own behavior entries for this student, and the form (the view re-checks the scope)
+        'behavior_notes': visible_behavior_notes(request.user).filter(student=student)[:30], 'behavior_form': BehaviorNoteForm()})
