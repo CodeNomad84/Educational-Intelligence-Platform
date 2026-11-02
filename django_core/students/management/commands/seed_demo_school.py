@@ -177,6 +177,7 @@ class Command(BaseCommand):
             if rng.random() < 0.4:
                 alerts.review_alert(leads[s.grade], a, Alert.DISMISSED, reason='other', note='تماس با خانواده؛ بیماری تأیید شد.')
         call_command('seed_strategies', school=school.pk, stdout=open('/dev/null', 'w'))
+        call_command('seed_demo_docs', school=school.code, confirmed=True, stdout=open('/dev/null', 'w'))
 
         # a handful of parent / student accounts for the walk-through
         for i, s in enumerate(students[:6]):

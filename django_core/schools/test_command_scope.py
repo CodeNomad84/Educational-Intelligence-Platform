@@ -19,7 +19,7 @@ from vocabulary.models import VocabularyTerm
 NEEDS_SCHOOL = {'run_rules', 'notify_due', 'seed_rules', 'seed_mission', 'seed_vocabulary', 'normalize_year_texts', 'backfill_enrollments'}
 SINGLE_SCHOOL = {   # act on exactly one school, or refuse when it is ambiguous
     'set_school_module', 'seed_demo', 'rollover_academic_year', 'import_history', 'backfill_school_memberships',
-    'backfill_student_school'}
+    'backfill_student_school', 'seed_demo_docs'}
 PLATFORM_WIDE = {   # not school data (global groups/rubric), batch-logged platform repair, or creates its own synthetic school
     'setup_staff_roles', 'setup_platform_role', 'create_school', 'load_mission_rubric', 'check_school_memberships', 'seed_temporal_synthetic',
     'seed_temporal_realistic', 'seed_demo_school', 'seed_strategies'}
@@ -27,7 +27,7 @@ READ_ONLY = {
     'check_academic_years', 'check_assignment_subjects', 'check_access_switch_ready', 'check_class_links', 'check_enrollment_backfill',
     'check_student_school_ready', 'compare_access_parity', 'demo_check'}
 CLASSES = (NEEDS_SCHOOL, SINGLE_SCHOOL, PLATFORM_WIDE, READ_ONLY)
-FIRST_PARTY_APPS = {'students', 'schools', 'missions', 'vocabulary', 'demo_intel', 'dashboard', 'exams', 'governance', 'risk', 'interventions',
+FIRST_PARTY_APPS = {'students', 'schools', 'missions', 'vocabulary', 'demo_intel', 'dashboard', 'exams', 'governance', 'risk', 'interventions', 'docqa',
                     'academics', 'behavior', 'accounts', 'core'}
 
 

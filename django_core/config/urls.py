@@ -21,6 +21,7 @@ urlpatterns = [
     path('mission/', include('missions.urls')),
     path('exams/', include('exams.urls')),
     path('rules/', include('risk.urls')),
+    path('assistant/', include('docqa.urls')),
     path('', include('dashboard.urls')),  
     path('api/', include(router.urls)),  # همه APIها زیر api/ قرار می‌گیرند
 ]

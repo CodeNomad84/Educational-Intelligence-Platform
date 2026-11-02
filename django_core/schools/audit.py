@@ -76,6 +76,13 @@ RULES_IMPORT = 'rules_import'              # detail = counts only, e.g. c3r1 (cr
 STRATEGIES_IMPORT = 'strategies_import'    # detail = counts only
 
 
+DOC_UPLOAD = 'doc_upload'                  # detail = c<chunks>; object = the SchoolDocument; no text
+DOC_DELETE = 'doc_delete'
+DOC_TOGGLE = 'doc_toggle'                  # detail = on | off (document active flag)
+DOC_AI_SETTING = 'doc_ai_setting'          # detail = on | off (the school's AI answer layer)
+DOC_ASK = 'doc_ask'                        # detail = ai:k<excerpts>c<cited> | search:k.. | none | refused:screen; NEVER the question or answer
+
+
 SYSTEM = 'system'      # actor of scheduled / command runs (no user): stored as user=None, username 'system', roles 'system'
 
 

@@ -28,7 +28,7 @@ def _is_weak(secret):
     )
 
 
-def service_headers(user):
+def service_headers(user, with_school=None):
     """Authorization headers for a FastAPI call made on behalf of ``user``.
 
     Raises ImproperlyConfigured when the secret is missing/too short (fail closed).
@@ -41,6 +41,12 @@ def service_headers(user):
             'SERVICE_JWT_SECRET is not configured (min %d characters, not a placeholder, not SECRET_KEY).'
             % MIN_SECRET_LENGTH
         )
+    schools = sorted(school_ids_for_admin(user))
+    if with_school is not None:        # AI calls: exactly ONE school, and only one the user belongs to (never a school named by the client)
+        from schools.entitlements import user_school_ids
+        if with_school not in user_school_ids(user):
+            raise ImproperlyConfigured('with_school is not a school of this user.')
+        schools = [with_school]
     now = int(time.time())
     payload = {
         'iss': ISSUER,
@@ -48,7 +54,7 @@ def service_headers(user):
         'sub': str(user.pk),
         'roles': sorted(roles_for(user)),
         # SchoolAdmin scope (FastAPI filters documents by it, ACL before retrieval); empty for every other role
-        'schools': sorted(school_ids_for_admin(user)),
+        'schools': schools,
         'iat': now,
         'exp': now + TTL_SECONDS,
     }

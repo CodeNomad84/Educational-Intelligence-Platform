@@ -7,7 +7,7 @@ import logging
 from pathlib import Path
 
 from auth import (
-    require_roles, require_roles_with_schools, school_ids, disabled_in_phase1, validate_service_secret, ADMIN)
+    require_roles, require_roles_with_schools, school_ids, disabled_in_phase1, validate_service_secret, ADMIN, TEACHER)
 import joblib
 import torch
 import numpy as np
@@ -159,8 +159,22 @@ _LLM_STATUS = {"bad_request": 422, "purpose_refused": 422, "pii_refused": 422, "
                "cap_reached": 429, "busy": 429, "upstream_error": 502}
 
 
+LLM_ROLES = (ADMIN, TEACHER, "GradeLead", "Counselor")      # staff only; Django adds the one-school claim for them (service_headers(with_school=...))
+
+
+@app.get("/llm/status/")
+def llm_status(payload: dict = Depends(require_roles_with_schools(*LLM_ROLES))):
+    """Which provider CLASS (if any) is active for the caller's one school; no URL, model or key."""
+    school = _single_school(payload)
+    try:
+        provider = llm_adapter.provider_for_school(school)
+    except llm_adapter.LLMError:
+        return {"enabled": False, "class": None}
+    return {"enabled": provider is not None, "class": provider.kind if provider else None}
+
+
 @app.post("/llm/complete/")
-def llm_complete(request: LLMRequest, http: Request, payload: dict = Depends(require_roles_with_schools(ADMIN))):
+def llm_complete(request: LLMRequest, http: Request, payload: dict = Depends(require_roles_with_schools(*LLM_ROLES))):
     """P7 staff assistant call (provider-agnostic, OFF unless an operator maps the school to a provider). The caller's school comes from
     the signed token, never from the body; Django applies ACL BEFORE building the messages and enforces the licensed per-school caps."""
     school = _single_school(payload)

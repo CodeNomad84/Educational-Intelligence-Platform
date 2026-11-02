@@ -367,7 +367,7 @@ class LLMRouteTests(BaseCase):
 
     def test_anonymous_and_non_admin_roles_are_refused(self):
         self.assertEqual(self.client.post('/llm/complete/', json=self.BODY).status_code, 401)
-        for roles in OTHER_ROLES + (['Teacher'],):
+        for roles in (['Parent'], [], ['Mentor'], ['Manager'], ['Student']):
             self.assertEqual(self.post(roles).status_code, 403, roles)
 
     def test_off_by_default_for_every_school(self):
@@ -398,6 +398,35 @@ class LLMRouteTests(BaseCase):
             upstream = self.post([ADMIN_ROLE])
             self.assertEqual((upstream.status_code, upstream.json()['detail']), (502, 'upstream_error'))
             self.assertNotIn('secret', upstream.text)
+
+
+class LLMStaffAndStatusTests(BaseCase):
+    """P7-5: staff roles may use the route and the status call when Django adds the one-school claim; others never."""
+    ENV = {'LLM_PROVIDERS': '{"p": {"class": "local", "base_url": "http://ollama:11434/v1", "model": "m"}}', 'LLM_SCHOOL_MAP': '{"1": "p"}'}
+
+    def test_staff_roles_and_status(self):
+        with mock.patch.dict(os.environ, self.ENV):
+            for roles in (['Teacher'], ['GradeLead'], ['Counselor'], [ADMIN_ROLE]):
+                ok = self.client.get('/llm/status/', headers=bearer(roles, schools=[1]))
+                self.assertEqual((ok.status_code, ok.json()), (200, {'enabled': True, 'class': 'local'}), roles)
+            self.assertEqual(self.client.get('/llm/status/', headers=bearer(['Teacher'], schools=[2])).json(), {'enabled': False, 'class': None})
+            self.assertEqual(self.client.get('/llm/status/', headers=bearer(['Teacher'], schools=[])).status_code, 403)
+            for roles in (['Parent'], ['Student'], []):
+                self.assertEqual(self.client.get('/llm/status/', headers=bearer(roles, schools=[1])).status_code, 403)
+            self.assertEqual(self.client.get('/llm/status/').status_code, 401)
+
+    def test_document_qa_is_local_only(self):
+        def transport(url, headers, body, timeout):
+            return 200, b'{"choices": [{"message": {"content": "ok"}}]}'
+        body = {'purpose': 'document_qa', 'messages': [{'role': 'user', 'content': 'q'}]}
+        ext = {'LLM_PROVIDERS': '{"x": {"class": "external", "base_url": "https://a.example.test/v1", "model": "m", "api_key_env": "LLM_KEY_X"}}',
+               'LLM_SCHOOL_MAP': '{"1": "x"}', 'LLM_KEY_X': 'fake-test-key-' + 'z' * 20}
+        with mock.patch('llm_adapter._urllib_transport', transport):
+            with mock.patch.dict(os.environ, self.ENV):
+                self.assertEqual(self.client.post('/llm/complete/', json=body, headers=bearer(['Teacher'], schools=[1])).status_code, 200)
+            with mock.patch.dict(os.environ, ext):
+                refused = self.client.post('/llm/complete/', json=body, headers=bearer(['Teacher'], schools=[1]))
+                self.assertEqual((refused.status_code, refused.json()['detail']), (422, 'purpose_refused'))
 
 
 class LLMRouteExternalTests(BaseCase):

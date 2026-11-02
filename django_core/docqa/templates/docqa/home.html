@@ -1,0 +1,20 @@
+{% extends 'dashboard/base.html' %}
+{% load eip_ui %}
+{% block title %}دستیار اسناد مدرسه{% endblock %}
+{% block page_actions %}{% if is_admin %}<a class="btn btn-sm btn-outline-secondary" href="{% url 'docqa:documents' %}">مدیریت اسناد</a>{% endif %}{% endblock %}
+{% block content %}
+<p class="text-muted small">پرسش دربارهٔ <strong>اسناد غیرشخصی مدرسه</strong> ({{ doc_count }} سند فعال). نام یا شناسهٔ دانش‌آموز نپرسید. {% if ai_on %}پاسخ هوشمند فقط وقتی داده می‌شود که مدل محلی فعال باشد؛ در غیر این صورت بخش‌های مرتبط سند را می‌بینید.{% else %}پاسخ هوشمند برای این مدرسه خاموش است؛ این صفحه جست‌وجوی ساده در اسناد است.{% endif %}</p>
+<form method="post" class="bg-white p-3 border rounded mb-3" style="max-width:48rem">{% csrf_token %}
+  <label class="form-label" for="q">سؤال شما</label>
+  <textarea id="q" name="question" class="form-control mb-2" rows="2" maxlength="500" required>{{ question|default:'' }}</textarea>
+  <button class="btn btn-primary">پرسش</button>
+</form>
+{% if result %}
+  {% if result.mode == 'none' %}<div class="alert alert-secondary">در اسناد مدرسه بخش مرتبطی پیدا نشد.</div>{% endif %}
+  {% if result.notice %}<div class="alert alert-warning">{{ result.notice }}</div>{% endif %}
+  {% if result.mode == 'ai' %}<div class="card mb-3 border-primary"><div class="card-body"><div>{{ result.answer|linebreaksbr }}</div><div class="small text-muted mt-2">{{ result.label }}</div></div></div>{% endif %}
+  {% if result.excerpts %}<h5>{% if result.mode == 'ai' %}منابع{% else %}بخش‌های مرتبط{% endif %}</h5>
+  {% for e in result.excerpts %}<div class="card mb-2 {% if forloop.counter in result.cited %}border-primary{% endif %}"><div class="card-body">
+    <div class="small text-muted">[{{ forloop.counter }}] {{ e.document.title }}{% if forloop.counter in result.cited %} · در پاسخ ارجاع شده{% endif %}</div>{{ e.text|linebreaksbr }}</div></div>{% endfor %}{% endif %}
+{% endif %}
+{% endblock %}

@@ -10,7 +10,7 @@ from .operator_page import is_platform_operator
 # Top-bar role label (design system P8-3), in this order.
 ROLE_LABELS = ((ADMIN, 'مدیر مدرسه'), (GRADE_LEAD, 'مربی پایه'), (COUNSELOR, 'مشاور'), (TEACHER, 'معلم'), (PARENT, 'ولی'),
                (STUDENT, 'دانش‌آموز'))
-_REAL_ROUTE = {'tutor_ai': 'dashboard:me_assistant', 'advisor_ai': 'dashboard:demo_assistant'}
+_REAL_ROUTE = {'tutor_ai': 'dashboard:me_assistant', 'advisor_ai': 'docqa:home'}
 
 
 def _module_url(key, enabled):
