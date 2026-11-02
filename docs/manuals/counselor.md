@@ -26,3 +26,6 @@ Alerts raised by an **alert rule** show "raised by rule X" and the numbers that 
 
 ## Mission reports (if licensed)
 **Steps:** `/mission/students/` → a referred student's report. Read only; observers are shown anonymously.
+
+## به‌روزرسانی ۱۴۰۵/۰۸/۱۱
+در صفحهٔ پروندهٔ ارجاعی کد ملی ماسک است؛ «نمایش کامل» ثبت می‌شود و فقط تا زمانی کار می‌کند که ارجاع باز است. تاریخ‌ها شمسی‌اند. **نمی‌بینید**: دانش‌آموزان بدون ارجاع باز.

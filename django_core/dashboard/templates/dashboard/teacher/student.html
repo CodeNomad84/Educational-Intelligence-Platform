@@ -1,4 +1,5 @@
 {% extends 'dashboard/base.html' %}
+{% load eip_ui %}
 {% block title %}{{ student.first_name }} {{ student.last_name }} — {{ assignment.get_subject_display }}{% endblock %}
 {% block content %}
 <a class="btn btn-link" href="{% url 'dashboard:teacher_grades' assignment.pk %}">← نمرات {{ assignment.school_class }}</a>
@@ -13,7 +14,7 @@
     <div class="alert alert-warning py-2">⚠ اگر «قابل نمایش به دانش‌آموز» را انتخاب کنید، دانش‌آموز (و والدین) این متن را خواهند خواند. به‌طور پیش‌فرض فقط کادر مدرسه می‌بیند.</div>
     <button class="btn btn-success">ثبت توصیه</button></form></div></div>
 <h5>توصیه‌های من</h5>
-{% for r in recommendations %}<div class="border rounded p-2 mb-2 bg-white"><small class="text-muted">{{ r.created_at|date:"Y-m-d" }} — {% if r.visible_to_student %}قابل نمایش به دانش‌آموز{% else %}فقط کادر مدرسه{% endif %}</small><div>{{ r.text|linebreaksbr }}</div></div>
+{% for r in recommendations %}<div class="border rounded p-2 mb-2 bg-white"><small class="text-muted">{{ r.created_at|jdate }} — {% if r.visible_to_student %}قابل نمایش به دانش‌آموز{% else %}فقط کادر مدرسه{% endif %}</small><div>{{ r.text|linebreaksbr }}</div></div>
 {% empty %}<p class="text-muted">توصیه‌ای ثبت نشده است.</p>{% endfor %}
 {% include 'dashboard/_behavior.html' %}
 {% endblock %}

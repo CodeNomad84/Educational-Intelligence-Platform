@@ -298,7 +298,8 @@ class ApprovalTrailTests(WeightBase):
         page = self.get(self.admin, self.url('detail', draft))
         self.assertContains(page, 'ساخته‌شده توسط')
         self.assertContains(page, 'admin')
-        self.assertContains(page, draft.approved_at.astimezone().strftime('%Y-%m-%d'))
+        from dashboard.templatetags.eip_ui import jdate
+        self.assertContains(page, jdate(draft.approved_at))   # Jalali display (decision 46)
         event = AuditEvent.objects.get(action='mission_weights_status', detail='approve:v2')
         self.assertEqual((event.username, event.school_id, event.object_id), ('admin', self.a.pk, str(draft.pk)))
         self.assertIsNotNone(event.created_at)

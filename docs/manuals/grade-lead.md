@@ -37,3 +37,6 @@ Some alerts are raised by an **alert rule** your school activated: the alert say
 
 ## Support levels, behavior notes, report card (since 2026-11-02)
 On your student list and Student 360 each student of your grade shows a support level (calculated from open plans and unreviewed alerts; not a diagnosis). On Student 360 you read and add behavior notes (positive or concern) and open the printable report card per term. **You do not see:** students outside your grade.
+
+## به‌روزرسانی ۱۴۰۵/۰۸/۱۱
+پروندهٔ ۳۶۰ دانش‌آموزان پایهٔ شما: خلاصه (میانگین، حضور، افت اخیر) در بالا؛ کد ملی ماسک است و «نمایش کامل» ثبت می‌شود. در «هشدارها» هر مورد را می‌پذیرید یا رد می‌کنید و برای موردهای پذیرفته‌شده «برنامهٔ مداخله» می‌سازید؛ می‌توانید از «کتابخانهٔ راهبردها» شروع کنید (متن قابل ویرایش است). یادداشت رفتاری (مثبت یا نگرانی) و کارنامه از همین پرونده. تاریخ‌ها شمسی‌اند. **نمی‌بینید**: دانش‌آموزان پایه‌های دیگر و محتوای جلسات مشاوره. **سؤال**: مدیر مدرسه.

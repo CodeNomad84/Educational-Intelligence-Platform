@@ -170,3 +170,13 @@ a.eip-stat:hover { border-color: var(--eip-border-strong); color: inherit; }
 }
 .eip-main, .eip-content { min-width: 0; }   /* flex children may shrink: wide tables scroll inside their own container, never widen the page */
 .eip-shell { overflow-x: clip; }   /* the hidden offcanvas sidebar must not widen the page on phones */
+table.eip-fit { min-width: 0 !important; }   /* tables designed to fit a phone (columns hidden with d-none d-md-table-cell) */
+
+/* Action tables on phones: one block per row with labelled cells, so the action column is never off-screen */
+@media (max-width: 767.98px) {
+  table.eip-stack { min-width: 0 !important; }
+  table.eip-stack thead { display: none; }
+  table.eip-stack tr { display: block; border-bottom: 1px solid var(--eip-border, #e3e8ef); padding: .5rem .25rem; }
+  table.eip-stack td { display: block; border: 0; padding: .15rem .5rem; }
+  table.eip-stack td[data-label]::before { content: attr(data-label) ': '; color: var(--eip-muted, #6b7686); font-size: .8rem; }
+}

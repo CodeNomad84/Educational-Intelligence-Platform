@@ -28,3 +28,6 @@ Attendance entry by teachers (**TO VERIFY**: no teacher attendance page exists i
 
 ## Behavior notes (since 2026-11-02)
 On a student's page in your class (`/teacher/...`) you can add a short positive or concern note at the bottom. **You see:** only the notes you wrote yourself. **You do not see:** notes by other staff, support levels, report cards.
+
+## به‌روزرسانی ۱۴۰۵/۰۸/۱۱
+یادداشت رفتاری (مثبت یا نگرانی) برای دانش‌آموزان کلاس‌های خودتان ثبت می‌شود و فقط یادداشت‌های خودتان را می‌بینید. تاریخ‌ها شمسی‌اند و با سه لیست روز، ماه و سال انتخاب می‌شوند. کد ملی دانش‌آموزان را نمی‌بینید. **سؤال**: مسئول پایه.

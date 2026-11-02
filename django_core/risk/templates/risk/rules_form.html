@@ -1,4 +1,5 @@
 {% extends 'dashboard/base.html' %}
+{% load eip_ui %}
 {% block title %}قاعده{% endblock %}
 {% block content %}
 {% include 'dashboard/school/_nav.html' %}
@@ -6,8 +7,8 @@
 <div class="alert alert-warning">{{ unvalidated }}</div>
 {% if rule %}<h5>{{ rule.code }} نسخهٔ {{ rule.version }} — <span class="badge bg-secondary">{{ rule.get_status_display }}</span></h5>
 <table class="table table-sm w-auto small"><tbody>
-  <tr><th>ساخته‌شده توسط</th><td>{{ rule.created_by.username|default:'—' }} ({{ rule.created_at|date:'Y-m-d H:i' }})</td></tr>
-  <tr><th>تأییدکننده</th><td>{{ rule.approved_by.username|default:'—' }}{% if rule.approved_at %} ({{ rule.approved_at|date:'Y-m-d H:i' }}){% endif %}</td></tr>
+  <tr><th>ساخته‌شده توسط</th><td>{{ rule.created_by.username|default:'—' }} ({{ rule.created_at|jdate }} {{ rule.created_at|date:'H:i' }})</td></tr>
+  <tr><th>تأییدکننده</th><td>{{ rule.approved_by.username|default:'—' }}{% if rule.approved_at %} ({{ rule.approved_at|jdate }} {{ rule.approved_at|date:'H:i' }}){% endif %}</td></tr>
 </tbody></table>{% else %}<h5>قاعدهٔ جدید</h5>{% endif %}
 {% for e in errors %}<div class="alert alert-danger">{{ e }}</div>{% endfor %}
 <form method="post" action="{% if rule %}{% url 'rules:detail' rule.pk %}{% else %}{% url 'rules:create' %}{% endif %}">{% csrf_token %}

@@ -1,4 +1,5 @@
 {% extends 'dashboard/base.html' %}
+{% load eip_ui %}
 {% block title %}برنامهٔ مداخله: {{ student.first_name }} {{ student.last_name }}{% endblock %}
 {% block content %}
 <a class="btn btn-link" href="{% url 'dashboard:plan_list' %}">← فهرست</a>
@@ -6,18 +7,18 @@
   <tr><th>نوع</th><td>{{ plan.get_intervention_type_display }}</td></tr>
   <tr><th>وضعیت</th><td>{{ plan.get_status_display }}</td></tr>
   <tr><th>مسئول</th><td>{{ plan.owner.username }}</td></tr>
-  <tr><th>شروع / سررسید</th><td>{{ plan.start_date|date:"Y-m-d" }} / {{ plan.due_date|date:"Y-m-d" }}</td></tr>
+  <tr><th>شروع / سررسید</th><td>{{ plan.start_date|jdate }} / {{ plan.due_date|jdate }}</td></tr>
   {% if plan.status == 'completed' %}<tr><th>نتیجه</th><td>{{ plan.get_outcome_display }}</td></tr>
-  <tr><th>ارزیابی مجدد در</th><td>{{ plan.reevaluate_on|date:"Y-m-d" }}</td></tr>{% endif %}
+  <tr><th>ارزیابی مجدد در</th><td>{{ plan.reevaluate_on|jdate }}</td></tr>{% endif %}
   {% if text %}
   <tr><th>هدف</th><td>{{ plan.goal }}</td></tr><tr><th>برنامه اقدام</th><td>{{ plan.action_plan|linebreaksbr }}</td></tr>
   {% if plan.outcome_note %}<tr><th>یادداشت نتیجه</th><td>{{ plan.outcome_note }}</td></tr>{% endif %}
   {% endif %}
 </table>
-{% if not text %}<div class="alert alert-secondary">متن این برنامه برای شما نمایش داده نمی‌شود (فقط مسئول برنامه و مشاورِ دارای ارجاع باز). {{ followup_count }} پیگیری{% if last_followup %}، آخرین: {{ last_followup.followup_date|date:"Y-m-d" }}{% endif %}.</div>{% endif %}
+{% if not text %}<div class="alert alert-secondary">متن این برنامه برای شما نمایش داده نمی‌شود (فقط مسئول برنامه و مشاورِ دارای ارجاع باز). {{ followup_count }} پیگیری{% if last_followup %}، آخرین: {{ last_followup.followup_date|jdate }}{% endif %}.</div>{% endif %}
 {% if text %}
 <h5>پیگیری‌ها</h5>
-<ul class="list-group mb-3" style="max-width:48rem">{% for f in followups %}<li class="list-group-item"><strong>{{ f.followup_date|date:"Y-m-d" }}</strong> — {{ f.get_assessment_display }}<br>{{ f.progress_note }}</li>{% empty %}<li class="list-group-item text-muted">پیگیری ثبت نشده است.</li>{% endfor %}</ul>
+<ul class="list-group mb-3" style="max-width:48rem">{% for f in followups %}<li class="list-group-item"><strong>{{ f.followup_date|jdate }}</strong> — {{ f.get_assessment_display }}<br>{{ f.progress_note }}</li>{% empty %}<li class="list-group-item text-muted">پیگیری ثبت نشده است.</li>{% endfor %}</ul>
 {% endif %}
 {% if can_edit and plan.status == 'planned' %}<form method="post" action="{% url 'dashboard:plan_start' plan.pk %}" class="d-inline">{% csrf_token %}<button class="btn btn-success">شروع اجرا</button></form>{% endif %}
 {% if can_edit and plan.status == 'active' %}

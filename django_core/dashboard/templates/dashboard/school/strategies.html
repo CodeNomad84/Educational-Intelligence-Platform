@@ -3,12 +3,11 @@
 {% block content %}
 <p class="text-muted">فهرست پیشنهادی که هنگام ثبت برنامهٔ مداخله انتخاب می‌شود. فقط راهبردهای فعال نمایش داده می‌شوند. این فهرست داده‌ای دربارهٔ دانش‌آموز ندارد.</p>
 <div class="row g-3">
-  <div class="col-lg-7"><div class="card"><div class="card-body p-0"><div class="table-responsive"><table class="table table-sm mb-0">
-    <thead><tr><th>عنوان</th><th>نوع</th><th>سطح</th><th>روز</th><th></th></tr></thead><tbody>
-    {% for s in rows %}<tr class="{% if not s.is_active %}text-muted{% endif %}"><td>{{ s.title }}</td><td>{{ s.get_intervention_type_display }}</td><td>{{ s.tier }}</td><td>{{ s.typical_days }}</td>
-      <td class="text-nowrap"><a href="{% url 'dashboard:school_strategy_edit' s.pk %}">ویرایش</a>
-        <form method="post" action="{% url 'dashboard:school_strategy_toggle' s.pk %}" class="d-inline">{% csrf_token %}<button class="btn btn-link btn-sm p-0">{% if s.is_active %}غیرفعال{% else %}فعال{% endif %}</button></form></td></tr>
-    {% empty %}<tr><td colspan="5" class="text-muted">راهبردی نیست. با دستور seed_strategies فهرست پایه ساخته می‌شود یا از فرم کناری اضافه کنید.</td></tr>{% endfor %}
+  <div class="col-lg-7"><div class="card"><div class="card-body p-0"><div class="table-responsive"><table class="table table-sm mb-0 eip-fit">
+    <thead><tr><th>عنوان</th><th>نوع</th><th>سطح</th></tr></thead><tbody>
+    {% for s in rows %}<tr class="{% if not s.is_active %}text-muted{% endif %}"><td>{{ s.title }} <small class="text-muted">({{ s.typical_days }} روز)</small><div class="small"><a href="{% url 'dashboard:school_strategy_edit' s.pk %}">ویرایش</a> ·
+        <form method="post" action="{% url 'dashboard:school_strategy_toggle' s.pk %}" class="d-inline">{% csrf_token %}<button class="btn btn-link btn-sm p-0">{% if s.is_active %}غیرفعال{% else %}فعال{% endif %}</button></form></div></td><td>{{ s.get_intervention_type_display }}</td><td>{{ s.tier }}</td></tr>
+    {% empty %}<tr><td colspan="3" class="text-muted">راهبردی نیست. با دستور seed_strategies فهرست پایه ساخته می‌شود یا از فرم کناری اضافه کنید.</td></tr>{% endfor %}
   </tbody></table></div></div></div></div>
   <div class="col-lg-5"><div class="card"><div class="card-header">{% if editing %}ویرایش راهبرد{% else %}راهبرد جدید{% endif %}</div><div class="card-body">
     <form method="post">{% csrf_token %}{% for f in form %}<div class="mb-2"><label class="form-label">{{ f.label }}</label>{{ f }}{% for e in f.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}</div>{% endfor %}

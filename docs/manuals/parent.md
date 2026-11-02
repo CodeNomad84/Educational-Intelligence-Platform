@@ -15,3 +15,6 @@ Who this is: a parent or guardian with an account linked to your child (the scho
 
 ## Behavior notes and report card (since 2026-11-02)
 On your child's page you see the **positive** notes teachers wrote, and **کارنامه**: a printable summary of grades and attendance per term (not the official report card). **You do not see:** concern notes; ask the school if you want to discuss them.
+
+## به‌روزرسانی ۱۴۰۵/۰۸/۱۱
+فقط فرزند خودتان. کد ملی ماسک است (`******` و چهار رقم آخر)؛ «نمایش کامل» مقدار را نشان می‌دهد و ثبت می‌شود. از «یادداشت‌های رفتاری» فقط **موارد مثبت** را می‌بینید. کارنامهٔ هر نیم‌سال قابل چاپ است (غیررسمی). **نمی‌بینید**: دانش‌آموزان دیگر، هشدارها، برنامه‌های مداخله و یادداشت‌های مشاور. **سؤال**: مدیر یا مسئول پایهٔ مدرسه.

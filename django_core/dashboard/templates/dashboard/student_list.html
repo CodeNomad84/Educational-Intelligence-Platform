@@ -13,17 +13,17 @@
     </div>
     {% if students %}
     <div class="table-responsive">
-        <table class="table table-hover">
-            <thead><tr><th>نام</th><th>کد ملی</th><th>پایه</th><th>کلاس</th>{% if show_support %}<th>سطح حمایت</th>{% endif %}<th></th></tr></thead>
+        <table class="table table-hover eip-fit">
+            <thead><tr><th>نام</th><th class="d-none d-md-table-cell">کد ملی</th><th class="d-none d-md-table-cell">پایه</th><th class="d-none d-md-table-cell">کلاس</th>{% if show_support %}<th>سطح حمایت</th>{% endif %}<th class="d-none d-md-table-cell"></th></tr></thead>
             <tbody>
             {% for student in students %}
                 <tr>
-                    <td>{{ student.first_name }} {{ student.last_name }}</td>
-                    <td class="ltr">{% if student.full_tier %}{{ student.national_id|mask_nid }}{% else %}—{% endif %}</td>
-                    <td>{{ student.get_grade_display }}</td>
-                    <td>{{ student.class_name|default:"—" }}</td>
+                    <td><a class="text-reset text-decoration-none fw-semibold" href="{% if student.full_tier %}{% url 'dashboard:student_360' student.id %}{% else %}{% url 'dashboard:student_detail' student.id %}{% endif %}">{{ student.first_name }} {{ student.last_name }}</a><div class="small text-muted d-md-none">{{ student.get_grade_display }} · {{ student.class_name|default:"—" }}</div></td>
+                    <td class="ltr d-none d-md-table-cell">{% if student.full_tier %}{{ student.national_id|mask_nid }}{% else %}—{% endif %}</td>
+                    <td class="d-none d-md-table-cell">{{ student.get_grade_display }}</td>
+                    <td class="d-none d-md-table-cell">{{ student.class_name|default:"—" }}</td>
                     {% if show_support %}<td>{% if student.support %}<span class="eip-tier tier-{{ student.support.level }}">{{ student.support.label }}</span>{% else %}<span class="eip-tier tier-1">سطح ۱</span>{% endif %}</td>{% endif %}
-                    <td class="text-nowrap text-end">
+                    <td class="text-nowrap text-end d-none d-md-table-cell">
                         <a href="{% url 'dashboard:student_detail' student.id %}" class="btn btn-sm btn-light">مشاهده</a>
                         {% if student.full_tier %}<a href="{% url 'dashboard:student_360' student.id %}" class="btn btn-sm btn-primary">پرونده ۳۶۰</a>{% endif %}
                     </td>

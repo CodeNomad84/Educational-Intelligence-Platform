@@ -1,4 +1,5 @@
 {% extends 'dashboard/base.html' %}
+{% load eip_ui %}
 {% block title %}صفحهٔ من{% endblock %}
 {% block content %}
 <h5>{{ student.first_name }} {{ student.last_name }} — {{ student.get_grade_display }}</h5>
@@ -11,6 +12,6 @@
   </tbody></table></div></div>
 {% empty %}<p class="text-muted">نمره‌ای ثبت نشده است.</p>{% endfor %}
 <h5 class="mt-4">بازخورد معلمان</h5>
-{% for r in recommendations %}<div class="border rounded p-2 mb-2 bg-white"><small class="text-muted">{{ r.created_at|date:"Y-m-d" }}{% if r.subject %} — {{ r.get_subject_display }}{% endif %}</small><div>{{ r.text|linebreaksbr }}</div></div>
+{% for r in recommendations %}<div class="border rounded p-2 mb-2 bg-white"><small class="text-muted">{{ r.created_at|jdate }}{% if r.subject %} — {{ r.get_subject_display }}{% endif %}</small><div>{{ r.text|linebreaksbr }}</div></div>
 {% empty %}<p class="text-muted">بازخوردی ثبت نشده است.</p>{% endfor %}
 {% endblock %}

@@ -18,3 +18,6 @@ Who this is: a student with an account linked to your own record. You land on `/
 ## Study assistant (demo)
 **Steps:** `/me/assistant/` (shown locked if the school does not have it). Today it is a rule-based demo; no real AI model is connected and nothing leaves the school's system.
 **PENDING POLICY:** the real tutor (external AI provider, safety escalation to adults, transparency to the student) is not built and needs owner decisions.
+
+## به‌روزرسانی ۱۴۰۵/۰۸/۱۱
+تاریخ‌ها در صفحه‌ها شمسی نمایش داده می‌شوند. چیز دیگری در دسترسی شما تغییر نکرده است: فقط نمرات و بازخورد معلمان دربارهٔ خودتان.
