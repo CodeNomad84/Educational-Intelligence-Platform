@@ -356,6 +356,50 @@ class AuthorizationTests(BaseCase):
         self.assertEqual(self.client.post('/predict/', headers=h, json={'grade': 'x'}).status_code, 422)
 
 
+class LLMRouteTests(BaseCase):
+    """P7: the staff assistant route. OFF unless an operator maps the school; mock transport only, no network, no real key."""
+
+    BODY = {'purpose': 'pedagogy', 'messages': [{'role': 'user', 'content': 'Explain fractions simply.'}]}
+    ENV = {'LLM_PROVIDERS': '{"p": {"class": "local", "base_url": "http://ollama:11434/v1", "model": "m"}}', 'LLM_SCHOOL_MAP': '{"1": "p"}'}
+
+    def post(self, roles, body=None, **over):
+        return self.client.post('/llm/complete/', json=body or self.BODY, headers=bearer(roles, **over))
+
+    def test_anonymous_and_non_admin_roles_are_refused(self):
+        self.assertEqual(self.client.post('/llm/complete/', json=self.BODY).status_code, 401)
+        for roles in OTHER_ROLES + (['Teacher'],):
+            self.assertEqual(self.post(roles).status_code, 403, roles)
+
+    def test_off_by_default_for_every_school(self):
+        with mock.patch.dict(os.environ, {'LLM_PROVIDERS': '', 'LLM_SCHOOL_MAP': ''}):
+            self.assertEqual(self.post([ADMIN_ROLE]).status_code, 403)
+
+    def test_the_school_comes_from_the_token_and_an_unmapped_school_has_no_ai(self):
+        calls = []
+        def transport(url, headers, body, timeout):
+            calls.append(url)
+            return 200, b'{"choices": [{"message": {"content": "hello"}}]}'
+        with mock.patch.dict(os.environ, self.ENV), mock.patch('llm_adapter._urllib_transport', transport):
+            self.assertEqual(self.post([ADMIN_ROLE], schools=[2]).status_code, 403)          # school 2 is not mapped
+            self.assertEqual(self.post([ADMIN_ROLE], schools=[1, 2]).status_code, 403)       # several schools: must choose exactly one
+            self.assertEqual(calls, [])
+            ok = self.post([ADMIN_ROLE], schools=[1])
+            self.assertEqual(ok.status_code, 200)
+            self.assertEqual(ok.json()['text'], 'hello')
+            self.assertIn('ممکن است اشتباه باشد', ok.json()['label'])
+            self.assertEqual(calls, ['http://ollama:11434/v1/chat/completions'])
+
+    def test_refusals_map_to_fixed_codes_without_provider_text(self):
+        def boom(url, headers, body, timeout):
+            return 500, b'provider secret text'
+        with mock.patch.dict(os.environ, self.ENV), mock.patch('llm_adapter._urllib_transport', boom):
+            bad_purpose = self.post([ADMIN_ROLE], {**self.BODY, 'purpose': 'counseling'})
+            self.assertEqual((bad_purpose.status_code, bad_purpose.json()['detail']), (422, 'purpose_refused'))
+            upstream = self.post([ADMIN_ROLE])
+            self.assertEqual((upstream.status_code, upstream.json()['detail']), (502, 'upstream_error'))
+            self.assertNotIn('secret', upstream.text)
+
+
 class EmbeddingFailureTests(unittest.TestCase):
     """The REAL rag_service.py (only ollama/psycopg2/pgvector are faked): an embedding failure must
     raise, never fall back to a zero vector, and nothing may be written or searched with one."""

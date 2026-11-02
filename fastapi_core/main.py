@@ -31,6 +31,7 @@ from rag_service import (
     delete_document,
 )
 from train_nn_model import StudentRiskModel
+import llm_adapter
 
 # ---------- تنظیمات لاگ با سطح DEBUG برای عیب‌یابی ----------
 logging.basicConfig(level=logging.DEBUG)
@@ -147,6 +148,31 @@ async def predict_risk(features: StudentFeatures, payload: dict = Depends(requir
         logger.error(f"خطا در پیش‌بینی: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"خطا در پردازش پیش‌بینی: {str(e)}")
 app.include_router(router_v1)
+
+class LLMRequest(BaseModel):
+    purpose: str
+    messages: list
+    avoid_names: list = []      # names of the school's roster that must not leave the platform (external class); sent by Django
+
+
+_LLM_STATUS = {"bad_request": 422, "purpose_refused": 422, "pii_refused": 422, "not_configured": 503, "bad_config": 503,
+               "cap_reached": 429, "upstream_error": 502}
+
+
+@app.post("/llm/complete/")
+def llm_complete(request: LLMRequest, payload: dict = Depends(require_roles_with_schools(ADMIN))):
+    """P7 staff assistant call (provider-agnostic, OFF unless an operator maps the school to a provider). The caller's school comes from
+    the signed token, never from the body; Django applies ACL BEFORE building the messages and enforces the licensed per-school caps."""
+    school = _single_school(payload)
+    try:
+        provider = llm_adapter.provider_for_school(school)
+        if provider is None:
+            raise HTTPException(status_code=403, detail="AI is not enabled for this school.")
+        names = [n for n in request.avoid_names[:2000] if isinstance(n, str)]
+        return llm_adapter.complete(provider, request.messages, request.purpose, school_id=school, roster_names=names)
+    except llm_adapter.LLMError as exc:
+        raise HTTPException(status_code=_LLM_STATUS.get(exc.code, 502), detail=exc.code)
+
 
 @app.post("/chat/")
 async def chat_endpoint(request: ChatRequest, payload: dict = Depends(disabled_in_phase1)):  # RAG out of Phase 1 scope
