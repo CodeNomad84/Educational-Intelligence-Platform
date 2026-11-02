@@ -86,7 +86,7 @@
             <div class="ms-auto dropdown">
                 <button class="eip-user dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                     <span class="eip-avatar" aria-hidden="true"><i class="bi bi-person"></i></span>
-                    <span class="d-none d-sm-inline"><span class="ltr">{{ user.username }}</span>{% if ROLE_LABEL %} <span class="text-muted">· {{ ROLE_LABEL }}</span>{% endif %}</span>
+                    <span class="d-none d-sm-inline"><span class="eip-user-name">{{ user.get_full_name|default:user.username }}</span>{% if ROLE_LABEL %} <span class="text-muted">· {{ ROLE_LABEL }}</span>{% endif %}</span>
                 </button>
                 <ul class="dropdown-menu dropdown-menu-end">
                     <li><a class="dropdown-item" href="{% url 'dashboard:profile' %}"><i class="bi bi-person-gear"></i> حساب من</a></li>
