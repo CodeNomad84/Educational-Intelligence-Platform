@@ -1,17 +1,17 @@
 # 0031 — Default catalog of rules, risk types, alerts and interventions (PROPOSAL, Level 2)
 
-Status: **PROPOSED — awaiting owner review of the catalog content. Nothing is built.** Date: 2026-11-02. Truth labels per `CLAUDE.md` §2.
+Status: **APPROVED WITH CHANGES by the owner 2026-11-02 (see section 7); build in progress.** Date: 2026-11-02. Truth labels per `CLAUDE.md` §2.
 
 ## 1. What the owner asked
 A default catalog based on established practice (rules, risk types, alerts, interventions), plus school-specific additions or replacements through forms or an Excel import.
 
-## 2. Research basis (cited from memory; **NOT VERIFIED** against the sources, to be checked before any external use)
+## 2. Research basis (web-checked 2026-11-02; status per row. Nothing below is shown to users: the catalog page says only "based on ABC early-warning and MTSS practice")
 | Source | What it supports | Status |
 |---|---|---|
-| Balfanz, Herzog and Mac Iver (2007), *Educational Psychologist* 42(4), "Preventing student disengagement and keeping students on the graduation path in urban middle-grades schools" | The ABC early-warning indicators: Attendance, Behavior, Course performance, as predictors of dropping out | NOT VERIFIED (citation from memory) |
-| Allensworth and Easton (2005, 2007), University of Chicago Consortium on Chicago School Research, "On-Track indicator" | Course performance plus credits as a strong early signal; the idea of a simple on-track flag | NOT VERIFIED |
-| Attendance Works (attendanceworks.org), chronic absence = missing about 10% or more of enrolled days | A 10% absence-rate watch level; tiers of response (prevention, early intervention, intensive) | NOT VERIFIED; a US convention, not Iranian |
-| Sugai and Horner (PBIS / MTSS literature); Response to Intervention tiers | Three tiers: universal, targeted, intensive; escalate only on data and review | NOT VERIFIED |
+| Balfanz, Herzog and Mac Iver (2007), *Educational Psychologist* 42(4), "Preventing student disengagement and keeping students on the graduation path in urban middle-grades schools" | The ABC early-warning indicators: Attendance, Behavior, Course performance, as predictors of dropping out | **VERIFIED** (bibliographic data and finding via a journal listing and the paper's hosted PDF page: *Educational Psychologist* 42(4), 223-235; sixth-grade attendance, behavior and course failure flagged about 60% of later non-graduates in a ~13,000-student cohort); full text not read |
+| Allensworth and Easton (2005, 2007), University of Chicago Consortium on Chicago School Research, "On-Track indicator" | Course performance plus credits as a strong early signal; the idea of a simple on-track flag | **VERIFIED** from summaries and a press release (2005: on-track = 5 credits and at most one semester F in grade 9; 3.5 times likelier to graduate in four years; 2007: grades, failures and attendance in the freshman year); full reports not read |
+| Attendance Works (attendanceworks.org), chronic absence = missing about 10% or more of enrolled days | A 10% absence-rate watch level | **VERIFIED** that Attendance Works defines chronic absence as missing 10% or more of school for any reason; it is a convention (agencies use other cut-offs), a US convention, not Iranian. Their tiers-of-response wording NOT VERIFIED |
+| Sugai and Horner (PBIS / MTSS literature); Response to Intervention tiers | Three tiers: universal, targeted, intensive; escalate only on data and review | **PARTLY VERIFIED**: the three-tier structure is confirmed by secondary sources only; the original Sugai and Horner papers were not found; the common 80/15/5 split is cited second-hand and is not used by this platform |
 | What Works Clearinghouse / Education Endowment Foundation toolkit entries (small-group tuition, peer tutoring, feedback, behaviour interventions) | Typical effective generic strategies for the tier 2 list | NOT VERIFIED |
 | Panorama Student Success and similar vendors (marketing pages) | Product shape only (indicators plus tiers plus library) | **Vendor claims, unverified; used for product shape, not for thresholds** |
 
@@ -70,3 +70,10 @@ None is needed for 3.1.
 2. Imported strategies land **inactive** (recommended) or active?
 3. Is "percent of scale" storage for score thresholds acceptable (recommended), or fixed 0-20 numbers?
 4. Which of the candidates in 3.4 (if any) should be proposed next.
+
+## 7. Owner decisions 2026-11-02 (approval with changes)
+1. **Alert fatigue, by family.** Families: attendance (repeated_absence, absence_run, chronic_absence_watch, chronic_absence_high), academic (low_average, failing_average, off_track_combo), behavior (repeated_concerns, concern_surge, concern_with_absence). A stronger hit supersedes a weaker OPEN one for the same student: simplest option chosen (decision 53): the runner does not raise a second alert; it suppresses the weaker rule's new alert while a stronger-ranked alert of the same family is open (status new, or accepted with an open plan); a stronger hit after a weaker open alert still raises its own alert (the weaker one is left for the human to review). The suppression is counted on the run (`skipped_superseded`).
+2. `off_track_combo` is titled «افت هم‌زمان نمره و حضور».
+3. Citations: verified as above before any user-facing use; user-facing text names no paper.
+4. Q2 imported strategies land inactive; Q3 percent of scale; Q4 next metric = grade trend slope (no new read path); homework, exams and missions after the demo.
+5. **Starter pack** (recommended for a new school, marked in the catalog): attendance_shift, repeated_absence, low_average, grade_drop, repeated_concerns, chronic_absence_watch. The rest are optional.
