@@ -168,3 +168,5 @@ a.eip-stat:hover { border-color: var(--eip-border-strong); color: inherit; }
   .eip-content .card-body, .eip-content .card { overflow-x: auto; }
   .eip-content table { min-width: 34rem; }
 }
+.eip-main, .eip-content { min-width: 0; }   /* flex children may shrink: wide tables scroll inside their own container, never widen the page */
+.eip-shell { overflow-x: clip; }   /* the hidden offcanvas sidebar must not widen the page on phones */
