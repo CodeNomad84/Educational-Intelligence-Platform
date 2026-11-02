@@ -18,6 +18,8 @@ import json
 import logging
 import os
 import re
+import threading
+import unicodedata
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
@@ -31,7 +33,8 @@ PURPOSES_EXTERNAL = frozenset({"policy_document", "curriculum_text", "question_d
 PURPOSES_LOCAL = PURPOSES_EXTERNAL | {"school_data_summary"}      # data the requesting user may already see (ACL is applied BEFORE this call)
 ROLES = ("system", "user", "assistant")
 MAX_MESSAGES, MAX_CHARS = 20, 8000
-_ENV_NAME = re.compile(r"[A-Z][A-Z0-9_]{0,63}")
+_ENV_NAME = re.compile(r"LLM_KEY_[A-Z0-9_]{1,56}")          # a key variable is DEDICATED to the adapter: nothing else can be named (review M1)
+_FORBIDDEN_IN_ENV_NAME = ("SERVICE_JWT", "SECRET", "PASSWORD", "DATABASE", "POSTGRES", "DJANGO", "TOKEN_SIGNING")
 _DIGITS = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
 
 
@@ -65,12 +68,12 @@ def _parse_provider(name, raw):
     if not isinstance(model, str) or not model.strip() or len(model) > 100:
         raise LLMError("bad_config")
     env_name = raw.get("api_key_env", "")
-    if env_name and not _ENV_NAME.fullmatch(str(env_name)):
+    if env_name and (not _ENV_NAME.fullmatch(str(env_name)) or any(bad in str(env_name) for bad in _FORBIDDEN_IN_ENV_NAME)):
         raise LLMError("bad_config")
     if raw["class"] == EXTERNAL and not env_name:
         raise LLMError("bad_config")
     timeout, max_tokens = raw.get("timeout", 30), raw.get("max_tokens", 600)
-    if not (isinstance(timeout, int) and 1 <= timeout <= 120 and isinstance(max_tokens, int) and 1 <= max_tokens <= 4000):
+    if not (isinstance(timeout, int) and 1 <= timeout <= 60 and isinstance(max_tokens, int) and 1 <= max_tokens <= 4000):
         raise LLMError("bad_config")
     return Provider(str(name), raw["class"], f"{url.scheme}://{url.netloc}{url.path.rstrip('/')}", model.strip(), str(env_name), timeout, max_tokens)
 
@@ -109,21 +112,46 @@ def provider_for_school(school_id, env=None):
 
 
 # ---- outbound filter (external class) ----
-_NATIONAL_ID = re.compile(r"(?<!\d)\d{10}(?!\d)")
+# A best-effort TRIPWIRE, not a guarantee (review M2, decision 59). The protections that count are the purpose whitelist and the fact that
+# Django builds non-personal prompts. It cannot catch: a first name alone, digits spelled in words, base64, "(at)" e-mail obfuscation,
+# transliterated or homoglyph names, a name absent from the roster Django sends, or a description that identifies a student without a
+# name or number ("the student who failed last week"). It does not and cannot detect counseling content.
 _PHONE = re.compile(r"(?<!\d)(?:\+?98|0)?9\d{9}(?!\d)")
+_LONG_RUN = re.compile(r"\d{10,}")
 _EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
+_BETWEEN_DIGITS = re.compile(r"(?<=\d)[\s\-_.،,/()]+(?=\d)")
+_LETTERS = str.maketrans({"ي": "ی", "ك": "ک", "ۀ": "ه", "ة": "ه", "أ": "ا", "إ": "ا", "ؤ": "و"})
+
+
+def _normalize(text):
+    """NFKC (fullwidth digits, ligatures), digits to ASCII, drop zero-width/bidi/format characters, tatweel and diacritics, unify
+    Arabic/Persian letter variants, casefold."""
+    text = unicodedata.normalize("NFKC", text).translate(_DIGITS).translate(_LETTERS)
+    text = "".join(ch for ch in text if unicodedata.category(ch) not in ("Cf", "Mn", "Cc") or ch in "\n\t ")
+    return text.replace("\u0640", "").casefold()
 
 
 def check_outbound(text, roster_names=()):
-    """Refuse text that looks like personal data: national id, mobile number, e-mail, or any name of the school's roster (>= 3 chars)."""
-    flat = text.translate(_DIGITS)
-    squeezed = re.sub(r"[\s\-_.،,/]", "", flat)
-    if _NATIONAL_ID.search(flat) or _NATIONAL_ID.search(squeezed) or _PHONE.search(squeezed) or _EMAIL.search(flat):
+    """Refuse text that looks like personal data: a run of 10+ digits (national id, even split by spaces, dashes, zero-width characters),
+    a mobile number, an e-mail, or a roster name (full name, or its last word when it has 3+ letters)."""
+    flat = _normalize(text)
+    squeezed = _BETWEEN_DIGITS.sub("", flat)
+    if _LONG_RUN.search(squeezed) or _PHONE.search(squeezed) or _EMAIL.search(flat):
         raise LLMError("pii_refused")
-    low = text.casefold()
     for name in roster_names:
-        if len(name) >= 3 and name.casefold() in low:
+        full = _normalize(name).strip()
+        words = full.split()
+        candidates = {full} | ({words[-1]} if len(words) > 1 else set())
+        if any(len(c) >= 3 and c in flat for c in candidates):
             raise LLMError("pii_refused")
+
+
+def check_conversation(messages, roster_names=()):
+    """Every message alone AND the whole conversation joined (an id split across two messages)."""
+    for m in messages:
+        check_outbound(m["content"], roster_names)
+    if len(messages) > 1:
+        check_outbound("\n".join(m["content"] for m in messages), roster_names)
 
 
 # ---- usage cap (per school per UTC day, in memory: defence in depth; the licensed per-school caps live in Django) ----
@@ -143,14 +171,35 @@ def _take_slot(school_id, env):
     _USAGE[key] = _USAGE.get(key, 0) + 1
 
 
+_BUSY, _BUSY_LOCK, MAX_CONCURRENT_PER_SCHOOL = {}, threading.Lock(), 3
+
+
+def _school_gate(school_id):
+    with _BUSY_LOCK:
+        gate = _BUSY.setdefault(school_id, threading.BoundedSemaphore(MAX_CONCURRENT_PER_SCHOOL))
+    if not gate.acquire(blocking=False):
+        raise LLMError("busy")
+    return gate
+
+
 def reset_usage():
     _USAGE.clear()
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Any 3xx is an error: following a redirect would resend the Authorization header to another host or over http (review L1)."""
+
+    def redirect_request(self, *args, **kwargs):
+        return None
+
+
+_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect())      # no environment proxies, no redirects
 
 
 def _urllib_transport(url, headers, body, timeout):
     request = urllib.request.Request(url, data=body, headers=headers, method="POST")
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:      # operator-configured URL only, never a request value
+        with _OPENER.open(request, timeout=timeout) as response:      # operator-configured URL only, never a request value
             return response.status, response.read(1_000_000)
     except urllib.error.HTTPError as exc:
         return exc.code, b""
@@ -175,15 +224,14 @@ def _validate_messages(messages):
 
 def complete(provider, messages, purpose, *, school_id, roster_names=(), env=None, transport=None):
     """One chat completion. Returns ``{text, label, provider_class, model, usage}``; raises ``LLMError`` with a fixed code
-    (bad_request, purpose_refused, pii_refused, not_configured, cap_reached, upstream_error)."""
+    (bad_request, purpose_refused, pii_refused, not_configured, cap_reached, busy, upstream_error)."""
     env = os.environ if env is None else env
     allowed = PURPOSES_EXTERNAL if provider.kind == EXTERNAL else PURPOSES_LOCAL
     if purpose not in allowed:
         raise LLMError("purpose_refused")
     messages = _validate_messages(messages)
     if provider.kind == EXTERNAL:
-        for m in messages:
-            check_outbound(m["content"], roster_names)
+        check_conversation(messages, roster_names)
     key = env.get(provider.api_key_env, "") if provider.api_key_env else ""
     if provider.kind == EXTERNAL and not key:
         raise LLMError("not_configured")
@@ -192,7 +240,11 @@ def complete(provider, messages, purpose, *, school_id, roster_names=(), env=Non
     if key:
         headers["Authorization"] = f"Bearer {key}"
     body = json.dumps({"model": provider.model, "messages": messages, "max_tokens": provider.max_tokens, "temperature": 0.2}).encode()
-    status, raw = (transport or _urllib_transport)(provider.base_url + "/chat/completions", headers, body, provider.timeout)
+    gate = _school_gate(school_id)               # at most MAX_CONCURRENT_PER_SCHOOL calls in flight per school (threadpool protection)
+    try:
+        status, raw = (transport or _urllib_transport)(provider.base_url + "/chat/completions", headers, body, provider.timeout)
+    finally:
+        gate.release()
     usage = {}
     try:
         if status != 200:

@@ -11,13 +11,13 @@ sys.path.insert(0, str(ROOT))
 import llm_adapter as ad  # noqa: E402
 
 KEY = 'sk-test-' + 'k' * 24          # a fake key for the mock only
-EXT = {'chatgpt': {'class': 'external', 'base_url': 'https://api.example.test/v1', 'model': 'model-x', 'api_key_env': 'EXT_KEY'}}
+EXT = {'chatgpt': {'class': 'external', 'base_url': 'https://api.example.test/v1', 'model': 'model-x', 'api_key_env': 'LLM_KEY_EXT'}}
 LOC = {'ollama': {'class': 'local', 'base_url': 'http://ollama:11434/v1', 'model': 'local-model'}}
 
 
 def env(providers=None, school_map=None, **extra):
     out = {'LLM_PROVIDERS': json.dumps(providers or {**EXT, **LOC}), 'LLM_SCHOOL_MAP': json.dumps(school_map or {'1': 'chatgpt', '2': 'ollama'}),
-           'EXT_KEY': KEY}
+           'LLM_KEY_EXT': KEY}
     out.update(extra)
     return out
 
@@ -61,9 +61,9 @@ class OffByDefaultTests(AdapterBase):
 
     def test_bad_configuration_is_refused_not_guessed(self):
         bad = [{'x': {'class': 'cloud', 'base_url': 'https://a.test/v1', 'model': 'm'}},
-               {'x': {'class': 'external', 'base_url': 'http://a.test/v1', 'model': 'm', 'api_key_env': 'K'}},           # external must be TLS
-               {'x': {'class': 'external', 'base_url': 'https://u:p@a.test/v1', 'model': 'm', 'api_key_env': 'K'}},       # credentials in URL
-               {'x': {'class': 'external', 'base_url': 'https://a.test/v1?k=1', 'model': 'm', 'api_key_env': 'K'}},
+               {'x': {'class': 'external', 'base_url': 'http://a.test/v1', 'model': 'm', 'api_key_env': 'LLM_KEY_K'}},           # external must be TLS
+               {'x': {'class': 'external', 'base_url': 'https://u:p@a.test/v1', 'model': 'm', 'api_key_env': 'LLM_KEY_K'}},       # credentials in URL
+               {'x': {'class': 'external', 'base_url': 'https://a.test/v1?k=1', 'model': 'm', 'api_key_env': 'LLM_KEY_K'}},
                {'x': {'class': 'external', 'base_url': 'https://a.test/v1', 'model': 'm'}},                               # external needs a key env
                {'x': {'class': 'external', 'base_url': 'https://a.test/v1', 'model': 'm', 'api_key_env': 'bad name'}},
                {'x': {'class': 'local', 'base_url': 'ftp://a.test', 'model': 'm'}},
@@ -96,13 +96,13 @@ class GeneralPurposeTests(AdapterBase):
         self.assertEqual(self.mock.calls[0][1]['Authorization'], f'Bearer {KEY}')
         self.assertNotIn(KEY, json.dumps(result))
         self.assertNotIn(KEY, repr(ad.provider_for_school(1, self.env)))
-        self.env.pop('EXT_KEY')
+        self.env.pop('LLM_KEY_EXT')
         self.mock = Mock()
         self.refused('not_configured')                                                              # external without a key: refused, no call
 
     def test_another_openai_compatible_provider_needs_configuration_only(self):
         self.env = env(providers={'deepseek-like': {'class': 'external', 'base_url': 'https://other.example.test', 'model': 'm2',
-                                                    'api_key_env': 'OTHER_KEY'}}, school_map={'7': 'deepseek-like'}, OTHER_KEY='other-' + 'x' * 20)
+                                                    'api_key_env': 'LLM_KEY_OTHER'}}, school_map={'7': 'deepseek-like'}, LLM_KEY_OTHER='other-' + 'x' * 20)
         result = self.call(school=7)
         self.assertEqual(self.mock.calls[0][0], 'https://other.example.test/chat/completions')
         self.assertEqual((result['provider_class'], result['model']), ('external', 'm2'))
@@ -175,6 +175,76 @@ class LocalClassRulesTests(AdapterBase):
     def test_local_class_does_not_apply_the_external_pii_filter(self):
         self.call(school=2, purpose='school_data_summary', messages=[{'role': 'user', 'content': 'Class 7-A has 24 students'}])
         self.assertEqual(len(self.mock.calls), 1)
+
+
+class ReviewFixTests(AdapterBase):
+    """P7 review (decision 59): M1 dedicated key variable, M2 normalised filter, L1 no redirects, L3 concurrency gate."""
+
+    def test_the_key_variable_must_be_a_dedicated_llm_key_not_any_secret(self):
+        for name in ('SERVICE_JWT_SECRET', 'DJANGO_SECRET_KEY', 'DATABASE_PASSWORD', 'OPENAI_API_KEY', 'LLM_KEY_SERVICE_JWT_SECRET',
+                     'LLM_KEY_DB_PASSWORD', 'llm_key_x', 'LLM_KEY_'):
+            with self.assertRaises(ad.LLMError, msg=name):
+                ad.load_providers({'LLM_PROVIDERS': json.dumps({'p': {'class': 'external', 'base_url': 'https://a.test/v1', 'model': 'm',
+                                                                        'api_key_env': name}})})
+        self.assertIn('p', ad.load_providers({'LLM_PROVIDERS': json.dumps({'p': {'class': 'external', 'base_url': 'https://a.test/v1',
+                                                                                'model': 'm', 'api_key_env': 'LLM_KEY_P'}})}))
+
+    def test_obfuscated_identifiers_and_names_are_still_refused(self):
+        roster = ['علی رضایی', 'Sara Karimi']
+        samples = ['0\u200c0\u200c1234 5678', '0\u200b012345678', '۰۹۱۲\u200c۳۴۵۶۷۸۹', '09\u200b123456789', '１２３４５６７８９０',
+                   'id 1234567890123', 'کد: 001 234 56 78', 'on علی رضايي list', 'on على رضايي list', 'خانم کریمی و رضایی',
+                   'Dear SARA KARIMI', 'sara\u200c karimi']
+        for text in samples:
+            with self.subTest(text=text):
+                with self.assertRaises(ad.LLMError):
+                    ad.check_outbound(text, roster)
+
+    def test_an_id_split_across_messages_is_caught_on_the_joined_conversation(self):
+        self.refused('pii_refused', messages=[{'role': 'user', 'content': 'first part 00123'}, {'role': 'user', 'content': '45678 second'}])
+
+    def test_clean_text_with_ordinary_numbers_still_passes(self):
+        ad.check_outbound('Make 5 questions for grade 7, page 12, year 1405, 24 students, 3 groups of 8.', ['علی رضایی'])
+
+    def test_a_redirect_is_never_followed_and_the_key_never_reaches_another_host(self):
+        import threading
+        from http.server import BaseHTTPRequestHandler, HTTPServer
+        seen = {'a': [], 'b': []}
+
+        def make(tag, location=None):
+            class H(BaseHTTPRequestHandler):
+                def do_POST(self):
+                    seen[tag].append(self.headers.get('Authorization'))
+                    self.send_response(302 if location else 200)
+                    if location:
+                        self.send_header('Location', location)
+                    self.end_headers()
+                def log_message(self, *a): pass
+            return HTTPServer(('127.0.0.1', 0), H)
+        b = make('b')
+        a = make('a', f'http://127.0.0.1:{b.server_port}/steal')
+        threads = [threading.Thread(target=srv.handle_request, daemon=True) for srv in (a, b)]
+        for t in threads:
+            t.start()
+        status, body = ad._urllib_transport(f'http://127.0.0.1:{a.server_port}/v1/chat/completions', {'Authorization': 'Bearer secret'}, b'{}', 5)
+        threads[0].join(5)
+        self.assertEqual((status, body), (302, b''))
+        self.assertEqual(seen['a'], ['Bearer secret'])
+        self.assertEqual(seen['b'], [])                      # the second host was never contacted
+        b.server_close()
+        a.server_close()
+
+    def test_per_school_concurrency_is_bounded(self):
+        gates = [ad._school_gate(9) for _ in range(ad.MAX_CONCURRENT_PER_SCHOOL)]
+        try:
+            self.env = env(school_map={'9': 'ollama'})
+            self.refused('busy', school=9, purpose='pedagogy')
+        finally:
+            for g in gates:
+                g.release()
+        self.call_school9 = None
+        self.mock = Mock()
+        self.env = env(school_map={'9': 'ollama'})
+        self.call(school=9)                                  # released: works again
 
 
 class SourceSafetyTests(unittest.TestCase):

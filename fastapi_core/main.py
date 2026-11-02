@@ -11,8 +11,8 @@ from auth import (
 import joblib
 import torch
 import numpy as np
-from fastapi import Depends, FastAPI, HTTPException, UploadFile, File
-from pydantic import BaseModel
+from fastapi import Depends, FastAPI, HTTPException, Request, UploadFile, File
+from pydantic import BaseModel, Field
 from typing import Optional
 from fastapi import APIRouter
 
@@ -150,25 +150,27 @@ async def predict_risk(features: StudentFeatures, payload: dict = Depends(requir
 app.include_router(router_v1)
 
 class LLMRequest(BaseModel):
-    purpose: str
-    messages: list
-    avoid_names: list = []      # names of the school's roster that must not leave the platform (external class); sent by Django
+    purpose: str = Field(max_length=40)
+    messages: list[dict[str, str]] = Field(max_length=20)
+    avoid_names: list[str] = Field(default=[], max_length=2000)   # roster names that must not leave the platform (external class); ONLY Django may send this route a request (see AI_GOVERNANCE)
 
 
 _LLM_STATUS = {"bad_request": 422, "purpose_refused": 422, "pii_refused": 422, "not_configured": 503, "bad_config": 503,
-               "cap_reached": 429, "upstream_error": 502}
+               "cap_reached": 429, "busy": 429, "upstream_error": 502}
 
 
 @app.post("/llm/complete/")
-def llm_complete(request: LLMRequest, payload: dict = Depends(require_roles_with_schools(ADMIN))):
+def llm_complete(request: LLMRequest, http: Request, payload: dict = Depends(require_roles_with_schools(ADMIN))):
     """P7 staff assistant call (provider-agnostic, OFF unless an operator maps the school to a provider). The caller's school comes from
     the signed token, never from the body; Django applies ACL BEFORE building the messages and enforces the licensed per-school caps."""
     school = _single_school(payload)
+    if int(http.headers.get("content-length") or 0) > 200_000:
+        raise HTTPException(status_code=413, detail="bad_request")
     try:
         provider = llm_adapter.provider_for_school(school)
         if provider is None:
             raise HTTPException(status_code=403, detail="AI is not enabled for this school.")
-        names = [n for n in request.avoid_names[:2000] if isinstance(n, str)]
+        names = [n[:100] for n in request.avoid_names]
         return llm_adapter.complete(provider, request.messages, request.purpose, school_id=school, roster_names=names)
     except llm_adapter.LLMError as exc:
         raise HTTPException(status_code=_LLM_STATUS.get(exc.code, 502), detail=exc.code)

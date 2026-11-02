@@ -400,6 +400,38 @@ class LLMRouteTests(BaseCase):
             self.assertNotIn('secret', upstream.text)
 
 
+class LLMRouteExternalTests(BaseCase):
+    """The EXTERNAL class through the route: the roster names sent by Django are enforced; body shape and size are bounded."""
+
+    ENV = {'LLM_PROVIDERS': '{"x": {"class": "external", "base_url": "https://api.example.test/v1", "model": "m", "api_key_env": "LLM_KEY_X"}}',
+           'LLM_SCHOOL_MAP': '{"1": "x"}', 'LLM_KEY_X': 'fake-test-key-' + 'z' * 20}
+    OK = {'purpose': 'pedagogy', 'messages': [{'role': 'user', 'content': 'Explain fractions simply.'}]}
+
+    def post(self, body, **kw):
+        return self.client.post('/llm/complete/', json=body, headers=bearer([ADMIN_ROLE], schools=[1]), **kw)
+
+    def test_roster_names_from_django_are_refused_and_nothing_is_sent(self):
+        sent = []
+        def transport(url, headers, body, timeout):
+            sent.append(url)
+            return 200, b'{"choices": [{"message": {"content": "ok"}}]}'
+        with mock.patch.dict(os.environ, self.ENV), mock.patch('llm_adapter._urllib_transport', transport):
+            bad = self.post({**self.OK, 'messages': [{'role': 'user', 'content': 'Why does Sara Karimi struggle?'}], 'avoid_names': ['Sara Karimi']})
+            self.assertEqual((bad.status_code, bad.json()['detail']), (422, 'pii_refused'))
+            self.assertEqual(sent, [])
+            self.assertEqual(self.post({**self.OK, 'avoid_names': ['Sara Karimi']}).status_code, 200)
+            self.assertEqual(len(sent), 1)
+
+    def test_body_shape_and_size_are_bounded(self):
+        with mock.patch.dict(os.environ, self.ENV):
+            for body in ({**self.OK, 'avoid_names': [1, 2]}, {**self.OK, 'messages': [{'role': 'user', 'content': 5}]},
+                         {**self.OK, 'messages': [{'role': 'user', 'content': 'x'}] * 21}, {**self.OK, 'purpose': 'p' * 41},
+                         {**self.OK, 'avoid_names': ['n'] * 2001}):
+                self.assertEqual(self.post(body).status_code, 422)
+            big = self.client.post('/llm/complete/', content=b'x' * 250_000, headers={**bearer([ADMIN_ROLE], schools=[1]), 'Content-Type': 'application/json'})
+            self.assertIn(big.status_code, (413, 422))
+
+
 class EmbeddingFailureTests(unittest.TestCase):
     """The REAL rag_service.py (only ollama/psycopg2/pgvector are faked): an embedding failure must
     raise, never fall back to a zero vector, and nothing may be written or searched with one."""
