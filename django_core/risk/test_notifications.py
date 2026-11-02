@@ -106,3 +106,12 @@ class DueNotificationTests(LoopBase):
         out = StringIO()
         call_command('notify_due', '--school', self.a.code, stdout=out)
         self.assertIn('created 1', out.getvalue())
+
+
+class UniquenessTests(LoopBase):
+    def test_a_duplicate_row_is_refused_by_the_database(self):
+        """Review L-2 (decision 52): get_or_create alone is not race-safe; the constraints are."""
+        from django.db import IntegrityError, transaction
+        alert = self.alert(self.s7)
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            Notification.objects.create(user=self.admin, school_id=alert.school_id, kind=Notification.ALERT_NEW, alert=alert)

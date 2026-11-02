@@ -219,4 +219,7 @@ class Notification(models.Model):
         indexes = [models.Index(fields=["user", "read_at"], name="notif_user_read_idx")]
         constraints = [models.CheckConstraint(
             condition=(models.Q(kind="alert_new", alert__isnull=False) | models.Q(kind="followup_due", plan__isnull=False)),
-            name="notif_target_matches_kind")]
+            name="notif_target_matches_kind"),
+            models.UniqueConstraint(fields=["user", "kind", "alert"], condition=models.Q(alert__isnull=False), name="notif_unique_alert"),
+            models.UniqueConstraint(fields=["user", "kind", "plan", "due_on"], condition=models.Q(plan__isnull=False),
+                                    name="notif_unique_plan_due")]

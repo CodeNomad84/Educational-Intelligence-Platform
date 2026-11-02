@@ -34,7 +34,7 @@ class MigrationTests(TestCase):
             keys = sorted(k for k in loader.disk_migrations if k[0] == app)
             self.assertEqual(keys[0], (app, '0001_initial'))
             if app == 'risk':
-                self.assertEqual(keys, [('risk', '0001_initial'), ('risk', '0002_rules'), ('risk', '0003_rule_last_edited_by'), ('risk', '0004_rule_kind_repeated_concerns'), ('risk', '0005_notification')])   # 0025: rule tables only (0003: one column on them; 0004: choices of Rule.kind, no SQL; 0005: Notification table)
+                self.assertEqual(keys, [('risk', '0001_initial'), ('risk', '0002_rules'), ('risk', '0003_rule_last_edited_by'), ('risk', '0004_rule_kind_repeated_concerns'), ('risk', '0005_notification'), ('risk', '0006_notification_unique')])   # 0025: rule tables only (0003: one column on them; 0004: choices of Rule.kind, no SQL; 0005: Notification table; 0006: its unique constraints)
             else:
                 self.assertEqual(keys, [('interventions', '0001_initial'), ('interventions', '0002_strategy')])   # P6-1: one table + one nullable column
             for key in keys:
