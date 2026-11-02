@@ -42,3 +42,6 @@ __pycache__/
 # Uploads and collected static files
 /django_core/media/
 /django_core/staticfiles/
+
+# Screenshots of UI slices (desktop + mobile), kept locally only
+/var/screenshots/

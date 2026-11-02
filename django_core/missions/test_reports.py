@@ -5,6 +5,7 @@ from datetime import timedelta
 
 from django.urls import get_resolver, reverse
 
+from dashboard.page_testing import without_own_name
 from dashboard.test_counselor import make_user
 from schools.models import AuditEvent, SchoolModule, TeacherAssignment
 from schools.module_grants import grant
@@ -137,8 +138,10 @@ class WhatEachRoleSeesTests(ReportBase):
         page = self.get(self.t1, self.report_url)
         self.assertEqual(page.status_code, 200)
         self.assertTemplateUsed(page, 'missions/report_status.html')
+        text = without_own_name(page)   # t1 is 'Obsone': its own top bar may name it, nothing else on the page may
         for hidden in ('t1b-evidence-text', 'found-two-causes', 'Obstwo', 'Obsone', 'مسیرهای پیشنهادی', 'دغدغه'):
-            self.assertNotContains(page, hidden)
+            self.assertNotIn(hidden, text)
+        self.assertIn('<span class="eip-user-name">Obsone', page.content.decode())   # the helper removed only the top bar
         ind = page.context['indicators']
         self.assertTrue(all('score' not in row for row in ind))
         self.assertTrue(all('score' not in row for row in page.context['branches']))
