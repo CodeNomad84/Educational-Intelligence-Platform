@@ -8,6 +8,7 @@ import math
 
 from django.contrib import messages
 from django.core.exceptions import ValidationError
+from django.db import IntegrityError
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods, require_POST
@@ -213,6 +214,8 @@ def catalog_page(request, school):
             rule = catalog_services.activate_template(request.user, school.pk, request.POST.get('code', ''))
         except ValidationError as exc:
             messages.error(request, ' '.join(exc.messages))
+        except IntegrityError:
+            messages.error(request, 'این قاعده قبلاً ساخته شده است.')
         else:
             messages.success(request, 'پیش‌نویس قاعده ساخته شد؛ ابتدا شبیه‌سازی و سپس تأیید لازم است.')
             return redirect('rules:detail', pk=rule.pk)
@@ -234,7 +237,8 @@ def import_template(request, school):
 
 
 def _plain(rows):
-    return [{k: (v if isinstance(v, (str, int, float)) or v is None else str(v)) for k, v in row.items()} for row in rows]
+    from . import catalog_services as svc
+    return svc.trim([{k: (v if isinstance(v, (str, int, float)) or v is None else str(v)) for k, v in row.items()} for row in rows])
 
 
 @school_page
@@ -248,16 +252,20 @@ def import_page(request, school):
         if not pending or pending.get('school') != school.pk or not secrets.compare_digest(pending['nonce'], request.POST.get('nonce', '')):
             messages.error(request, 'فایلی برای تأیید وجود ندارد؛ دوباره بارگذاری کنید.')
             return redirect('rules:import')
-        del request.session['rules_import']
-        r_report = svc.import_rules(request.user, school.pk, pending['rules'], apply=True)
-        s_report = svc.import_strategies(school, pending['strategies'], apply=True)
+        from django.db import transaction
+        with transaction.atomic():              # all or nothing; a failure leaves the pending upload in place for a retry (review L2)
+            r_report = svc.import_rules(request.user, school.pk, pending['rules'], apply=True)
+            s_report = svc.import_strategies(school, pending['strategies'], apply=True)
+        request.session.pop('rules_import', None)
         made_r, made_s = sum(1 for x in r_report if x[1] == 'ok'), sum(1 for x in s_report if x[1] == 'ok')
         audit.record(request.user, audit.RULES_IMPORT, school=school.pk, detail=f'c{made_r}r{len(r_report) - made_r}')
         audit.record(request.user, audit.STRATEGIES_IMPORT, school=school.pk, detail=f'c{made_s}r{len(s_report) - made_s}')
         context.update(done=True, r_report=r_report, s_report=s_report)
     elif request.method == 'POST':
         upload = request.FILES.get('file')
-        if upload is None or not upload.name.lower().endswith('.xlsx'):
+        if not svc.upload_allowed(request.user.pk):
+            messages.error(request, 'تعداد بارگذاری‌ها بیش از حد مجاز است؛ چند دقیقه بعد دوباره تلاش کنید.')
+        elif upload is None or not upload.name.lower().endswith('.xlsx'):
             messages.error(request, 'یک فایل xlsx بارگذاری کنید.')
         else:
             try:

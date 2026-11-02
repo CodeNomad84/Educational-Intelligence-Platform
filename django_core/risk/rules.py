@@ -239,13 +239,15 @@ def _is_open(alert):
 def _family_state(rule, school_id, student_id):
     """``(stronger_open, weaker_new_alert)`` for this student within the rule's catalog family (decision 53). Rules outside a
     family are independent. Rank = position in ``catalog.FAMILIES`` (weakest first)."""
-    placed = catalog.FAMILY_OF.get(rule.code)
+    placed = catalog.FAMILY_OF.get(rule.template_code) if rule.template_code == rule.code else None   # only a rule made FROM the catalog joins a family (review L5)
     if placed is None:
         return False, None
     family, rank = placed
     weaker = None
     hits = RuleHit.objects.filter(school_id=school_id, student_id=student_id, rule__code__in=catalog.FAMILIES[family]).select_related('alert', 'rule')
     for hit in hits:
+        if hit.rule.template_code != hit.rule.code or hit.rule.risk_type != rule.risk_type:
+            continue
         other = catalog.FAMILY_OF[hit.rule.code][1]
         if other == rank or not _is_open(hit.alert):
             continue
@@ -261,6 +263,9 @@ SEVERITY_ORDER = {'yellow': 0, 'orange': 1}
 
 def _upgrade_alert(rule, alert, message, explanation, school_id, student, as_of, evidence, actor):
     with transaction.atomic():
+        alert = Alert.objects.select_for_update().select_related('risk_event').get(pk=alert.pk)
+        if alert.status != Alert.NEW:                  # reviewed in the gap: the stronger signal gets its own alert (review L4)
+            return False
         event = alert.risk_event
         if SEVERITY_ORDER.get(rule.severity, 0) > SEVERITY_ORDER.get(event.severity, 0):
             event.severity = rule.severity
@@ -268,9 +273,14 @@ def _upgrade_alert(rule, alert, message, explanation, school_id, student, as_of,
         event.save(update_fields=['severity', 'risk_type', 'explanation'])
         alert.message = message
         alert.save(update_fields=['message'])
-        RuleHit.objects.get_or_create(school_id=school_id, rule=rule, student=student, evaluated_on=as_of,
-                                      defaults={'alert': alert, 'evidence': {'items': evidence}})
+        try:
+            with transaction.atomic():
+                RuleHit.objects.get_or_create(school_id=school_id, rule=rule, student=student, evaluated_on=as_of,
+                                              defaults={'alert': alert, 'evidence': {'items': evidence}})
+        except IntegrityError:
+            pass
     audit.record(actor, audit.ALERT_RAISE, alert, school=school_id, detail=f'up:{rule.code}'[:40])
+    return True
 
 
 def _run_rule(rule, students, attendance, grades, as_of, school_id, scale_ok, breaker_percent, actor, triggered_by, concerns=None):
@@ -301,9 +311,9 @@ def _run_rule(rule, students, attendance, grades, as_of, school_id, scale_ok, br
             run.skipped_superseded += 1
             continue
         if weaker_new is not None:               # a weaker NEW alert exists: upgrade it in place instead of adding another
-            _upgrade_alert(rule, weaker_new, message, explanation, school_id, student, as_of, fired[student.pk], actor)
-            run.alerts_upgraded += 1
-            continue
+            if _upgrade_alert(rule, weaker_new, message, explanation, school_id, student, as_of, fired[student.pk], actor):
+                run.alerts_upgraded += 1
+                continue
         try:
             with transaction.atomic():           # one transaction per student: a failed hit insert rolls its alert back
                 alert = raise_alert(student, risk_type=rule.risk_type, severity=rule.severity, message=message,
@@ -337,7 +347,7 @@ def run_school(school_id, *, as_of=None, triggered_by=None):
         for rule in active:
             run = _run_rule(rule, students, attendance, grades, as_of, school_id, scale_ok, breaker, actor, triggered_by, concerns)
             audit.record(actor, audit.RULE_RUN, rule, school=school_id,
-                         detail=f"e{run.evaluated}h{run.hits}a{run.alerts_raised}c{run.skipped_cooldown}i{run.skipped_insufficient}"
+                         detail=f"e{run.evaluated}h{run.hits}a{run.alerts_raised}c{run.skipped_cooldown}i{run.skipped_insufficient}u{run.alerts_upgraded}s{run.skipped_superseded}"
                                 + ('B' if run.status == RuleRun.Status.BREAKER else 'S' if run.status == RuleRun.Status.NO_SCALE else ''))
             runs.append(run)
     return runs

@@ -232,7 +232,7 @@ class RunnerTests(RulesBase):
         self.go()
         run_event = AuditEvent.objects.get(action='rule_run')
         self.assertEqual((run_event.username, run_event.user_id, run_event.roles, run_event.school_id), ('system', None, 'system', self.a.pk))
-        self.assertEqual(run_event.detail, 'e8h1a1c0i7')
+        self.assertEqual(run_event.detail, 'e8h1a1c0i7u0s0')
         raised = AuditEvent.objects.get(action='alert_raise')
         self.assertEqual((raised.username, raised.detail), ('system', 'repeated_absence'))
         every = ' '.join(f'{e.detail} {e.object_type} {e.object_id} {e.username}' for e in AuditEvent.objects.all())

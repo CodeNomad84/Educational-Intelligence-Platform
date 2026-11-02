@@ -3,9 +3,10 @@ as the forms (``lifecycle.create`` -> ``rules.validate_*``; ``StrategyForm``). R
 until a human simulates and approves. The school is always the caller's (never read from the file). Reports hold fixed reason codes."""
 import io
 import re
+import zipfile
 
 from django.core.exceptions import ValidationError
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from openpyxl import Workbook, load_workbook
 
 from interventions.models import Strategy
@@ -15,6 +16,8 @@ from . import catalog, lifecycle, rules, signals
 from .models import Rule, RuleSettings
 
 MAX_BYTES, MAX_ROWS = 1_000_000, 200
+MAX_UNCOMPRESSED, MAX_MEMBERS, MAX_SCANNED, MAX_COLUMNS, MAX_CELL = 10_000_000, 20, 2000, 40, 500
+UPLOADS_PER_WINDOW, WINDOW_SECONDS = 10, 600
 RULE_COLUMNS = ['code', 'kind', 'title', 'risk_type', 'severity', 'connective', 'cooldown_days']
 CLAUSE_COLUMNS = ['metric', 'op', 'threshold', 'window_days', 'baseline_days', 'min_records']
 SLOTS = rules.MAX_CLAUSES
@@ -33,6 +36,17 @@ class ImportRefused(Exception):
     def __init__(self, code):
         super().__init__(code)
         self.code = code
+
+
+def upload_allowed(user_id):
+    """At most ``UPLOADS_PER_WINDOW`` import uploads per user per window (cache-based, shared by workers in production)."""
+    from django.core.cache import cache
+    key = f'rules-import:{user_id}'
+    cache.add(key, 0, WINDOW_SECONDS)
+    try:
+        return cache.incr(key) <= UPLOADS_PER_WINDOW
+    except ValueError:
+        return True
 
 
 def activate_template(actor, school_id, code):
@@ -89,12 +103,27 @@ def _num(value):
     return text
 
 
+KEEP = set(RULE_COLUMNS) | {f'{n}{i}' for i in range(1, SLOTS + 1) for n in CLAUSE_COLUMNS} | set(STRATEGY_COLUMNS) | {'line'}
+
+
+def trim(rows):
+    """Whitelisted columns only, cells cut to ``MAX_CELL`` characters (the session stores this, review L3)."""
+    return [{k: (v[:MAX_CELL] if isinstance(v, str) else v) for k, v in row.items() if k in KEEP} for row in rows]
+
+
 def read_workbook(data):
     """``(rule_rows, strategy_rows)`` as lists of dicts with the 1-based sheet line; raises ``ImportRefused`` for the file."""
     if len(data) > MAX_BYTES:
         raise ImportRefused('file_too_large')
     if not data.startswith(b'PK'):
         raise ImportRefused('not_xlsx')
+    try:       # the compressed size is not the cost: refuse a decompression bomb BEFORE openpyxl loads shared strings (review M1)
+        with zipfile.ZipFile(io.BytesIO(data)) as archive:
+            infos = archive.infolist()
+            if len(infos) > MAX_MEMBERS or sum(i.file_size for i in infos) > MAX_UNCOMPRESSED:
+                raise ImportRefused('file_too_large')
+    except zipfile.BadZipFile:
+        raise ImportRefused('not_xlsx') from None
     try:
         wb = load_workbook(io.BytesIO(data), read_only=True, data_only=False)   # formulas stay '=...' text and are refused
     except Exception:       # noqa: BLE001 - any parse failure is one fixed refusal
@@ -103,7 +132,9 @@ def read_workbook(data):
     for name in ('Rules', 'Strategies'):
         rows = []
         if name in wb.sheetnames:
-            for index, raw in enumerate(wb[name].iter_rows(values_only=True), start=1):
+            for index, raw in enumerate(wb[name].iter_rows(values_only=True, max_col=MAX_COLUMNS), start=1):
+                if index > MAX_SCANNED:                                   # blank rows count too (review M1)
+                    raise ImportRefused('too_many_rows')
                 if index == 1:
                     header = [_text(h) for h in raw]
                     continue
@@ -138,12 +169,12 @@ def _rule_args(row):
                 continue
             try:
                 clause[key] = int(float(text)) if integer else float(text)
-            except ValueError:
+            except (ValueError, OverflowError):
                 raise ValidationError('bad_number') from None
         clauses.append(clause)
     try:
         cooldown = int(float(_num(row.get('cooldown_days')) or 14))
-    except ValueError:
+    except (ValueError, OverflowError):
         raise ValidationError('bad_number') from None
     return dict(code=_text(row.get('code')), kind=_text(row.get('kind')), title=_text(row.get('title')), risk_type=_text(row.get('risk_type')),
                 severity=_text(row.get('severity')), connective=_text(row.get('connective')) or 'all', clauses=clauses, cooldown_days=cooldown)
@@ -166,6 +197,8 @@ def import_rules(actor, school_id, rows, *, apply):
                         raise _DryRun
             except _DryRun:
                 pass
+            except IntegrityError:
+                raise ValidationError('code_exists') from None
             report.append((row['line'], 'ok', args['code']))
         except ValidationError as exc:
             report.append((row['line'], 'refused', ' '.join(exc.messages)[:80]))
@@ -197,6 +230,6 @@ def import_strategies(school, rows, *, apply):
                 obj.school, obj.is_active = school, False        # lands inactive (owner decision 2026-11-02)
                 obj.save()
             report.append((row['line'], 'ok', title))
-        except (ValidationError, ValueError) as exc:
-            report.append((row['line'], 'refused', ' '.join(getattr(exc, 'messages', [str(exc)]))[:80]))
+        except (ValidationError, ValueError, OverflowError) as exc:      # fixed tokens only: never echo a cell value (review I2)
+            report.append((row['line'], 'refused', ' '.join(exc.messages)[:80] if isinstance(exc, ValidationError) else 'invalid_row'))
     return report

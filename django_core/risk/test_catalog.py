@@ -220,3 +220,87 @@ class ImportTests(RulesBase):
         self.assertTrue(AuditEvent.objects.filter(action='rules_import', detail='c1r0').exists())
         self.assertTrue(AuditEvent.objects.filter(action='strategies_import', detail='c1r0').exists())
         self.assertEqual(self.post_file(b'junk').status_code, 200)                  # a bad file is a message, not an error page
+
+
+class ReviewFixesTests(RulesBase):
+    """Review of 0031 (decision 58): M1 bomb guards and throttle, L1 overflow, L3 session payload, L4 recheck, L5 family keying."""
+    report = ImportTests.report
+    post_file = ImportTests.post_file
+    absent_streak = RulesBase.absent_streak
+
+    def test_zip_bomb_member_count_blank_rows_and_overflow_cells_are_refused_or_reported(self):
+        import zipfile
+        good = book([GOOD])
+        out = io.BytesIO()
+        with zipfile.ZipFile(io.BytesIO(good)) as src, zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED) as dst:
+            for item in src.infolist():
+                dst.writestr(item, src.read(item.filename))
+            dst.writestr('xl/junk.bin', b'\0' * (svc.MAX_UNCOMPRESSED + 1))      # tiny when compressed, huge when read
+        self.assertLess(len(out.getvalue()), svc.MAX_BYTES)
+        with self.assertRaises(svc.ImportRefused) as ctx:
+            svc.read_workbook(out.getvalue())
+        self.assertEqual(ctx.exception.code, 'file_too_large')
+        many = io.BytesIO()
+        with zipfile.ZipFile(io.BytesIO(good)) as src, zipfile.ZipFile(many, 'w') as dst:
+            for item in src.infolist():
+                dst.writestr(item, src.read(item.filename))
+            for n in range(svc.MAX_MEMBERS + 1):
+                dst.writestr(f'xl/x{n}.txt', b'x')
+        with self.assertRaises(svc.ImportRefused):
+            svc.read_workbook(many.getvalue())
+        wb = Workbook()
+        wb.active.title = 'Rules'
+        wb.active.append(svc.RULE_COLUMNS)
+        for _ in range(svc.MAX_SCANNED + 5):
+            wb.active.append([' '])                                                 # blank-looking rows still count as scanned
+        buf = io.BytesIO()
+        wb.save(buf)
+        with self.assertRaises(svc.ImportRefused) as ctx:
+            svc.read_workbook(buf.getvalue())
+        self.assertEqual(ctx.exception.code, 'too_many_rows')
+        report = self.report([{**GOOD, 'window_days1': 'inf'}, {**GOOD, 'code': 'o2', 'cooldown_days': '1e999'}])
+        self.assertEqual([x[1] for x in report], ['refused', 'refused'])             # OverflowError is a row refusal, not a 500
+        _r, s_rows = svc.read_workbook(book(strategy_rows=[{**GOOD_S, 'tier': 'inf'}]))
+        self.assertEqual(svc.import_strategies(self.a, s_rows, apply=False)[0][1:], ('refused', 'invalid_row'))
+
+    def test_uploads_are_throttled_per_user(self):
+        from django.core.cache import cache
+        cache.clear()
+        self.client.force_login(self.admin)
+        for _ in range(svc.UPLOADS_PER_WINDOW):
+            self.post_file(book([GOOD]))
+        page = self.post_file(book([GOOD]))
+        self.assertContains(page, 'بیش از حد مجاز')
+        self.assertNotIn('preview', page.context or {})
+        cache.clear()
+
+    def test_the_session_keeps_only_whitelisted_short_cells(self):
+        self.client.force_login(self.admin)
+        r_rows, _s = svc.read_workbook(book([{**GOOD, 'title': 'T' * 900}]))
+        r_rows[0]['evil_extra_column'] = 'x' * 5000
+        kept = svc.trim(r_rows)
+        self.assertNotIn('evil_extra_column', kept[0])
+        self.assertEqual(len(kept[0]['title']), svc.MAX_CELL)
+
+    def test_a_weaker_alert_reviewed_in_the_gap_is_not_upgraded(self):
+        self.absent_streak(self.s7, days=range(1, 9))
+        FamilySupersessionTests.go(self, 'repeated_absence')
+        rules.run_school(self.a.pk, as_of=TODAY)
+        alert = Alert.objects.get(student=self.s7)
+        from risk.services import review_alert
+        review_alert(self.admin, alert, Alert.ACCEPTED)                              # reviewed after _family_state read it as NEW
+        rule = Rule.objects.get(code='repeated_absence')
+        self.assertFalse(rules._upgrade_alert(rule, alert, 'm', 'e', self.a.pk, self.s7, TODAY, [], self.admin))
+        alert.refresh_from_db()
+        self.assertEqual(alert.message == 'm', False)
+
+    def test_only_rules_made_from_the_catalog_join_a_family(self):
+        self.absent_streak(self.s7, days=range(1, 9))
+        FamilySupersessionTests.go(self, 'repeated_absence')                         # catalog rule
+        custom = lifecycle.create(self.admin, self.a.pk, code='absence_run', kind='absence_run', title='custom', risk_type='attendance',
+                                  severity='orange', connective='all', clauses=catalog.instantiate('absence_run', 20))
+        lifecycle.simulate(custom, self.admin, as_of=TODAY)
+        lifecycle.submit(custom, self.admin)
+        lifecycle.approve(custom, self.admin)                                        # same code as a template, but NOT made from it
+        rules.run_school(self.a.pk, as_of=TODAY)
+        self.assertEqual(Alert.objects.filter(student=self.s7).count(), 2)           # no supersession, no upgrade
