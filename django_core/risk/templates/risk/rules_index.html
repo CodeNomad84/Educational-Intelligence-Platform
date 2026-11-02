@@ -27,6 +27,7 @@
   <div class="col-md-3 pt-3"><button class="btn btn-sm btn-primary">ذخیره</button></div>
 </form></div>
 <div class="mb-3"><a class="btn btn-sm btn-success" href="{% url 'rules:create' %}">قاعدهٔ جدید</a>
+  <a class="btn btn-sm btn-primary" href="{% url 'rules:catalog' %}">کاتالوگ پیش‌فرض</a> <a class="btn btn-sm btn-outline-primary" href="{% url 'rules:import' %}">درون‌ریزی از Excel</a>
   {% for code in starters %}<a class="btn btn-sm btn-outline-secondary" href="{% url 'rules:create' %}?from={{ code }}">از پیشنهاد اولیه: {{ code }}</a>{% endfor %}</div>
 <table class="table table-sm bg-white">
   <thead><tr><th>کد</th><th>نسخه</th><th>عنوان</th><th>نوع</th><th>شدت</th><th>وضعیت</th><th></th></tr></thead>

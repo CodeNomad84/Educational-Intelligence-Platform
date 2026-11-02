@@ -71,6 +71,11 @@ SCHOOL_CREATE = 'school_create'            # detail = cmd | admin (which path cr
 STRATEGY_SAVE = 'strategy_save'              # detail = created | edited | on | off; object = the Strategy (id only)
 
 
+RULE_FROM_TEMPLATE = 'rule_from_template'    # detail = <code> v<catalog version>; object = the new draft Rule
+RULES_IMPORT = 'rules_import'              # detail = counts only, e.g. c3r1 (created, refused)
+STRATEGIES_IMPORT = 'strategies_import'    # detail = counts only
+
+
 SYSTEM = 'system'      # actor of scheduled / command runs (no user): stored as user=None, username 'system', roles 'system'
 
 

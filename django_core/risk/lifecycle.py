@@ -48,7 +48,7 @@ def _check(rule):
 
 
 @transaction.atomic
-def create(actor, school_id, *, code, kind, title, risk_type, severity, connective, clauses, cooldown_days=14):
+def create(actor, school_id, *, code, kind, title, risk_type, severity, connective, clauses, cooldown_days=14, template=None):
     """New code -> version 1 draft. The code is unique per school (a new version of a code goes through ``clone``)."""
     _admin_of(actor, school_id)
     if not re.fullmatch(r'[a-z0-9][a-z0-9_-]{0,39}', code or ''):
@@ -58,6 +58,8 @@ def create(actor, school_id, *, code, kind, title, risk_type, severity, connecti
     rule = Rule(school_id=school_id, code=code, version=1, kind=kind, title=title.strip()[:120], risk_type=risk_type,
                 severity=severity, connective=connective, clauses=clauses, cooldown_days=cooldown_days, created_by=actor,
                 last_edited_by=actor)
+    if template:
+        rule.template_code, rule.template_version = template
     if not rule.title:
         raise ValidationError('عنوان لازم است.')
     _check(rule)

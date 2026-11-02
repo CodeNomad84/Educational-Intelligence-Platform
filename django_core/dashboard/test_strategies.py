@@ -11,7 +11,7 @@ class StrategyTests(LoopBase):
     def test_seed_is_idempotent_and_roles(self):
         call_command('seed_strategies', stdout=open('/dev/null', 'w'))
         n = Strategy.objects.filter(school=self.a).count()
-        self.assertGreaterEqual(n, 30)
+        self.assertGreaterEqual(n, 48)
         call_command('seed_strategies', stdout=open('/dev/null', 'w'))
         self.assertEqual(Strategy.objects.filter(school=self.a).count(), n)
         url = reverse('dashboard:school_strategies')

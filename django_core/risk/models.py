@@ -111,7 +111,9 @@ class Rule(models.Model):
         ARCHIVED = "archived", "بایگانی"
 
     RULE_RISK_TYPES = ("academic", "attendance", "behavioral")   # never emotional / family / social / motivation
-    KINDS = ("attendance_shift", "repeated_absence", "low_average", "grade_drop", "repeated_concerns")
+    KINDS = ("attendance_shift", "repeated_absence", "low_average", "grade_drop", "repeated_concerns", "chronic_absence_watch",
+             "chronic_absence_high", "absence_run", "late_pattern", "failing_average", "off_track_combo", "concern_surge",
+             "concern_with_absence")   # == risk.catalog.TEMPLATES (a test pins it)
 
     school = models.ForeignKey("schools.School", on_delete=models.PROTECT, related_name="+")
     code = models.SlugField(max_length=40)
@@ -123,6 +125,8 @@ class Rule(models.Model):
     connective = models.CharField(max_length=3, choices=[("all", "all"), ("any", "any")], default="all")
     clauses = models.JSONField(default=list)
     cooldown_days = models.PositiveSmallIntegerField(default=14)
+    template_code = models.CharField(max_length=40, blank=True)             # 0031: provenance when created from the catalog
+    template_version = models.PositiveSmallIntegerField(null=True, blank=True)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT, db_index=True)
     params_hash = models.CharField(max_length=64, blank=True)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
@@ -193,6 +197,8 @@ class RuleRun(models.Model):
     alerts_raised = models.PositiveIntegerField(default=0)
     skipped_cooldown = models.PositiveIntegerField(default=0)
     skipped_insufficient = models.PositiveIntegerField(default=0)
+    skipped_superseded = models.PositiveIntegerField(default=0)   # 0031: a stronger open alert of the same family exists
+    alerts_upgraded = models.PositiveIntegerField(default=0)      # 0031: a weaker NEW alert was upgraded in place
 
     class Meta:
         ordering = ["-started_at", "-pk"]

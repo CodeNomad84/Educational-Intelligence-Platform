@@ -1,0 +1,13 @@
+{% extends 'dashboard/base.html' %}
+{% load eip_ui %}
+{% block title %}کاتالوگ پیش‌فرض قواعد{% endblock %}
+{% block content %}
+<p class="text-muted">{{ basis }}. آستانه‌ها پیشنهاد اولیه و اعتبارسنجی‌نشده‌اند و حد قانونی نیستند؛ معلمان و مشاور مدرسه باید آن‌ها را بازبینی کنند. فعال‌سازی فقط یک <strong>پیش‌نویس</strong> می‌سازد؛ تا شبیه‌سازی و تأیید انسانی انجام نشود هیچ هشداری ساخته نمی‌شود. (نسخهٔ کاتالوگ {{ version }})</p>
+<div class="card"><div class="table-responsive"><table class="table table-sm mb-0 eip-fit">
+<thead><tr><th>قاعده</th><th>نوع</th><th>شدت</th><th>سطح پیشنهادی</th><th></th></tr></thead><tbody>
+{% for r in rows %}<tr><td>{{ r.template.title }}{% if r.template.starter %} <span class="badge text-bg-success">بسته پیشنهادی شروع</span>{% endif %}<div class="small text-muted">{{ r.code }}{% if r.template.family %} · خانواده: {{ r.template.family }}{% endif %}</div></td>
+<td>{{ r.template.risk_type }}</td><td>{{ r.template.severity }}</td><td>{{ r.template.tier }}</td>
+<td>{% if r.have %}<span class="text-muted small">قبلاً ساخته شده</span>{% elif r.needs_scale and not settings.grade_scale_max %}<span class="text-muted small">نیازمند سقف مقیاس نمره</span>{% else %}<form method="post">{% csrf_token %}<input type="hidden" name="code" value="{{ r.code }}"><button class="btn btn-sm btn-outline-primary">ساخت پیش‌نویس</button></form>{% endif %}</td></tr>{% endfor %}
+</tbody></table></div></div>
+<p class="small text-muted mt-3">در یک خانواده، قاعدهٔ قوی‌تر جای قاعدهٔ ضعیف‌تر را می‌گیرد: برای یک دانش‌آموز هشدار دوم ساخته نمی‌شود.</p>
+{% endblock %}

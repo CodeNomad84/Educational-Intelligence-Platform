@@ -201,3 +201,75 @@ def action(request, school, pk):
     else:
         messages.success(request, 'انجام شد.')
     return redirect('rules:detail', pk=rule.pk)
+
+
+# ---- 0031: catalog and Excel import (SchoolAdmin, own school) ----
+@school_page
+@require_http_methods(['GET', 'POST'])
+def catalog_page(request, school):
+    from . import catalog, catalog_services
+    if request.method == 'POST':
+        try:
+            rule = catalog_services.activate_template(request.user, school.pk, request.POST.get('code', ''))
+        except ValidationError as exc:
+            messages.error(request, ' '.join(exc.messages))
+        else:
+            messages.success(request, 'پیش‌نویس قاعده ساخته شد؛ ابتدا شبیه‌سازی و سپس تأیید لازم است.')
+            return redirect('rules:detail', pk=rule.pk)
+        return redirect('rules:catalog')
+    have = set(Rule.objects.filter(school=school).values_list('code', flat=True))
+    rows = [{'code': c, 'template': t, 'have': c in have, 'needs_scale': catalog.uses_scale(t)} for c, t in catalog.TEMPLATES.items()]
+    return render(request, 'risk/rules_catalog.html', _context(school, request, rows=rows, basis=catalog.BASIS_FA,
+                                                                version=catalog.CATALOG_VERSION, settings=_settings(school)))
+
+
+@school_page
+def import_template(request, school):
+    from django.http import HttpResponse
+    from . import catalog_services
+    response = HttpResponse(catalog_services.template_workbook(),
+                            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = 'attachment; filename="rules_strategies_template.xlsx"'
+    return response
+
+
+def _plain(rows):
+    return [{k: (v if isinstance(v, (str, int, float)) or v is None else str(v)) for k, v in row.items()} for row in rows]
+
+
+@school_page
+@require_http_methods(['GET', 'POST'])
+def import_page(request, school):
+    import secrets
+    from . import catalog_services as svc
+    context = {}
+    if request.method == 'POST' and request.POST.get('step') == 'confirm':
+        pending = request.session.get('rules_import')
+        if not pending or pending.get('school') != school.pk or not secrets.compare_digest(pending['nonce'], request.POST.get('nonce', '')):
+            messages.error(request, 'فایلی برای تأیید وجود ندارد؛ دوباره بارگذاری کنید.')
+            return redirect('rules:import')
+        del request.session['rules_import']
+        r_report = svc.import_rules(request.user, school.pk, pending['rules'], apply=True)
+        s_report = svc.import_strategies(school, pending['strategies'], apply=True)
+        made_r, made_s = sum(1 for x in r_report if x[1] == 'ok'), sum(1 for x in s_report if x[1] == 'ok')
+        audit.record(request.user, audit.RULES_IMPORT, school=school.pk, detail=f'c{made_r}r{len(r_report) - made_r}')
+        audit.record(request.user, audit.STRATEGIES_IMPORT, school=school.pk, detail=f'c{made_s}r{len(s_report) - made_s}')
+        context.update(done=True, r_report=r_report, s_report=s_report)
+    elif request.method == 'POST':
+        upload = request.FILES.get('file')
+        if upload is None or not upload.name.lower().endswith('.xlsx'):
+            messages.error(request, 'یک فایل xlsx بارگذاری کنید.')
+        else:
+            try:
+                r_rows, s_rows = svc.read_workbook(upload.read(svc.MAX_BYTES + 1))
+            except svc.ImportRefused as exc:
+                messages.error(request, {'file_too_large': 'فایل بزرگ‌تر از حد مجاز است.', 'not_xlsx': 'فایل xlsx معتبر نیست.',
+                                         'too_many_rows': 'تعداد ردیف‌ها بیش از حد مجاز است.'}[exc.code])
+            else:
+                r_report = svc.import_rules(request.user, school.pk, r_rows, apply=False)
+                s_report = svc.import_strategies(school, s_rows, apply=False)
+                nonce = secrets.token_urlsafe(16)
+                request.session['rules_import'] = {'nonce': nonce, 'school': school.pk, 'rules': _plain(r_rows), 'strategies': _plain(s_rows)}
+                context.update(preview=True, nonce=nonce, r_report=r_report, s_report=s_report,
+                               can_confirm=any(x[1] == 'ok' for x in r_report + s_report))
+    return render(request, 'risk/rules_import.html', _context(school, request, **context))

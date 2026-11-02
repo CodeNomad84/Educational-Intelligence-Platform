@@ -16,6 +16,7 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
+from . import catalog
 from students.access import system_scope_concern_notes, system_scope_attendance, system_scope_enrollments, system_scope_grades, system_scope_students
 
 from schools import audit
@@ -230,6 +231,48 @@ def _blocked_by_cooldown(rule, hits, as_of):
     return last is not None and (as_of - last).days < rule.cooldown_days
 
 
+def _is_open(alert):
+    """Open = not yet reviewed, or accepted while a plan is planned/active."""
+    return alert.status == Alert.NEW or (alert.status == Alert.ACCEPTED and alert.plans.filter(status__in=OPEN_PLAN_STATUSES).exists())
+
+
+def _family_state(rule, school_id, student_id):
+    """``(stronger_open, weaker_new_alert)`` for this student within the rule's catalog family (decision 53). Rules outside a
+    family are independent. Rank = position in ``catalog.FAMILIES`` (weakest first)."""
+    placed = catalog.FAMILY_OF.get(rule.code)
+    if placed is None:
+        return False, None
+    family, rank = placed
+    weaker = None
+    hits = RuleHit.objects.filter(school_id=school_id, student_id=student_id, rule__code__in=catalog.FAMILIES[family]).select_related('alert', 'rule')
+    for hit in hits:
+        other = catalog.FAMILY_OF[hit.rule.code][1]
+        if other == rank or not _is_open(hit.alert):
+            continue
+        if other > rank:
+            return True, None
+        if hit.alert.status == Alert.NEW and (weaker is None or other > catalog.FAMILY_OF[weaker[1]][1]):
+            weaker = (hit.alert, hit.rule.code)
+    return False, (weaker[0] if weaker else None)
+
+
+SEVERITY_ORDER = {'yellow': 0, 'orange': 1}
+
+
+def _upgrade_alert(rule, alert, message, explanation, school_id, student, as_of, evidence, actor):
+    with transaction.atomic():
+        event = alert.risk_event
+        if SEVERITY_ORDER.get(rule.severity, 0) > SEVERITY_ORDER.get(event.severity, 0):
+            event.severity = rule.severity
+        event.risk_type, event.explanation = rule.risk_type, explanation
+        event.save(update_fields=['severity', 'risk_type', 'explanation'])
+        alert.message = message
+        alert.save(update_fields=['message'])
+        RuleHit.objects.get_or_create(school_id=school_id, rule=rule, student=student, evaluated_on=as_of,
+                                      defaults={'alert': alert, 'evidence': {'items': evidence}})
+    audit.record(actor, audit.ALERT_RAISE, alert, school=school_id, detail=f'up:{rule.code}'[:40])
+
+
 def _run_rule(rule, students, attendance, grades, as_of, school_id, scale_ok, breaker_percent, actor, triggered_by, concerns=None):
     run = RuleRun(school_id=school_id, rule=rule, mode='live', as_of=as_of, triggered_by=triggered_by, evaluated=len(students))
     uses_scale = any(c['metric'] == 'avg_score' for c in rule.clauses)
@@ -253,6 +296,14 @@ def _run_rule(rule, students, attendance, grades, as_of, school_id, scale_ok, br
             run.skipped_cooldown += 1
             continue
         message, explanation = message_for(rule, fired[student.pk])
+        stronger_open, weaker_new = _family_state(rule, school_id, student.pk)
+        if stronger_open:                        # a stronger rule of the same family already has an open alert: no second alert
+            run.skipped_superseded += 1
+            continue
+        if weaker_new is not None:               # a weaker NEW alert exists: upgrade it in place instead of adding another
+            _upgrade_alert(rule, weaker_new, message, explanation, school_id, student, as_of, fired[student.pk], actor)
+            run.alerts_upgraded += 1
+            continue
         try:
             with transaction.atomic():           # one transaction per student: a failed hit insert rolls its alert back
                 alert = raise_alert(student, risk_type=rule.risk_type, severity=rule.severity, message=message,
