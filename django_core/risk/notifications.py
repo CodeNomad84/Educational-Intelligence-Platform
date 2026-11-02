@@ -18,10 +18,12 @@ DUE_SOON_DAYS = 7
 
 def _candidates(student):
     """Users who MIGHT review this student's alerts; the access layer (``reviewable_alerts``) is the authority afterwards."""
-    from schools.models import GradeLeadAssignment, SchoolMembership
+    from schools.models import GradeLeadAssignment
+    from students.access import ADMIN
     from students.models import Referral
 
-    ids = set(SchoolMembership.objects.filter(school_id=student.school_id, is_active=True).values_list('user_id', flat=True))
+    # SchoolAdmins by group (memberships are read only inside schools/); ``reviewable_alerts`` decides who really qualifies
+    ids = set(get_user_model().objects.filter(groups__name=ADMIN, is_active=True).values_list('pk', flat=True))
     ids |= set(GradeLeadAssignment.objects.filter(school_id=student.school_id, grade=student.grade).values_list('user_id', flat=True))
     ids |= set(Referral.objects.filter(student=student, status='open').values_list('counselor_id', flat=True))
     return get_user_model().objects.filter(pk__in=ids, is_active=True)
