@@ -10,7 +10,7 @@
 
 ## Independent security review (fresh agent, read-only, no tests run) — raw findings
 No Critical, High or Medium: no STOP.
-- **L-1 Low** The REST API `/api/students/` returns the full national id (serializers.py:42, views.py:196-233), unmasked and unaudited, to full-tier users already scoped by `visible_students`. Masking is a UI control only. **Open, owner decision** (an API contract change = L2).
+- **L-1 Low** The REST API `/api/students/` returns the full national id (serializers.py:42, views.py:196-233), unmasked and unaudited, to full-tier users already scoped by `visible_students`. Masking is a UI control only. **Closed 2026-11-02 on owner approval** (decision 44): list masked, detail read audited.
 - **L-2 Low** The picker could clear or change an existing date outside its year window, and `sync()` ran on load. **Fixed**: year range widens to the existing value; `sync()` only runs when there is no value.
 - **L-3 Low** A duplicate strategy title would raise IntegrityError (500). **Fixed**: `clean_title` per school; `typical_days` 1-365 validated server-side.
 - **L-4 Low** `seed_demo_school` had no environment guard. **Fixed**: refuses when non-superuser accounts exist outside DEBUG/DEMO_MODE; password at least 8 chars.

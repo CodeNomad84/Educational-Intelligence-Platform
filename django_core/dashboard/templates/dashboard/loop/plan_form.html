@@ -5,7 +5,7 @@
 <form method="post" class="bg-white p-3 border rounded" style="max-width:40rem">{% csrf_token %}
   {% if alert %}<input type="hidden" name="alert" value="{{ alert.pk }}">{% endif %}
   {% if strategies %}<div class="mb-3"><label class="form-label">شروع از کتابخانهٔ راهبردها (اختیاری)</label>
-    <select name="strategy" id="strategy" class="form-select"><option value="">—</option>{% for s in strategies %}<option value="{{ s.pk }}" data-type="{{ s.intervention_type }}" data-days="{{ s.typical_days }}" data-text="{{ s.description }}">سطح {{ s.tier }} · {{ s.title }}</option>{% endfor %}</select>
+    <select name="strategy" id="strategy" class="form-select"><option value="">—</option>{% for s in strategies %}<option value="{{ s.pk }}" data-type="{{ s.intervention_type }}" data-days="{{ s.typical_days }}" data-title="{{ s.title }}" data-text="{{ s.description }}">سطح {{ s.tier }} · {{ s.title }}</option>{% endfor %}</select>
     <div class="form-text">فقط متن پیشنهادی را پر می‌کند؛ پیش از ثبت می‌توانید آن را ویرایش کنید.</div></div>{% endif %}
   {% for field in form %}{% if field.name != 'owner' %}<div class="mb-3"><label class="form-label">{{ field.label }}</label>{{ field }}{% for e in field.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}</div>{% endif %}{% endfor %}
   {% if is_admin %}<div class="mb-3"><label class="form-label">مسئول (پیش‌فرض: خودتان)</label>
@@ -19,6 +19,6 @@ var sel = document.getElementById('strategy');
 if (sel) sel.addEventListener('change', function () {
   var o = sel.selectedOptions[0]; if (!o || !o.value) return;
   var f = sel.form.elements;
-  f.intervention_type.value = o.dataset.type; f.goal.value = f.goal.value || o.text.split('·').pop().trim(); f.action_plan.value = o.dataset.text;
+  f.intervention_type.value = o.dataset.type; f.goal.value = f.goal.value || o.dataset.title; f.action_plan.value = o.dataset.text;
 });
 </script>{% endblock %}

@@ -6,6 +6,7 @@ meetings) are for the Grade Lead of that student's grade only. Audit stores coun
 """
 from datetime import date
 
+from django.utils import timezone
 from django import forms
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
@@ -63,7 +64,7 @@ def report(request, pk):
             ctx['error'] = 'برای این مدرسه نسخهٔ فعال وزن‌ها وجود ندارد.'
         else:
             ctx['branch_choices'] = list(Branch.objects.all())
-            ctx['today'] = date.today()
+            ctx['today'] = timezone.localdate()
             audit.record(request.user, audit.MISSION_REPORT_VIEW, student, school=student.school_id, detail=kind)
     return render(request, 'missions/report_status.html' if ctx.get('teacher_view') else 'missions/report.html', ctx)
 
@@ -85,7 +86,7 @@ def _read_plan(post, branches):
             errors.append(f'مسیر {i}: شاخهٔ نامعتبر یا تکراری.')
         elif not experience or not goal or review is None or len(experience) > 300 or len(goal) > 300:
             errors.append(f'مسیر {i}: تجربهٔ عملی، هدف رشد و تاریخ بازبینی لازم است.')
-        elif review < date.today():
+        elif review < timezone.localdate():
             errors.append(f'مسیر {i}: تاریخ بازبینی نباید گذشته باشد.')
         else:
             seen.add(branch.pk)

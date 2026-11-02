@@ -2,6 +2,7 @@
 are that school's rows only, and the school of a saved row is set server-side, never taken from the request."""
 from datetime import date
 
+from django.utils import timezone
 from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import UserCreationForm
@@ -157,7 +158,7 @@ def suggested_year(school):
     """Defaults for the next academic year form: the year after the latest one (Gregorian dates, Mehr 1 - Shahrivar 31)."""
     latest = AcademicYear.objects.filter(school=school).order_by('-start_date').first()
     if latest is None:
-        today = date.today()
+        today = timezone.localdate()
         first = today.year - 622 if today.month >= 3 else today.year - 623   # Solar Hijri start year, roughly
     else:
         first = int(latest.code.split('-')[0]) + 1

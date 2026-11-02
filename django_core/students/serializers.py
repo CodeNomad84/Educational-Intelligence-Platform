@@ -5,6 +5,7 @@ from rest_framework import serializers
 from schools.models import SchoolClass
 
 from .models import Student
+from .masking import mask_national_id
 from .student_school import MESSAGES, NATIONAL_ID_REFUSED, SCHOOL_NOT_ALLOWED, national_id_taken, StudentSchoolError, class_choices, parent_choices, resolve_student_school
 
 
@@ -79,6 +80,8 @@ class StudentSerializer(serializers.ModelSerializer):
         if not getattr(instance, 'full_tier', False):
             for name in self.LIMITED_OMIT:
                 data.pop(name, None)
+        elif 'national_id' in data and getattr(self.context.get('view'), 'action', None) == 'list':
+            data['national_id'] = mask_national_id(data['national_id'])   # lists are masked; the detail read is audited (decision 44)
         return data
 
 class FileUploadSerializer(serializers.Serializer):

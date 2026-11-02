@@ -6,6 +6,7 @@ from django.shortcuts import get_object_or_404, redirect
 from django.views.decorators.http import require_POST
 
 from interventions.models import Strategy
+from schools import audit
 
 from .school_views import _render, school_page
 
@@ -46,6 +47,7 @@ def strategies(request, school, pk=None):
         obj = form.save(commit=False)
         obj.school = school
         obj.save()
+        audit.record(request.user, audit.STRATEGY_SAVE, obj, school=school, detail='edited' if instance else 'created')
         messages.success(request, 'ذخیره شد.')
         return redirect('dashboard:school_strategies')
     return _render(request, school, 'strategies.html', form=form, editing=instance,
@@ -58,4 +60,5 @@ def strategy_toggle(request, school, pk):
     obj = get_object_or_404(Strategy, pk=pk, school=school)
     obj.is_active = not obj.is_active
     obj.save(update_fields=['is_active'])
+    audit.record(request.user, audit.STRATEGY_SAVE, obj, school=school, detail='on' if obj.is_active else 'off')
     return redirect('dashboard:school_strategies')

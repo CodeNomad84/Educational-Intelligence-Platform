@@ -280,6 +280,21 @@ class ApiFieldPolicyTests(Base):
             self.assertNotIn(name, other)
         self.assertEqual(own["national_id"], self.s10a.national_id)
 
+    def test_list_masks_the_national_id_and_detail_reveals_it_with_an_audit_event(self):
+        """L-1 (decision 44): lists carry the page mask; the detail read returns the full id and writes national_id_reveal."""
+        from schools.models import AuditEvent
+        client = self.client_for(self.lead())
+        rows = client.get("/api/students/").json()
+        rows = rows.get("results", rows)
+        self.assertTrue(rows)
+        for row in rows:
+            if "national_id" in row:
+                self.assertTrue(row["national_id"].startswith("******"), row["national_id"])
+        self.assertFalse(AuditEvent.objects.filter(action="national_id_reveal").exists())
+        full = client.get(f"/api/students/{self.s10a.pk}/").json()
+        self.assertEqual(full["national_id"], self.s10a.national_id)
+        self.assertEqual(AuditEvent.objects.filter(action="national_id_reveal", detail="api").count(), 1)
+
     def test_out_of_scope_is_404(self):
         client = self.client_for(self.lead())
         self.assertEqual(client.get(f"/api/students/{self.s11a.pk}/").status_code, 404)

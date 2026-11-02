@@ -3,6 +3,7 @@ Who may record: SchoolAdmin, Grade Lead (their students) and a Subject Teacher (
 up inside ``behavior_writable_students``, so anyone else gets a 404. Who reads what: ``students.access.visible_behavior_notes``."""
 from datetime import date
 
+from django.utils import timezone
 from django import forms
 from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect
@@ -25,11 +26,11 @@ class BehaviorNoteForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['occurred_on'].initial = date.today
+        self.fields['occurred_on'].initial = timezone.localdate
 
     def clean_occurred_on(self):
         day = self.cleaned_data['occurred_on']
-        if day > date.today():
+        if day > timezone.localdate():
             raise forms.ValidationError('تاریخ نمی‌تواند در آینده باشد.')
         return day
 

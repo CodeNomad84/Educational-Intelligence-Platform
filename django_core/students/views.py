@@ -230,6 +230,8 @@ class StudentViewSet(viewsets.ModelViewSet):
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
         audit.record(request.user, audit.VIEW_DETAIL, instance, detail='api')
+        if getattr(instance, 'full_tier', False):
+            audit.record(request.user, audit.NATIONAL_ID_REVEAL, instance, detail='api')   # the full id leaves only on a detail read
         return Response(self.get_serializer(instance).data)
 
     # Writes are SchoolAdmin only; the instance has no tier annotation, so mark it full for the response.

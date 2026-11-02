@@ -35,3 +35,16 @@ class StrategyTests(LoopBase):
         InterventionPlan.objects.all().delete()
         self.client.post(reverse('dashboard:plan_new', args=[self.s7.pk]), {**data, 'strategy': own.pk})
         self.assertEqual(InterventionPlan.objects.get().strategy, own)
+
+    def test_changes_are_audited_and_duplicates_are_a_form_error(self):
+        from schools.models import AuditEvent
+        self.client.force_login(self.admin)
+        data = {'title': 'T1', 'intervention_type': 'academic', 'tier': 1, 'typical_days': 20, 'description': 'd'}
+        url = reverse('dashboard:school_strategies')
+        self.client.post(url, data)
+        self.assertEqual(self.client.post(url, data).status_code, 200)       # duplicate title: form error, not a 500
+        self.assertEqual(Strategy.objects.filter(school=self.a, title='T1').count(), 1)
+        self.assertEqual(self.client.post(url, {**data, 'title': 'T2', 'typical_days': 0}).status_code, 200)
+        obj = Strategy.objects.get(title='T1')
+        self.client.post(reverse('dashboard:school_strategy_toggle', args=[obj.pk]))
+        self.assertEqual(set(AuditEvent.objects.filter(action='strategy_save').values_list('detail', flat=True)), {'created', 'off'})

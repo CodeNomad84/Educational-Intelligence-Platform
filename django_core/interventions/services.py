@@ -104,7 +104,7 @@ def add_followup(user, plan, followup_date, note, assessment):
         raise LoopError('text_required')
     if assessment not in dict(InterventionFollowUp.ASSESSMENT_CHOICES):
         raise LoopError('bad_choice')
-    if followup_date > date.today():
+    if followup_date > timezone.localdate():
         raise LoopError('bad_dates')
     with transaction.atomic():
         # Lock the row and re-check the status: a follow-up can only be added while the plan is active.

@@ -68,6 +68,9 @@ LIST_PAGES = ('students', 'referrals', 'plans', 'alerts', 'api_students', 'atten
 SCHOOL_CREATE = 'school_create'            # detail = cmd | admin (which path created it); object = the School
 
 
+STRATEGY_SAVE = 'strategy_save'              # detail = created | edited | on | off; object = the Strategy (id only)
+
+
 SYSTEM = 'system'      # actor of scheduled / command runs (no user): stored as user=None, username 'system', roles 'system'
 
 

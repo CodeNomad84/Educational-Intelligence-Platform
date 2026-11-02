@@ -60,10 +60,6 @@ def key_signals(grade_years, attendance, trend_subjects=None):
             'present_rate': attendance['present_rate'], 'drop': drop}
 
 
-def mask_national_id(value):
-    return '******' + value[-4:] if value and len(value) > 4 else value
-
-
 def summary_context(request, student):
     """The read-only summary shared by the Student 360 page and the counselor's case page (all through the access layer)."""
     enrollments = (Enrollment.objects.filter(student=student).select_related('academic_year', 'school_class')

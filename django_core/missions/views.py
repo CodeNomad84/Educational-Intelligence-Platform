@@ -6,6 +6,7 @@ or writes the logged-in user's OWN session; other observers' rows are never load
 """
 from datetime import date
 
+from django.utils import timezone
 from django import forms
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
@@ -30,7 +31,7 @@ MAX_EVIDENCE = 300
 
 class ActivityForm(forms.Form):
     title = forms.CharField(label='عنوان فعالیت', max_length=120, widget=forms.TextInput(attrs={'class': 'form-control'}))
-    held_on = forms.DateField(label='تاریخ', initial=date.today, widget=forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}))
+    held_on = forms.DateField(label='تاریخ', initial=timezone.localdate, widget=forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}))
     scope = forms.ChoiceField(label='مدرسه / پایه', widget=forms.Select(attrs={'class': 'form-select'}))
     period = forms.ChoiceField(label='دوره', widget=forms.Select(attrs={'class': 'form-select'}))
     activity_type = forms.ChoiceField(label='نوع فعالیت', widget=forms.Select(attrs={'class': 'form-select'}))

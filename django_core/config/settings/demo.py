@@ -8,7 +8,9 @@ import copy
 from .development import *  # noqa: F401,F403
 
 DEMO_MODE = True
-DEMO_DB_FILENAME = 'demo_db.sqlite3'
+import os
+
+DEMO_DB_FILENAME = os.environ.get('EIP_DEMO_DB', 'demo_db.sqlite3')   # an absolute path is allowed (scripts/reset_demo_school.sh checks, tests)
 
 DATABASES = {
     'default': {

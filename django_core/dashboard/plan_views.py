@@ -5,6 +5,7 @@ open referral (``may_read_plan_text``), and every plan page view is audit-logged
 ``interventions.services``."""
 from datetime import date
 
+from django.utils import timezone
 from django import forms
 from django.contrib import messages
 from django.http import Http404
@@ -43,13 +44,13 @@ class PlanForm(forms.Form):
     goal = forms.CharField(label='هدف', max_length=300, widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 2}))
     action_plan = forms.CharField(label='برنامه اقدام', max_length=1000,
                                   widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 4}))
-    start_date = forms.DateField(label='شروع', widget=DATE, initial=date.today)
+    start_date = forms.DateField(label='شروع', widget=DATE, initial=timezone.localdate)
     due_date = forms.DateField(label='سررسید', widget=DATE)
     owner = forms.IntegerField(label='مسئول', required=False, widget=forms.Select(attrs={'class': 'form-select'}))
 
 
 class FollowUpForm(forms.Form):
-    followup_date = forms.DateField(label='تاریخ', widget=DATE, initial=date.today)
+    followup_date = forms.DateField(label='تاریخ', widget=DATE, initial=timezone.localdate)
     assessment = forms.ChoiceField(label='ارزیابی', choices=InterventionFollowUp.ASSESSMENT_CHOICES,
                                    widget=forms.Select(attrs={'class': 'form-select'}))
     progress_note = forms.CharField(label='یادداشت پیشرفت', max_length=1000,
@@ -68,7 +69,7 @@ def plan_list(request):
         plans = plans.filter(status__in=[InterventionPlan.PLANNED, InterventionPlan.ACTIVE])
     elif status in dict(InterventionPlan.STATUS_CHOICES):
         plans = plans.filter(status=status)
-    due = due_for_reevaluation(visible_plans(request.user), visible_alerts(request.user), date.today())
+    due = due_for_reevaluation(visible_plans(request.user), visible_alerts(request.user), timezone.localdate())
     plans = list(plans[:200])
     audit.record_list(request.user, 'plans', plans)
     return render(request, 'dashboard/loop/plans.html', {

@@ -84,5 +84,5 @@ def jdate(value, style='short'):
 @register.filter
 def mask_nid(value):
     """National id with all but the last four digits hidden; the full value is fetched by an audited click."""
-    value = str(value or '')
-    return '******' + value[-4:] if len(value) > 4 else value
+    from students.masking import mask_national_id
+    return mask_national_id(value)
