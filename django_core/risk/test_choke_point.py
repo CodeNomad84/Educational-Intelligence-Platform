@@ -34,12 +34,12 @@ class MigrationTests(TestCase):
             keys = sorted(k for k in loader.disk_migrations if k[0] == app)
             self.assertEqual(keys[0], (app, '0001_initial'))
             if app == 'risk':
-                self.assertEqual(keys, [('risk', '0001_initial'), ('risk', '0002_rules'), ('risk', '0003_rule_last_edited_by')])   # 0025: rule tables only (0003: one column on them)
+                self.assertEqual(keys, [('risk', '0001_initial'), ('risk', '0002_rules'), ('risk', '0003_rule_last_edited_by'), ('risk', '0004_rule_kind_repeated_concerns'), ('risk', '0005_notification')])   # 0025: rule tables only (0003: one column on them; 0004: choices of Rule.kind, no SQL; 0005: Notification table)
             else:
                 self.assertEqual(keys, [('interventions', '0001_initial'), ('interventions', '0002_strategy')])   # P6-1: one table + one nullable column
             for key in keys:
                 for op in loader.disk_migrations[key].operations:
-                    self.assertIsInstance(op, (migrations.CreateModel, migrations.AddIndex, migrations.AddConstraint, migrations.AddField))   # new tables only
+                    self.assertIsInstance(op, (migrations.CreateModel, migrations.AddIndex, migrations.AddConstraint, migrations.AddField, migrations.AlterField))   # new tables only (AlterField: choices of Rule.kind, state only)
 
     def test_models_are_not_in_the_django_admin(self):
         registered = {m._meta.label for m in admin.site._registry}

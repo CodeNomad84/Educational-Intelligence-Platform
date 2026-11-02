@@ -1,5 +1,5 @@
 from django.urls import path
-from . import behavior_views, module_info, report_card, operator_page, quickstart, account_views, bulk_views, password_reset, counselor_views, loop_views, plan_views, grade_dashboard, school_views, strategy_views, student360, student_views, teacher_views, views
+from . import notification_views, behavior_views, module_info, report_card, operator_page, quickstart, account_views, bulk_views, password_reset, counselor_views, loop_views, plan_views, grade_dashboard, school_views, strategy_views, student360, student_views, teacher_views, views
 
 app_name = 'dashboard'
 
@@ -31,6 +31,8 @@ urlpatterns = [
     path('students/<int:pk>/refer/', counselor_views.student_refer, name='student_refer'),
     path('students/<int:pk>/behavior/new/', behavior_views.behavior_new, name='behavior_new'),
     path('students/<int:pk>/report-card/', report_card.report_card, name='report_card'),
+    path('notifications/', notification_views.notification_list, name='notifications'),
+    path('notifications/read/', notification_views.notification_read, name='notifications_read'),
     path('alerts/', loop_views.alert_list, name='alert_list'),
     path('students/<int:pk>/alert/', loop_views.alert_new, name='alert_new'),
     path('alerts/<int:pk>/review/', loop_views.alert_review, name='alert_review'),

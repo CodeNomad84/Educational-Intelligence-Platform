@@ -8,7 +8,7 @@ it; there is no score and no level.
 import hashlib
 import json
 import math
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 from datetime import timedelta
 from numbers import Real
 
@@ -16,7 +16,7 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
-from students.access import system_scope_attendance, system_scope_enrollments, system_scope_grades, system_scope_students
+from students.access import system_scope_concern_notes, system_scope_attendance, system_scope_enrollments, system_scope_grades, system_scope_students
 
 from schools import audit
 
@@ -40,6 +40,8 @@ STARTERS = {
                                        'min_records': 5}]),
     'low_average': dict(title='میانگین پایین نمرات اخیر', risk_type='academic', severity='yellow', connective='all',
                         clauses=[{'metric': 'avg_score', 'op': '<', 'threshold': 12, 'window_days': 45, 'min_records': 3}]),
+    'repeated_concerns': dict(title='نگرانی‌های رفتاری مکرر ثبت‌شده توسط کادر', risk_type='behavioral', severity='yellow', connective='all',
+                              clauses=[{'metric': 'concern_count', 'op': '>=', 'threshold': 3, 'window_days': 30, 'min_records': 0}]),
     'grade_drop': dict(title='افت نمرهٔ یک درس', risk_type='academic', severity='orange', connective='all',
                        clauses=[{'metric': 'subject_drop', 'op': '>=', 'threshold': 3, 'window_days': 45, 'baseline_days': 75,
                                  'min_records': 2}]),
@@ -121,6 +123,22 @@ def load_school(school_id, first_as_of, last_as_of):
     return grade_of, attendance, grades
 
 
+Concern = namedtuple('Concern', 'date')
+
+
+def load_concerns(school_id, first_as_of, last_as_of):
+    """``{student_id: [Concern(date)]}``: dates of concern entries only (the note text and category are never selected)."""
+    since = first_as_of - timedelta(days=MAX_SPAN_DAYS)
+    out = defaultdict(list)
+    for sid, day in system_scope_concern_notes(school_id).filter(occurred_on__gt=since, occurred_on__lte=last_as_of).values_list('student_id', 'occurred_on'):
+        out[sid].append(Concern(day))
+    return out
+
+
+def _uses_behavior(rule):
+    return any(signals.METRICS[c['metric']][1] == 'behavior' for c in rule.clauses)
+
+
 def _evidence(clause, signal):
     item = {'metric': clause['metric'], 'op': clause['op'], 'threshold': clause['threshold'],
             'window_days': clause['window_days'], 'value': round(signal.value, 2), 'records': signal.records}
@@ -132,13 +150,13 @@ def _evidence(clause, signal):
     return item
 
 
-def evaluate_student(rule, attendances, grades, as_of):
+def evaluate_student(rule, attendances, grades, as_of, concerns=()):
     """``('fired', evidence)`` | ``('insufficient', None)`` | ``('no', None)``. Insufficient data is never a hit."""
     fired, insufficient, evidence = 0, 0, []
     for clause in rule.clauses:
         signal = signals.evaluate_metric(
             clause['metric'], attendances, grades, as_of, window_days=clause['window_days'],
-            baseline_days=clause.get('baseline_days'), min_records=clause.get('min_records'))
+            baseline_days=clause.get('baseline_days'), min_records=clause.get('min_records'), concerns=concerns)
         if signal is None:
             insufficient += 1
         elif signals.OPS[clause['op']](signal.value, clause['threshold']):
@@ -154,9 +172,10 @@ def evaluate_student(rule, attendances, grades, as_of):
     return ('insufficient', None) if insufficient else ('no', None)
 
 
-def evaluate_rule(rule, students, attendance, grades, as_of):
+def evaluate_rule(rule, students, attendance, grades, as_of, concerns=None):
     """Results for every student of ``students`` ({id: grade}): ``{student_id: (verdict, evidence)}``."""
-    return {sid: evaluate_student(rule, attendance.get(sid, []), grades.get(sid, []), as_of) for sid in students}
+    concerns = concerns or {}
+    return {sid: evaluate_student(rule, attendance.get(sid, []), grades.get(sid, []), as_of, concerns.get(sid, [])) for sid in students}
 
 
 # ---- simulation: aggregate counts only, nothing stored but the caller's RuleRun ----
@@ -165,9 +184,10 @@ def simulate(rule, *, as_of, weeks=8):
     a count under MIN_GROUP is ``None`` (withheld). No student id leaves this function and nothing is written."""
     dates = [as_of - timedelta(days=7 * n) for n in range(weeks - 1, -1, -1)]
     students, attendance, grades = load_school(rule.school_id, dates[0], dates[-1])
+    concerns = load_concerns(rule.school_id, dates[0], dates[-1]) if _uses_behavior(rule) else None
     result = []
     for day in dates:
-        verdicts = evaluate_rule(rule, students, attendance, grades, day)
+        verdicts = evaluate_rule(rule, students, attendance, grades, day, concerns)
         by_grade = defaultdict(int)
         for sid, (verdict, _evidence_) in verdicts.items():
             if verdict == 'fired':
@@ -183,7 +203,8 @@ def simulate(rule, *, as_of, weeks=8):
 # ---- the runner (live): the only code that turns rule hits into alerts ----
 METRIC_FA = {'absence_rate': 'نرخ غیبت', 'absence_shift_pp': 'افزایش نرخ غیبت (واحد درصد)', 'late_count': 'تعداد تأخیر',
              'absent_days': 'تعداد روزهای غیبت', 'max_consecutive_absences': 'بیشترین غیبت پیاپی', 'avg_score': 'میانگین نمرات',
-             'grades_count': 'تعداد نمرات', 'subject_drop': 'بیشترین افت نمرهٔ یک درس'}
+             'grades_count': 'تعداد نمرات', 'subject_drop': 'بیشترین افت نمرهٔ یک درس',
+             'concern_count': 'تعداد یادداشت‌های نگرانی رفتاری'}
 OPEN_PLAN_STATUSES = ('planned', 'active')
 DEFAULT_BREAKER_PERCENT = 15
 
@@ -209,14 +230,14 @@ def _blocked_by_cooldown(rule, hits, as_of):
     return last is not None and (as_of - last).days < rule.cooldown_days
 
 
-def _run_rule(rule, students, attendance, grades, as_of, school_id, scale_ok, breaker_percent, actor, triggered_by):
+def _run_rule(rule, students, attendance, grades, as_of, school_id, scale_ok, breaker_percent, actor, triggered_by, concerns=None):
     run = RuleRun(school_id=school_id, rule=rule, mode='live', as_of=as_of, triggered_by=triggered_by, evaluated=len(students))
     uses_scale = any(c['metric'] == 'avg_score' for c in rule.clauses)
     if uses_scale and not scale_ok:
         run.status = RuleRun.Status.NO_SCALE
         run.save()
         return run
-    verdicts = evaluate_rule(rule, students, attendance, grades, as_of)
+    verdicts = evaluate_rule(rule, students, attendance, grades, as_of, concerns)
     fired = {sid: ev for sid, (v, ev) in verdicts.items() if v == 'fired'}
     run.hits = len(fired)
     run.skipped_insufficient = sum(1 for v, _e in verdicts.values() if v == 'insufficient')
@@ -261,8 +282,9 @@ def run_school(school_id, *, as_of=None, triggered_by=None):
     runs = []
     if active:
         students, attendance, grades = load_school(school_id, as_of, as_of)
+        concerns = load_concerns(school_id, as_of, as_of) if any(_uses_behavior(r) for r in active) else None
         for rule in active:
-            run = _run_rule(rule, students, attendance, grades, as_of, school_id, scale_ok, breaker, actor, triggered_by)
+            run = _run_rule(rule, students, attendance, grades, as_of, school_id, scale_ok, breaker, actor, triggered_by, concerns)
             audit.record(actor, audit.RULE_RUN, rule, school=school_id,
                          detail=f"e{run.evaluated}h{run.hits}a{run.alerts_raised}c{run.skipped_cooldown}i{run.skipped_insufficient}"
                                 + ('B' if run.status == RuleRun.Status.BREAKER else 'S' if run.status == RuleRun.Status.NO_SCALE else ''))

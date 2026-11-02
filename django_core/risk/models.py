@@ -111,7 +111,7 @@ class Rule(models.Model):
         ARCHIVED = "archived", "بایگانی"
 
     RULE_RISK_TYPES = ("academic", "attendance", "behavioral")   # never emotional / family / social / motivation
-    KINDS = ("attendance_shift", "repeated_absence", "low_average", "grade_drop")
+    KINDS = ("attendance_shift", "repeated_absence", "low_average", "grade_drop", "repeated_concerns")
 
     school = models.ForeignKey("schools.School", on_delete=models.PROTECT, related_name="+")
     code = models.SlugField(max_length=40)
@@ -196,3 +196,27 @@ class RuleRun(models.Model):
 
     class Meta:
         ordering = ["-started_at", "-pk"]
+
+
+class Notification(models.Model):
+    """P6-2 in-app notification (decision 51). Holds NO text: the wording comes from ``kind`` and is generic (no student name, no
+    alert or plan content). A row is created only for a user who can already see the alert / plan (``reviewable_alerts`` /
+    ``visible_plans``), and is shown only while that is still true (``risk.notifications.visible_notifications``)."""
+    ALERT_NEW, FOLLOWUP_DUE = "alert_new", "followup_due"
+    KIND_CHOICES = [(ALERT_NEW, "هشدار جدید"), (FOLLOWUP_DUE, "سررسید برنامهٔ مداخله")]
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="+")
+    school = models.ForeignKey("schools.School", on_delete=models.PROTECT, related_name="+")
+    kind = models.CharField(max_length=20, choices=KIND_CHOICES)
+    alert = models.ForeignKey(Alert, on_delete=models.CASCADE, null=True, blank=True, related_name="+")
+    plan = models.ForeignKey("interventions.InterventionPlan", on_delete=models.CASCADE, null=True, blank=True, related_name="+")
+    due_on = models.DateField(null=True, blank=True)       # followup_due: the plan's due date this row refers to (de-duplication)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    read_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at", "-pk"]
+        indexes = [models.Index(fields=["user", "read_at"], name="notif_user_read_idx")]
+        constraints = [models.CheckConstraint(
+            condition=(models.Q(kind="alert_new", alert__isnull=False) | models.Q(kind="followup_due", plan__isnull=False)),
+            name="notif_target_matches_kind")]

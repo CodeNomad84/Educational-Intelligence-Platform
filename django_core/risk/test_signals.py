@@ -70,6 +70,6 @@ class GradeMetricTests(SimpleTestCase):
 
     def test_catalog_is_closed(self):
         self.assertEqual(set(S.METRICS), {'absence_rate', 'absence_shift_pp', 'late_count', 'absent_days',
-                                          'max_consecutive_absences', 'avg_score', 'grades_count', 'subject_drop'})
+                                          'max_consecutive_absences', 'avg_score', 'grades_count', 'subject_drop', 'concern_count'})
         with self.assertRaises(KeyError):
             S.evaluate_metric('eval', [], [], TODAY, window_days=1)

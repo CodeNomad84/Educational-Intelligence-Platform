@@ -111,6 +111,15 @@ def subject_drop(grades, today, window_days, baseline_days, min_records=2, max_s
 
 
 # The closed catalog: metric name -> (function, source rows, takes baseline_days). Rules may use nothing else.
+def concern_count(concerns, today, window_days, min_records=0):
+    """Number of staff 'concern' behavior entries in the recent window (P6, decision 50). Counts only: the entries' text and
+    category are never read (the loader selects the date alone). ``concerns``: rows with a ``date``."""
+    rows = _window(concerns, today, window_days)
+    if len(rows) < min_records:
+        return None
+    return Signal(len(rows), len(rows), {})
+
+
 METRICS = {
     'absence_rate': (absence_rate, 'attendance', False),
     'absence_shift_pp': (absence_shift_pp, 'attendance', True),
@@ -120,10 +129,11 @@ METRICS = {
     'avg_score': (avg_score, 'grade', False),
     'grades_count': (grades_count, 'grade', False),
     'subject_drop': (subject_drop, 'grade', True),
+    'concern_count': (concern_count, 'behavior', False),
 }
 
 
-def evaluate_metric(name, attendances, grades, today, *, window_days, baseline_days=None, min_records=None):
+def evaluate_metric(name, attendances, grades, today, *, window_days, baseline_days=None, min_records=None, concerns=()):
     """Run one catalog metric. ``None`` = not enough records."""
     func, source, takes_baseline = METRICS[name]
     kwargs = {'window_days': window_days}
@@ -131,4 +141,5 @@ def evaluate_metric(name, attendances, grades, today, *, window_days, baseline_d
         kwargs['baseline_days'] = baseline_days
     if min_records is not None:
         kwargs['min_records'] = min_records
-    return func(attendances if source == 'attendance' else grades, today, **kwargs)
+    rows = {'attendance': attendances, 'grade': grades, 'behavior': concerns}[source]
+    return func(rows, today, **kwargs)

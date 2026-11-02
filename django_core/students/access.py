@@ -519,6 +519,14 @@ def system_scope_grades(school):
     return Grade.objects.filter(student__in=system_scope_students(school))
 
 
+def system_scope_concern_notes(school):
+    """Staff 'concern' behavior entries of the system-scope students of ONE school, for the rule engine (decision 50). Positive
+    entries are never returned; callers select dates only (the text is not needed and must not be read)."""
+    from .models import BehaviorNote
+
+    return BehaviorNote.objects.filter(student__in=system_scope_students(school), kind=BehaviorNote.CONCERN)
+
+
 def system_scope_enrollments(school):
     """The CURRENT enrollments (grade per student) of the system-scope students of one school."""
     school_id = getattr(school, 'pk', school)

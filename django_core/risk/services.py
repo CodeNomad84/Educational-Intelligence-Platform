@@ -30,8 +30,12 @@ def raise_alert(student, *, risk_type, severity, message, explanation, detected_
         event = RiskEvent.objects.create(
             school_id=student.school_id, student=student, risk_type=risk_type, severity=severity,
             detected_by=detected_by, explanation=explanation, risk_score=risk_score)
-        return Alert.objects.create(school_id=student.school_id, student=student, risk_event=event,
-                                    raised_by=raised_by, message=message)
+        alert = Alert.objects.create(school_id=student.school_id, student=student, risk_event=event,
+                                     raised_by=raised_by, message=message)
+    from .notifications import notify_alert      # P6-2: after the alert is committed to the transaction; never blocks it
+
+    notify_alert(alert)
+    return alert
 
 
 def _detected_by(user):

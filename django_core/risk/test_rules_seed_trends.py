@@ -16,11 +16,11 @@ from students.models import Attendance, Grade
 
 
 class SeedTests(RulesBase):
-    def test_seeds_four_drafts_idempotently_and_labelled(self):
+    def test_seeds_five_drafts_idempotently_and_labelled(self):
         call_command('seed_rules', school='a', stdout=StringIO())
         call_command('seed_rules', school='a', stdout=StringIO())
         rules = Rule.objects.filter(school=self.a)
-        self.assertEqual(sorted(rules.values_list('code', flat=True)), ['attendance_shift', 'grade_drop', 'low_average', 'repeated_absence'])
+        self.assertEqual(sorted(rules.values_list('code', flat=True)), ['attendance_shift', 'grade_drop', 'low_average', 'repeated_absence', 'repeated_concerns'])
         self.assertEqual(set(rules.values_list('status', flat=True)), {'draft'})
         self.assertTrue(all('اعتبارسنجی‌نشده' in r.title for r in rules))
         self.assertFalse(Rule.objects.filter(school=self.b).exists())
