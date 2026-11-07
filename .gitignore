@@ -16,6 +16,10 @@ id_rsa*
 *.sql
 *.sqlite3
 database/*.db
+# Keep the least-privilege role conversion script under version control: CI runs
+# scripts/test_db_roles.sh, which reads deploy/postgres-maintenance/r04-convert-existing.sql.
+# Only that folder is un-ignored; every other *.sql stays ignored.
+!deploy/postgres-maintenance/*.sql
 
 # Runtime volumes (PostgreSQL, Redis, MinIO, Ollama, static/media) and downloaded datasets
 /data/
