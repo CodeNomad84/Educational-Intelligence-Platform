@@ -44,6 +44,7 @@ class PreflightTests(unittest.TestCase):
         self.assertTrue(self.mod.check(self.good(ALLOWED_HOSTS='a.real.ir,b.real.ir,c.real.ir'), 'dedicated'))
         self.assertTrue(self.mod.check({}), 'empty')
 
+    @unittest.skipUnless(PROFILES.is_dir(), 'deploy/profiles not mounted (container run)')
     def test_the_shipped_profile_examples_cannot_be_used_unfilled_and_output_has_no_values(self):
         for name in ('shared-iranian-server.env.example', 'dedicated-school-server.env.example'):
             env = self.mod.parse(PROFILES / name)
