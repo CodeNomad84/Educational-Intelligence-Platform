@@ -2,7 +2,7 @@
 
 Written for the owner, 2026-10-25, from the repository at `8435a0e`. Docs only; it changes no behavior and is **derived**: code, migrations and tests win over it (see `ROADMAP.md` and `RUNBOOK.md` for detail).
 Legend: `[x]` done and verified in the repo (commit or file cited) · `[~]` partial (what is missing is stated) · `[ ]` not started · `[!]` blocked or needs an owner decision. A line marked "unverified" was not checked against code or tests for this list.
-Test status at `8435a0e`: 1150 tests on SQLite and on PostgreSQL 16, 57 `demo_intel`, all OK; FastAPI 28 OK (`docs/TESTING.md`). ROADMAP.md now points here for status.
+Test status (latest real run 2026-11-07, `/tmp/tests_run.log`): Django 1565 tests on SQLite (11 skipped) plus `demo_intel` 62, all OK; PostgreSQL and FastAPI NOT covered by that run (`docs/TESTING.md`). ROADMAP.md now points here for status.
 
 ## 1. Foundation
 - [x] Phase 1 boot and critical security containment closed (`docs/PHASE1_FINAL_STATUS.md`, `4c096de` per `ROADMAP.md`).
@@ -39,7 +39,10 @@ Test status at `8435a0e`: 1150 tests on SQLite and on PostgreSQL 16, 57 `demo_in
 - [x] Demo seed with all modules licensed and synthetic mission and exam data (`4651c9a`, `8435a0e`).
 - [~] Grade entry (own class and subject) is done for teachers, but roadmap item 2.2b "grade needs academic year and class" is recorded as open (`SECURITY.md` C5a-R1).
 - [x] (built 2026-10-28, change 0025; see the rules entry below) Deterministic risk rules and alerts in the real core DB (roadmap 2.3/2.4; `risk/` has `RiskEvent`/`Alert` models only; the demo has its own rules).
-- [x] Intervention loop built 2026-10-26 (change 0022; commits `9063a1c`, `e8e367e`, `63c0715` and the Student 360/re-evaluation commit): manual alerts, human review (accept/dismiss with a coded reason), intervention plans, follow-ups, outcome, re-evaluation list and Student 360 tile; base module, no AI; emotional-plan text only for the owner and an open-referral Counselor. `NOT YET IMPLEMENTED`: the rule engine that calls `risk.services.raise_alert` (2.3), notifications, parent view, effectiveness scoring.
+- [x] Intervention loop built 2026-10-26 (change 0022; commits `9063a1c`, `e8e367e`, `63c0715` and the Student 360/re-evaluation commit): manual alerts, human review (accept/dismiss with a coded reason), intervention plans, follow-ups, outcome, re-evaluation list and Student 360 tile; base module, no AI; emotional-plan text only for the owner and an open-referral Counselor. Built since: the rule engine that calls `risk.services.raise_alert` (change 0025, 2026-10-28), P6-1/P6-2/P6-3 (three bullets below). `NOT YET IMPLEMENTED`: a parent or student view of alerts and plans; the numeric per-plan effectiveness score (doc 12 §16.3, deferred).
+- [x] P6-1 intervention strategy library — 2026-11-02, decision 42, commit `ecddc70`, report 0030 (demo-track exit); expanded by 0031 (decisions 53-55): school-editable `interventions.Strategy` (migration 0002), ~30 generic Persian entries from `seed_strategies`, picker on the plan form, permission tests.
+- [x] P6-2 in-app notifications — 2026-11-02, decisions 50-52, commits `c816582`/`de8ea66`/`c58565f` (no separate numbered report; `DECISIONS_BY_CODE.md` 50-52): `risk.Notification` (migrations 0005/0006), rows only for users whose existing scope already contains the object, bell + `/notifications/`; `concern_count` rule signal in the same batch. Parent notifications remain NOT BUILT.
+- [x] P6-3 effectiveness per strategy — 2026-11-02, decision 49, commit `10e7f31` (no separate numbered report): the strategies page shows each strategy's completed-plan outcomes from the viewer's own `visible_plans`, withheld below `MIN_GROUP` (5); counts only, no new access path.
 - [!] Retention period for alerts, plans, follow-ups and risk events waits for the legal policy; risk events 3 years per doc 12, not enforced; nothing is deleted automatically.
 - [ ] Open item: `Referral` and `CounselorNote` still use `CASCADE` on the student, the new loop tables use `PROTECT` (students are deactivated, never deleted); decide whether to align (changes applied models, Tier C).
 - [ ] Open item: the local `.git/info/exclude` hides `django_core/{risk,interventions,behavior,governance,accounts,core}`; `risk/` and `interventions/` were force-added (new files there need `git add -f`).
@@ -94,7 +97,8 @@ Test status at `8435a0e`: 1150 tests on SQLite and on PostgreSQL 16, 57 `demo_in
 - [x] Demo-stub study assistant and demo School Assistant run without any LLM (`bbc0190`, `demo_intel/`).
 - [ ] LLM integration for the tutor: pseudonymisation, safety escalation to adults, transparency to the student (all in the design, none built).
 - [!] External-LLM switch: whether any external provider is allowed at all, which provider and which country.
-- [ ] `advisor_ai` real implementation (RAG over school data with ACL before retrieval; FastAPI RAG is disabled, HTTP 403).
+- [x] P7 provider-agnostic LLM adapter — 2026-11-02, report 0032, decisions 56-59 (`fastapi_core/llm_adapter.py`): one OpenAI-compatible client, external/local classes, both OFF by default, dedicated `LLM_KEY_*` keys, PII tripwire + purpose whitelist; external class never called with a real key (tests mock). NOT VERIFIED against a real provider.
+- [x] P7-5 staff document assistant (`docqa`) — 2026-11-02, report 0034, decisions 61-64: SchoolAdmin uploads non-personal documents (attestation + screening + limits), ACL-first keyword retrieval, cited answers from a LOCAL class only, per-school switch OFF by default, licensed caps + metadata-only audit; demo works with no model. NOT BUILT: student-facing tutor, RAG over student data, embeddings, the external class on the Django side (wait for legal/consent).
 - [ ] Adaptive learning feedback from exam analytics (after exams Slice 2).
 - [ ] Prompt-injection and unauthorized-retrieval tests for the AI layer (`SECURITY.md` review topics).
 
@@ -118,6 +122,7 @@ Test status at `8435a0e`: 1150 tests on SQLite and on PostgreSQL 16, 57 `demo_in
 
 ## 7. Deployment and operations
 - [ ] Production deployment from `docs/DEPLOYMENT.md` (Docker compose exists; production never run; unverified).
+- [~] Production + multi-school readiness PREPARED 2026-11-02, report 0035, decisions 65-67 (nothing deployed; no real key or data): R-04 least-privilege DB roles + rehearsal (CI job `dbroles`), two deployment profiles, `scripts/preflight.py`, second-school gate test, `MULTI_SCHOOL_READINESS.md`, `DEPLOYMENT.md` §11. `NOT VERIFIED`: real server, real certificates/secrets, off-site backup target + restore, external port scan, running `r04-convert-existing.sql` on existing data.
 - [~] Scheduled, encrypted, off-site backups: scripts and rehearsal done (C-K, `RUNBOOK.md` §3); schedule, off-site target and a restore on the real infrastructure wait for the server (O2/O3).
 - [ ] Monitoring, logging and alerting.
 - [ ] Onboarding runbook for a first pilot school: create school, admin, year, classes, staff, bulk accounts (steps 2 and 6 of `RUNBOOK.md` exist; pilot not done).
@@ -172,4 +177,5 @@ Test status at `8435a0e`: 1150 tests on SQLite and on PostgreSQL 16, 57 `demo_in
 ## Resume note (Phase 3 autonomous mode, CLAUDE.md §6a-bis, started 2026-11-01)
 - Owner decisions OW-1..OW-7 (Iran hosting shared/dedicated, mandatory backups, `.ir` HTTPS, provider-agnostic server-side controls, no real data, demo goal, two AI provider classes, push except `main`) and the decision pack: `docs/changes/0028-p3-p8-decision-pack-PROPOSAL.md`.
 - Order: C-B `create_school` > C-D dependency audit > C-H production hardening + self-hosted assets > C-K backups > C-L audit completeness > STOP before C-A (Tier C).
-- **Next step:** (C-A, P8-3, P5-1..P5-4 done; P5-3 rule signal open) P6-1 strategy library > polish of every page > demo school seed + `docs/owner/DEMO_SCRIPT.fa.md` > P5-3 behavior rule signal.
+- **Completed since this note (CURRENT at `a48c6a1`, work up to 2026-11-02):** C-A admin closure, P5-1..P5-4, P5-3 behavior rule signal (decision 50), P6-1/P6-2/P6-3 (decisions 42, 50-52, 49), P8 completion (decision 60), P7 adapter (report 0032, decisions 56-59), P7-5 document assistant (report 0034, decisions 61-64), P9 PREPARED (report 0035, decisions 65-67).
+- **Next step (2026-11-07):** STOP for owner review — the autonomous run approved through Phase 9 is finished at P9 PREPARED. Remaining code work is owner-gated or blocked: S7 per-school national id (`DECISION REQUIRED`, `changes/0020`); S8 remainder + S9/S10 second-school go-live; P4 mixed-scale normalisation; exams Slice 3/4; student tutor, parent view and any external-provider use wait on the legal/consent/provider decisions.
