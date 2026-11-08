@@ -59,3 +59,12 @@ Answer format for new questions: Feature / Primary module / Backend / Frontend /
 | Support levels (tiers) rule | `interventions/support.py` | 2026-11-02 (P5-2); derived, never stored |
 | Behavior log | `students/models.py::BehaviorNote`, `students/access.py::visible_behavior_notes` / `behavior_writable_students`, `dashboard/behavior_views.py`, `_behavior.html` | 2026-11-02 (P5-3); access change: update `SECURITY.md` table |
 | Printable report card | `dashboard/report_card.py` (terms), `report_card.html` | 2026-11-02 (P5-4) |
+
+## Local-only ignores in `.git/info/exclude` — a trap for new files (2026-11-07, L1 hygiene)
+
+`.git/info/exclude` is **local to one machine** — it is never committed, so a fresh clone (CI, another developer) does **not** have it. On this machine it hides `django_core/{risk,interventions,behavior,governance,accounts,core}` (owner decision 2026-10-14; those scaffolds were archived on branch `archive/scaffold-apps-2026-10-13`). Two consequences:
+
+- A **new** file inside one of those folders is silently skipped by `git add`; it must be added with `git add -f <path>`. Existing tracked files there are unaffected, and the exclude has no effect on any other checkout.
+- CI (or any fresh clone) cannot rely on a path that exists only on one developer's disk: the path must be **tracked in the repository**. This is why `deploy/postgres-maintenance/r04-convert-existing.sql` needed a `.gitignore` negation (`!deploy/postgres-maintenance/*.sql`), not an exclude entry — `scripts/test_db_roles.sh` reads it.
+
+**Safer alternative (PROPOSED — not applied; needs owner approval):** if those legacy folders are truly archived on `archive/scaffold-apps-2026-10-13` and no longer needed in the working tree, delete them locally and move their rules into `.gitignore` (or drop the entries entirely). Then every clone behaves identically and the `git add -f` footgun disappears. Do **not** edit `.git/info/exclude` by hand until that is approved. Background: `docs/RUNBOOK.md` (local git exclude note), `docs/PROJECT_CHECKLIST.md` (open item).
