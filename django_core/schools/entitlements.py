@@ -3,8 +3,9 @@
 Always-on base (no rows, never asked here): auth/roles, school structure, bulk accounts, grades, attendance, teacher
 recommendations, the simple student views, Student 360 and counseling, rule-based risk / ML predict, audit. Optional modules are the keys below; no row (or a row outside its
 dates) means OFF. Dependencies are enforced here: a module whose dependency is off counts as off.
-Disabled = data retained, reads and writes blocked. Django-side only (the FastAPI token carries no module claim yet);
-the Django admin is a known UNGATED surface.
+Disabled = data retained, reads and writes blocked. Django-side only (the FastAPI token carries no module claim yet).
+The Django admin is NOT an ungated surface: since C-A (S9, 2026-11-01) it opens only for platform operators and shows
+platform tables only (school data is not registered; `schools/admin.py`, `schools/test_admin_closure.py`).
 """
 from django.db.models import Q
 from django.utils import timezone

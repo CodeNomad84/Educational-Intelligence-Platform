@@ -10,4 +10,4 @@
 
 **Owner tasks (not done and not decided here):** a real server and domain; real certificates and secrets; the off-site backup target and offline private key; a restore rehearsal and an external port scan on the real server; running `r04-convert-existing.sql` if any database already holds data; the real LLM provider/key and the legal/consent decisions before any student data reaches any AI class; pricing, trial length, legal text, consent, retention; the S7 decision (per-school national id); S8 remainder; Redis authentication if the network is shared.
 
-**Independent review:** see the addendum below (fresh agent, raw findings).
+**Independent review:** NOT VERIFIED — this report refers to an addendum that was never written (no such section exists in the file); a fresh-agent review of the P9 batch is not recorded here. The P7/P7-5/P8 batches were reviewed separately (reports 0032, 0034, 0033).
