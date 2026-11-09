@@ -1,13 +1,13 @@
 {% extends 'dashboard/base.html' %}
 {% load eip_ui %}
-{% block title %}هشدارها و نگرانی‌ها{% endblock %}
+{% block title %}هشدارها و نگرانی‌ها{% endblock %}{% block page_title %}هشدارها و نگرانی‌ها{% endblock %}
 {% block content %}
 <p class="text-muted small">هشدارها فقط ثبت‌شدهٔ کارکنان‌اند و تصمیم نیستند؛ هر مورد باید توسط یک فرد بررسی شود.</p>
 <div class="mb-3">
-  {% for code, label in statuses %}<a class="btn btn-sm {% if code == status %}btn-primary{% else %}btn-outline-primary{% endif %}" href="?status={{ code }}">{{ label }}</a> {% endfor %}
+  {% for code, label in statuses %}<a class="btn btn-sm {% if code == status %}btn-primary{% else %}btn-outline-primary{% endif %}" href="?status={{ code }}"{% if code == status %} aria-current="page"{% endif %}>{{ label }}</a> {% endfor %}
 </div>
 <table class="table table-sm bg-white eip-stack">
-  <thead><tr><th>دانش‌آموز</th><th>نوع</th><th>شدت</th><th>توضیح</th><th>ثبت‌کننده</th><th>تاریخ</th><th>وضعیت</th><th></th></tr></thead>
+  <thead><tr><th scope="col">دانش‌آموز</th><th scope="col">نوع</th><th scope="col">شدت</th><th scope="col">توضیح</th><th scope="col">ثبت‌کننده</th><th scope="col">تاریخ</th><th scope="col">وضعیت</th><th scope="col"><span class="visually-hidden">اقدام‌ها</span></th></tr></thead>
   <tbody>
   {% for a in alerts %}
     <tr>
@@ -19,8 +19,8 @@
         {% if a.pk in reviewable and a.status == 'new' %}
           <form method="post" action="{% url 'dashboard:alert_review' a.pk %}" class="d-inline">{% csrf_token %}<input type="hidden" name="decision" value="accept"><button class="btn btn-sm btn-success">پذیرش</button></form>
           <form method="post" action="{% url 'dashboard:alert_review' a.pk %}" class="mt-1">{% csrf_token %}<input type="hidden" name="decision" value="dismiss">
-            <select name="reason" class="form-select form-select-sm d-inline w-auto">{% for code, label in reasons %}<option value="{{ code }}">{{ label }}</option>{% endfor %}</select>
-            <input name="note" maxlength="300" class="form-control form-control-sm d-inline w-auto" placeholder="یادداشت">
+            <select name="reason" aria-label="دلیل رد" class="form-select form-select-sm d-inline w-auto">{% for code, label in reasons %}<option value="{{ code }}">{{ label }}</option>{% endfor %}</select>
+            <input name="note" maxlength="300" aria-label="یادداشت" class="form-control form-control-sm d-inline w-auto" placeholder="یادداشت">
             <button class="btn btn-sm btn-outline-danger">رد</button></form>
         {% endif %}
         {% if a.status == 'accepted' and a.pk in reviewable %}<a class="btn btn-sm btn-primary" href="{% url 'dashboard:plan_new' a.student_id %}?alert={{ a.pk }}">ایجاد برنامهٔ مداخله</a>{% endif %}

@@ -1,6 +1,6 @@
 {% extends 'dashboard/base.html' %}
 {% load eip_ui %}
-{% block title %}دستیار اسناد مدرسه{% endblock %}
+{% block title %}دستیار اسناد مدرسه{% endblock %}{% block page_title %}دستیار اسناد مدرسه{% endblock %}
 {% block page_actions %}{% if is_admin %}<a class="btn btn-sm btn-outline-secondary" href="{% url 'docqa:documents' %}">مدیریت اسناد</a>{% endif %}{% endblock %}
 {% block content %}
 <p class="text-muted small">پرسش دربارهٔ <strong>اسناد غیرشخصی مدرسه</strong> ({{ doc_count }} سند فعال). نام یا شناسهٔ دانش‌آموز نپرسید. {% if ai_on %}پاسخ هوشمند فقط وقتی داده می‌شود که مدل محلی فعال باشد؛ در غیر این صورت بخش‌های مرتبط سند را می‌بینید.{% else %}پاسخ هوشمند برای این مدرسه خاموش است؛ این صفحه جست‌وجوی ساده در اسناد است.{% endif %}</p>

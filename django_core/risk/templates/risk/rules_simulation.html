@@ -1,6 +1,6 @@
 {% extends 'dashboard/base.html' %}
 {% load eip_ui %}
-{% block title %}شبیه‌سازی قاعده{% endblock %}
+{% block title %}شبیه‌سازی قاعده{% endblock %}{% block page_title %}شبیه‌سازی قاعده{% endblock %}
 {% block content %}
 {% include 'dashboard/school/_nav.html' %}
 <a class="btn btn-link" href="{% url 'rules:detail' rule.pk %}">← {{ rule.code }} نسخهٔ {{ rule.version }}</a>

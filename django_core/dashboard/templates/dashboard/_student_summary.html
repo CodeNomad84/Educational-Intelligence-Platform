@@ -13,19 +13,19 @@
     <p class="mb-0"><strong>مدرسه:</strong> {{ student.school.name }}</p>
   </div></div></div>
   <div class="col-lg-8"><div class="card h-100"><div class="card-header">مسیر تحصیلی (ثبت‌نام‌ها)</div><div class="card-body p-0"><div class="table-responsive">
-    <table class="table table-sm mb-0"><thead><tr><th>سال</th><th>کلاس</th><th>پایه</th><th>وضعیت</th></tr></thead><tbody>
+    <table class="table table-sm mb-0"><thead><tr><th scope="col">سال</th><th scope="col">کلاس</th><th scope="col">پایه</th><th scope="col">وضعیت</th></tr></thead><tbody>
     {% for e in enrollments %}<tr><td>{{ e.academic_year.label|default:e.academic_year.code }}</td><td>{{ e.school_class|default:"—" }}</td><td>{{ e.get_grade_display }}</td><td>{{ e.get_status_display }}</td></tr>
     {% empty %}<tr><td colspan="4" class="text-muted">ثبت‌نامی وجود ندارد.</td></tr>{% endfor %}
     </tbody></table></div></div></div></div>
 </div>
-<h5 class="mt-4">نمرات به تفکیک سال و درس</h5>
+<h2 class="h5 mt-4">نمرات به تفکیک سال و درس</h2>
 {% for year, subjects, year_average in grade_years %}
 <div class="card mb-3"><div class="card-header">{{ year }} — میانگین کل: <strong>{{ year_average }}</strong></div><div class="card-body p-0"><div class="table-responsive">
-  <table class="table table-sm mb-0"><thead><tr><th>درس</th><th>تعداد نمره</th><th>میانگین</th></tr></thead><tbody>
+  <table class="table table-sm mb-0"><thead><tr><th scope="col">درس</th><th scope="col">تعداد نمره</th><th scope="col">میانگین</th></tr></thead><tbody>
   {% for name, count, avg in subjects %}<tr><td>{{ name }}</td><td>{{ count }}</td><td>{{ avg }}</td></tr>{% endfor %}
   </tbody></table></div></div></div>
 {% empty %}<p class="text-muted">نمره‌ای ثبت نشده است.</p>{% endfor %}
-<h5 class="mt-4">حضور و غیاب</h5>
+<h2 class="h5 mt-4">حضور و غیاب</h2>
 {% if attendance.total %}
 <div class="card"><div class="card-body">
   <p class="mb-2">{{ attendance.total }} روز ثبت شده{% if attendance.present_rate is not None %} — حضور: <strong>{{ attendance.present_rate }}٪</strong>{% endif %}</p>
@@ -33,6 +33,6 @@
   <div class="d-flex flex-wrap gap-3 mt-2 small">{% for label, n, pct, css in attendance.bars %}<span><span class="badge {{ css }}">&nbsp;</span> {{ label }}: {{ n }}</span>{% endfor %}</div>
 </div></div>
 {% else %}<p class="text-muted">حضور و غیابی ثبت نشده است.</p>{% endif %}
-<h5 class="mt-4">توصیه‌های معلمان</h5>
+<h2 class="h5 mt-4">توصیه‌های معلمان</h2>
 {% for r in recommendations %}<div class="border rounded p-2 mb-2 bg-white"><small class="text-muted">{{ r.created_at|jdate }}{% if r.subject %} — {{ r.get_subject_display }}{% endif %}{% if r.visible_to_student %} — قابل نمایش به دانش‌آموز{% else %} — فقط کادر مدرسه{% endif %}{% if r.author %} — {{ r.author.first_name }} {{ r.author.last_name }}{% endif %}</small><div>{{ r.text|linebreaksbr }}</div></div>
 {% empty %}<p class="text-muted">توصیه‌ای ثبت نشده است.</p>{% endfor %}

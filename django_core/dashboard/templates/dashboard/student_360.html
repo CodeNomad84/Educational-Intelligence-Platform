@@ -1,38 +1,41 @@
 {% extends 'dashboard/base.html' %}
-{% block title %}پرونده ۳۶۰: {{ student.first_name }} {{ student.last_name }}{% endblock %}
+{% block title %}پرونده ۳۶۰: {{ student.first_name }} {{ student.last_name }}{% endblock %}{% block page_title %}پرونده ۳۶۰: {{ student.first_name }} {{ student.last_name }}{% endblock %}
 {% load eip_ui %}
 {% block content %}
 <a class="btn btn-link" href="{% url 'dashboard:student_list' %}">← فهرست دانش‌آموزان</a>
-<a class="btn btn-sm btn-outline-primary mb-2" href="{% url 'dashboard:report_card' student.pk %}"><i class="bi bi-printer"></i> کارنامه</a>
+<a class="btn btn-sm btn-outline-primary mb-2" href="{% url 'dashboard:report_card' student.pk %}"><i class="bi bi-printer" aria-hidden="true"></i> کارنامه</a>
 {% if IS_SCHOOL_ADMIN or IS_GRADE_LEAD %}<a class="btn btn-sm btn-outline-primary mb-2" href="{% url 'dashboard:alert_new' student.pk %}">ثبت نگرانی</a>{% endif %}
 {% if referral_form %}<button type="button" class="btn btn-sm btn-outline-warning mb-2" data-bs-toggle="modal" data-bs-target="#referralModal">ارجاع به مشاور</button>{% endif %}
 {% if account_form %}<button type="button" class="btn btn-sm btn-outline-secondary mb-2" data-bs-toggle="modal" data-bs-target="#accountModal">ساخت حساب دانش‌آموز</button>{% endif %}
 {% if support %}<div class="alert alert-warning d-flex flex-wrap gap-2 align-items-center"><span class="eip-tier tier-{{ support.level }}">{{ support.label }}</span><span>{{ support.open_plans }} برنامهٔ باز · {{ support.new_alerts }} هشدار بررسی‌نشده</span><span class="eip-note">{{ support_note }}</span></div>{% endif %}
 {% include 'dashboard/_student_summary.html' %}
 {% if loop_alerts or loop_plans %}
-<h5 class="mt-3">هشدارها و مداخله‌ها</h5>
+<h2 class="h5 mt-3">هشدارها و مداخله‌ها</h2>
 <div class="table-responsive"><table class="table table-sm bg-white">
+  <thead><tr><th scope="col">نوع</th><th scope="col">عنوان</th><th scope="col">وضعیت</th><th scope="col">تاریخ</th><th scope="col">جزئیات</th></tr></thead>
+  <tbody>
   {% for a in loop_alerts %}<tr><td>هشدار</td><td>{{ a.risk_event.get_risk_type_display }}</td><td>{{ a.get_status_display }}</td><td>{{ a.created_at|jdate }}</td><td></td></tr>{% endfor %}
   {% for p in loop_plans %}<tr><td>مداخله</td><td>{{ p.get_intervention_type_display }}</td><td>{{ p.get_status_display }}</td><td>{{ p.start_date|jdate }}</td>
     <td>{% if p.outcome %}{{ p.get_outcome_display }}{% endif %}{% if p.status == 'completed' and p.reevaluate_on %} (ارزیابی مجدد: {{ p.reevaluate_on|jdate }}){% endif %} <a href="{% url 'dashboard:plan_detail' p.pk %}">مشاهده</a></td></tr>{% endfor %}
+  </tbody>
 </table></div>
 {% endif %}
 {% if trend_weeks %}
-<h5 class="mt-4">روند (محاسبهٔ خودکار، فقط برای مرور)</h5>
+<h2 class="h5 mt-4">روند (محاسبهٔ خودکار، فقط برای مرور)</h2>
 <p class="small text-muted">نرخ غیبت هفتگی در ۱۲ هفتهٔ اخیر؛ «—» یعنی کمتر از ۳ رکورد در آن هفته. این ارقام تصمیم نیستند و تشخیص یا برچسب دانش‌آموز نیستند.</p>
-<div class="table-responsive"><table class="table table-sm bg-white text-center small"><tr>{% for end, rate, n in trend_weeks %}<th>{{ end|jdate }}</th>{% endfor %}</tr>
+<div class="table-responsive"><table class="table table-sm bg-white text-center small"><thead><tr>{% for end, rate, n in trend_weeks %}<th scope="col">{{ end|jdate }}</th>{% endfor %}</tr></thead>
 <tr>{% for end, rate, n in trend_weeks %}<td>{% if rate is None %}—{% else %}{{ rate|floatformat:0 }}٪{% endif %}</td>{% endfor %}</tr></table></div>
-{% if trend_subjects %}<div class="table-responsive"><table class="table table-sm bg-white small w-100"><thead><tr><th>درس</th><th>۹۰ تا ۱۳۵ روز پیش</th><th>۴۵ تا ۹۰ روز پیش</th><th>۴۵ روز اخیر</th></tr></thead><tbody>
+{% if trend_subjects %}<div class="table-responsive"><table class="table table-sm bg-white small w-100"><thead><tr><th scope="col">درس</th><th scope="col">۹۰ تا ۱۳۵ روز پیش</th><th scope="col">۴۵ تا ۹۰ روز پیش</th><th scope="col">۴۵ روز اخیر</th></tr></thead><tbody>
 {% for subject, avgs in trend_rows %}<tr><td>{{ subject }}</td>{% for a in avgs %}<td>{% if a is None %}—{% else %}{{ a|floatformat:1 }}{% endif %}</td>{% endfor %}</tr>{% endfor %}</tbody></table></div>{% endif %}
 {% endif %}
 {% if referrals %}
-<h5 class="mt-4">ارجاع به مشاور</h5>
-<div class="table-responsive"><table class="table table-sm bg-white"><thead><tr><th>مشاور</th><th>دلیل</th><th>وضعیت</th><th>تاریخ</th></tr></thead><tbody>
+<h2 class="h5 mt-4">ارجاع به مشاور</h2>
+<div class="table-responsive"><table class="table table-sm bg-white"><thead><tr><th scope="col">مشاور</th><th scope="col">دلیل</th><th scope="col">وضعیت</th><th scope="col">تاریخ</th></tr></thead><tbody>
 {% for r in referrals %}<tr><td>{{ r.counselor.first_name }} {{ r.counselor.last_name }}</td><td>{{ r.reason }}</td><td>{{ r.get_status_display }}</td><td>{{ r.created_at|jdate }}</td></tr>{% endfor %}
 </tbody></table></div>
 {% endif %}
 {% if counselor_notes %}
-<h5 class="mt-4">یادداشت‌های مشاور (فقط مشاور، مسئول پایه و مدیر مدرسه)</h5>
+<h2 class="h5 mt-4">یادداشت‌های مشاور (فقط مشاور، مسئول پایه و مدیر مدرسه)</h2>
 {% for n in counselor_notes %}<div class="border rounded p-2 mb-2 bg-white"><small class="text-muted">{{ n.created_at|jdate }}</small><div>{{ n.text|linebreaksbr }}</div></div>{% endfor %}
 {% endif %}
 {% if closed_note_dates %}

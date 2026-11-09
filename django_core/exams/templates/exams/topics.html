@@ -1,5 +1,5 @@
 {% extends 'dashboard/base.html' %}
-{% block title %}مبحث‌های آزمون{% endblock %}
+{% block title %}مبحث‌های آزمون{% endblock %}{% block page_title %}مبحث‌های آزمون{% endblock %}
 {% block content %}
 <a class="btn btn-link" href="{% url 'exams:teacher_home' %}">← بانک پرسش</a>
 {% for e in errors %}<div class="alert alert-danger">{{ e }}</div>{% endfor %}

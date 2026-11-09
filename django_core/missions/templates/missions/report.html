@@ -1,6 +1,6 @@
 {% extends 'dashboard/base.html' %}
 {% load eip_ui %}
-{% block title %}گزارش مأموریت‌محور{% endblock %}
+{% block title %}گزارش مأموریت‌محور{% endblock %}{% block page_title %}گزارش مأموریت‌محور{% endblock %}
 {% block content %}
 <a class="btn btn-link" href="{% url 'missions:students' %}">← دانش‌آموزان</a>
 <h4>{{ student.last_name }} {{ student.first_name }}</h4>

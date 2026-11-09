@@ -1,5 +1,5 @@
 {% extends 'dashboard/base.html' %}
-{% block title %}نمرات {{ assignment.get_subject_display }} — {{ assignment.school_class }}{% endblock %}
+{% block title %}نمرات {{ assignment.get_subject_display }} — {{ assignment.school_class }}{% endblock %}{% block page_title %}نمرات {{ assignment.get_subject_display }} — {{ assignment.school_class }}{% endblock %}
 {% block content %}
 <a class="btn btn-link" href="{% url 'dashboard:teacher_home' %}">← کلاس‌های من</a>
 <div class="card mb-4"><div class="card-header">ثبت نمره (حداکثر {{ scale }}) — فقط ردیف‌های پر شده ثبت می‌شوند</div><div class="card-body">
@@ -7,22 +7,22 @@
     <div class="row mb-3"><div class="col-md-4">{{ form.exam_type.label_tag }}{{ form.exam_type }}{{ form.exam_type.errors }}</div>
       <div class="col-md-4">{{ form.date.label_tag }}{{ form.date }}{{ form.date.errors }}</div></div>
     <table class="table table-sm">
-      <thead><tr><th>دانش‌آموز</th><th style="width:140px">نمره</th><th></th></tr></thead>
+      <thead><tr><th scope="col">دانش‌آموز</th><th scope="col">نمره</th></tr></thead>
       <tbody>
       {% for r in rows %}
         <tr><td><a href="{% url 'dashboard:teacher_student' assignment.pk r.student.pk %}">{{ r.student.last_name }} {{ r.student.first_name }}</a></td>
-          <td><input name="score_{{ r.student.pk }}" class="form-control form-control-sm" inputmode="decimal" value="{{ r.value }}"></td>
-          <td class="text-danger">{{ r.error }}</td></tr>
-      {% empty %}<tr><td colspan="3" class="text-muted">دانش‌آموزی در این کلاس ثبت‌نام نشده است.</td></tr>
+          <td><input name="score_{{ r.student.pk }}" id="score_{{ r.student.pk }}" class="form-control form-control-sm" inputmode="decimal" value="{{ r.value }}" aria-label="نمرهٔ {{ r.student.first_name }} {{ r.student.last_name }}"{% if r.error %} aria-invalid="true" aria-describedby="score_{{ r.student.pk }}_error"{% endif %}>
+          {% if r.error %}<div id="score_{{ r.student.pk }}_error" class="text-danger small" role="alert">{{ r.error }}</div>{% endif %}</td></tr>
+      {% empty %}<tr><td colspan="2" class="text-muted">دانش‌آموزی در این کلاس ثبت‌نام نشده است.</td></tr>
       {% endfor %}
       </tbody>
     </table>
     {% if rows %}<button class="btn btn-success">ثبت نمرات</button>{% endif %}
   </form>
 </div></div>
-<h5>آخرین نمرات</h5>
+<h2 class="h5">آخرین نمرات</h2>
 <table class="table table-sm bg-white">
-  <thead><tr><th>دانش‌آموز</th><th>نوع</th><th>نمره</th><th>تاریخ</th><th></th></tr></thead>
+  <thead><tr><th scope="col">دانش‌آموز</th><th scope="col">نوع</th><th scope="col">نمره</th><th scope="col">تاریخ</th><th scope="col"><span class="visually-hidden">اقدام‌ها</span></th></tr></thead>
   <tbody>
   {% for g in recent %}
     <tr><td>{{ g.student.last_name }} {{ g.student.first_name }}</td><td>{{ g.get_exam_type_display }}</td><td>{{ g.score }}</td><td>{{ g.date }}</td>

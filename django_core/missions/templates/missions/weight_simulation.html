@@ -1,5 +1,5 @@
 {% extends 'dashboard/base.html' %}
-{% block title %}شبیه‌سازی نسخهٔ {{ ws.version }}{% endblock %}
+{% block title %}شبیه‌سازی نسخهٔ {{ ws.version }}{% endblock %}{% block page_title %}شبیه‌سازی نسخهٔ {{ ws.version }}{% endblock %}
 {% block content %}
 <a class="btn btn-link" href="{% url 'missions:weight_detail' ws.pk %}">← نسخهٔ {{ ws.version }}</a>
 <div class="alert alert-warning">شبیه‌سازی فقط تفاوت‌های <strong>تجمیعی</strong> را نشان می‌دهد (بدون نام دانش‌آموز، مشاهده‌گر یا شاهد) و ذخیره نمی‌شود. گروه کمتر از ۵ نفر نمایش داده نمی‌شود. نتایج اولیه و اعتبارسنجی‌نشده است.</div>

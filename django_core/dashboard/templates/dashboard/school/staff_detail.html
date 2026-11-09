@@ -1,5 +1,5 @@
 {% extends 'dashboard/base.html' %}
-{% block title %}{{ noun }}: {{ person.first_name }} {{ person.last_name }}{% endblock %}
+{% block title %}{{ noun }}: {{ person.first_name }} {{ person.last_name }}{% endblock %}{% block page_title %}{{ noun }}: {{ person.first_name }} {{ person.last_name }}{% endblock %}
 {% block content %}
 {% include 'dashboard/school/_nav.html' %}
 <p>نام کاربری: <strong>{{ person.username }}</strong> —
@@ -8,7 +8,7 @@
     <button class="btn btn-sm btn-outline-warning">{% if person.is_active %}غیرفعال‌سازی{% else %}فعال‌سازی{% endif %}</button></form></p>
 {% if kind != 'counselors' %}
 <table class="table table-sm bg-white">
-  <thead><tr>{% if kind == 'teachers' %}<th>کلاس</th><th>درس</th>{% else %}<th>پایه</th><th>سال تحصیلی</th>{% endif %}<th></th></tr></thead>
+  <thead><tr>{% if kind == 'teachers' %}<th scope="col">کلاس</th><th scope="col">درس</th>{% else %}<th scope="col">پایه</th><th scope="col">سال تحصیلی</th>{% endif %}<th scope="col"><span class="visually-hidden">اقدام‌ها</span></th></tr></thead>
   <tbody>
   {% for a in assignments %}
     <tr>{% if kind == 'teachers' %}<td>{{ a.school_class }}</td><td>{{ a.get_subject_display }}</td>

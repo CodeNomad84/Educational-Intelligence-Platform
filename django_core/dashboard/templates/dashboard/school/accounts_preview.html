@@ -1,11 +1,11 @@
 {% extends 'dashboard/base.html' %}
-{% block title %}پیش‌نمایش حساب‌های گروهی{% endblock %}
+{% block title %}پیش‌نمایش حساب‌های گروهی{% endblock %}{% block page_title %}پیش‌نمایش حساب‌های گروهی{% endblock %}
 {% block content %}
 {% include 'dashboard/school/_nav.html' %}
 <div class="alert alert-info">پیش‌نمایش؛ هنوز چیزی ثبت نشده است. ایجاد: {{ counts.create }} · پیوند به دانش‌آموز موجود: {{ counts.link }} · موجود: {{ counts.exists }} · خطا: {{ counts.error }} · حساب جدید: {{ plan.new_accounts }}</div>
 {% if plan.blocking %}<div class="alert alert-danger">{{ plan.blocking }}</div>{% endif %}
 <table class="table table-sm bg-white">
-  <thead><tr><th>برگه</th><th>ردیف</th><th>نام</th><th>کد ملی</th><th>وضعیت</th><th>توضیح</th></tr></thead>
+  <thead><tr><th scope="col">برگه</th><th scope="col">ردیف</th><th scope="col">نام</th><th scope="col">کد ملی</th><th scope="col">وضعیت</th><th scope="col">توضیح</th></tr></thead>
   <tbody>
   {% for r in plan.rows %}
     <tr class="{% if r.status == 'error' %}table-danger{% endif %}"><td>{{ r.sheet }}</td><td>{{ r.line }}</td><td>{{ r.name }}</td><td dir="ltr">{{ r.national_id }}</td>

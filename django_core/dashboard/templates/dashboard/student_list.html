@@ -1,6 +1,6 @@
 {% extends 'dashboard/base.html' %}
 {% load eip_ui %}
-{% block title %}{% if IS_PARENT and not IS_SCHOOL_ADMIN and not IS_GRADE_LEAD and not IS_TEACHER %}فرزندان من{% else %}دانش‌آموزان{% endif %}{% endblock %}
+{% block title %}{% if IS_PARENT and not IS_SCHOOL_ADMIN and not IS_GRADE_LEAD and not IS_TEACHER %}فرزندان من{% else %}دانش‌آموزان{% endif %}{% endblock %}{% block page_title %}{% if IS_PARENT and not IS_SCHOOL_ADMIN and not IS_GRADE_LEAD and not IS_TEACHER %}فرزندان من{% else %}دانش‌آموزان{% endif %}{% endblock %}
 {% block subtitle %}<p class="eip-subtitle">{{ students|length }} دانش‌آموز</p>{% endblock %}
 {% block page_actions %}{% if IS_SCHOOL_ADMIN %}<a href="{% url 'dashboard:student_add' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> افزودن دانش‌آموز</a>{% endif %}{% endblock %}
 {% block content %}
@@ -14,7 +14,7 @@
     {% if students %}
     <div class="table-responsive">
         <table class="table table-hover eip-fit">
-            <thead><tr><th>نام</th><th class="d-none d-md-table-cell">کد ملی</th><th class="d-none d-md-table-cell">پایه</th><th class="d-none d-md-table-cell">کلاس</th>{% if show_support %}<th>سطح حمایت</th>{% endif %}<th class="d-none d-md-table-cell"></th></tr></thead>
+            <thead><tr><th scope="col">نام</th><th scope="col" class="d-none d-md-table-cell">کد ملی</th><th scope="col" class="d-none d-md-table-cell">پایه</th><th scope="col" class="d-none d-md-table-cell">کلاس</th>{% if show_support %}<th scope="col">سطح حمایت</th>{% endif %}<th scope="col" class="d-none d-md-table-cell"><span class="visually-hidden">اقدام‌ها</span></th></tr></thead>
             <tbody>
             {% for student in students %}
                 <tr>

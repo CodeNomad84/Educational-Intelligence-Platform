@@ -1,9 +1,9 @@
 {% extends 'dashboard/base.html' %}
-{% block title %}بازنشانی رمز دانش‌آموزان و والدین پایه{% endblock %}
+{% block title %}بازنشانی رمز دانش‌آموزان و والدین پایه{% endblock %}{% block page_title %}بازنشانی رمز دانش‌آموزان و والدین پایه{% endblock %}
 {% block content %}
 <div class="alert alert-warning">پیش از بازنشانی، هویت درخواست‌کننده را تأیید کنید (حضوری یا از مسیر رسمی مدرسه). برای حساب <strong>والدین</strong> دقت بیشتری لازم است: رمز را فقط حضوری یا با تأیید قطعی هویت بدهید. هر بازنشانی در گزارش دسترسی‌ها ثبت می‌شود و حداکثر ۲۰ بازنشانی در ساعت مجاز است.</div>
 <table class="table table-sm bg-white align-middle">
-  <thead><tr><th>دانش‌آموز</th><th>کلاس</th><th>حساب دانش‌آموز</th><th>حساب والد</th></tr></thead>
+  <thead><tr><th scope="col">دانش‌آموز</th><th scope="col">کلاس</th><th scope="col">حساب دانش‌آموز</th><th scope="col">حساب والد</th></tr></thead>
   <tbody>
   {% for r in rows %}
     <tr><td>{{ r.student.first_name }} {{ r.student.last_name }}</td><td>{{ r.student.class_name }}</td>

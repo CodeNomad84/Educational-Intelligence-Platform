@@ -1,6 +1,6 @@
 {% extends 'dashboard/base.html' %}
 {% load eip_ui %}
-{% block title %}پرونده ارجاعی: {{ student.first_name }} {{ student.last_name }}{% endblock %}
+{% block title %}پرونده ارجاعی: {{ student.first_name }} {{ student.last_name }}{% endblock %}{% block page_title %}پرونده ارجاعی: {{ student.first_name }} {{ student.last_name }}{% endblock %}
 {% block content %}
 <a class="btn btn-link" href="{% url 'dashboard:counselor_home' %}">← پرونده‌های ارجاعی</a>
 <div class="alert alert-warning"><strong>دلیل ارجاع:</strong> {{ referral.reason }}
@@ -10,7 +10,7 @@
   <p class="mb-0"><strong>مادر:</strong> <span dir="ltr">{{ student.mother_phone|default:"—" }}</span></p>
 </div></div>
 {% include 'dashboard/_student_summary.html' %}
-<h5 class="mt-4">یادداشت‌های مشاور (فقط شما، مسئول پایه و مدیر مدرسه)</h5>
+<h2 class="h5 mt-4">یادداشت‌های مشاور (فقط شما، مسئول پایه و مدیر مدرسه)</h2>
 {% for n in notes %}<div class="border rounded p-2 mb-2 bg-white"><small class="text-muted">{{ n.created_at|jdate }}</small><div>{{ n.text|linebreaksbr }}</div></div>
 {% empty %}<p class="text-muted">یادداشتی ثبت نشده است.</p>{% endfor %}
 <div class="card mb-3"><div class="card-body"><form method="post">{% csrf_token %}{{ form.as_p }}<button class="btn btn-success">ثبت یادداشت</button></form></div></div>

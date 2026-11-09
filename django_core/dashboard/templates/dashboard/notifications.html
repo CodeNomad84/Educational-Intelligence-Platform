@@ -1,6 +1,6 @@
 {% extends 'dashboard/base.html' %}
 {% load eip_ui %}
-{% block title %}اعلان‌ها{% endblock %}
+{% block title %}اعلان‌ها{% endblock %}{% block page_title %}اعلان‌ها{% endblock %}
 {% block page_actions %}<form method="post" action="{% url 'dashboard:notifications_read' %}">{% csrf_token %}<button class="btn btn-sm btn-outline-secondary">علامت‌گذاری همه به‌عنوان خوانده‌شده</button></form>{% endblock %}
 {% block content %}
 <p class="text-muted small">اعلان‌ها فقط یادآوری‌اند و نام یا جزئیات دانش‌آموز ندارند؛ برای دیدن جزئیات به صفحهٔ مربوط بروید.</p>

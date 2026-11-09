@@ -1,5 +1,5 @@
 {% extends 'dashboard/base.html' %}
-{% block title %}آمار تجمیعی مأموریت‌محور{% endblock %}
+{% block title %}آمار تجمیعی مأموریت‌محور{% endblock %}{% block page_title %}آمار تجمیعی مأموریت‌محور{% endblock %}
 {% block content %}
 <div class="alert alert-warning">فقط شمار دانش‌آموزان به تفکیک وضعیت شواهد (بدون نام، نمره یا رتبه). گروه‌های کمتر از {{ min_group }} نفر نمایش داده نمی‌شوند.</div>
 {% for b in blocks %}<h5>دوره: {{ b.period.label }}</h5>

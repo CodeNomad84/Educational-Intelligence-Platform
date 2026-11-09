@@ -1,5 +1,5 @@
 {% extends 'dashboard/base.html' %}
-{% block title %}ورود پرسش‌ها از فایل CSV{% endblock %}
+{% block title %}ورود پرسش‌ها از فایل CSV{% endblock %}{% block page_title %}ورود پرسش‌ها از فایل CSV{% endblock %}
 {% block content %}
 <a class="btn btn-link" href="{% url 'exams:teacher_home' %}">← بانک پرسش</a>
 <div class="alert alert-info">ابتدا فقط <strong>پیش‌نمایش</strong> می‌بینید و چیزی ذخیره نمی‌شود. پرسش‌های واردشده <strong>پیش‌نویس</strong> هستند و باید تأیید شوند. حداکثر {{ max_rows }} ردیف؛ فایل UTF-8.</div>

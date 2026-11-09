@@ -1,5 +1,5 @@
 {% extends 'dashboard/base.html' %}
-{% block title %}انتخاب در فعالیت‌ها{% endblock %}
+{% block title %}انتخاب در فعالیت‌ها{% endblock %}{% block page_title %}انتخاب در فعالیت‌ها{% endblock %}
 {% block content %}
 <a class="btn btn-link" href="{% url 'missions:report' student.pk %}?period={{ period.pk }}">← گزارش</a>
 <h4>انتخاب در فعالیت‌ها — {{ student.last_name }} {{ student.first_name }} ({{ period.label }})</h4>

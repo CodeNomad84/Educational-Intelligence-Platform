@@ -1,5 +1,5 @@
 {% extends 'dashboard/base.html' %}
-{% block title %}پرسش{% endblock %}
+{% block title %}پرسش{% endblock %}{% block page_title %}پرسش{% endblock %}
 {% block content %}
 <a class="btn btn-link" href="{% url 'exams:teacher_home' %}">← بانک پرسش</a>
 {% if read_only %}<div class="alert alert-secondary">فقط مشاهده: فقط سازندهٔ پرسش آن را ویرایش می‌کند و بعد از اولین تلاش دانش‌آموزان ویرایش بسته می‌شود (پرسش را بازنشسته و نسخهٔ تازه بسازید).</div>{% endif %}

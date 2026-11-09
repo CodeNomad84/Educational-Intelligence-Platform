@@ -1,5 +1,5 @@
 {% extends 'dashboard/base.html' %}
-{% block title %}نمای کلی پلتفرم (اپراتور){% endblock %}
+{% block title %}نمای کلی پلتفرم (اپراتور){% endblock %}{% block page_title %}نمای کلی پلتفرم (اپراتور){% endblock %}
 {% block content %}
 <div class="alert alert-info">فقط نمایش. تنها نام مدرسه، وضعیت ماژول و شمارنده‌ها نمایش داده می‌شود؛ هیچ داده‌ای از دانش‌آموزان یا نام اشخاص در این صفحه نیست. فعال‌سازی و تمدید از صفحهٔ مدیریت یا فرمان <code dir="ltr">set_school_module</code> انجام می‌شود.</div>
 <p>
@@ -9,12 +9,12 @@
 </p>
 {% for e in schools %}
 <div class="card mb-3"><div class="card-header"><strong>{{ e.school.name }}</strong> <span class="text-muted small" dir="ltr">{{ e.school.code }}</span></div><div class="card-body">
-  <table class="table table-sm mb-3"><thead><tr><th>ماژول</th><th>وضعیت</th><th>تاریخ پایان</th><th>روز مانده</th></tr></thead><tbody>
+  <table class="table table-sm mb-3"><thead><tr><th scope="col">ماژول</th><th scope="col">وضعیت</th><th scope="col">تاریخ پایان</th><th scope="col">روز مانده</th></tr></thead><tbody>
   {% for m in e.modules %}<tr class="{% if m.expiring %}table-warning{% endif %}"><td>{{ m.label }} <span class="text-muted small" dir="ltr">{{ m.key }}</span></td><td>{{ m.state_label }}</td>
     <td>{% if m.end %}{{ m.end }}{% elif m.state_label != 'قفل' %}بدون پایان{% else %}—{% endif %}</td><td>{% if m.days is not None %}{{ m.days }}{% else %}—{% endif %}</td></tr>{% endfor %}
   </tbody></table>
   <div class="small text-muted mb-1">فراخوانی‌های هوش مصنوعی (سقف روزانه {{ e.usage.daily_cap }}، سقف ماهانه {{ e.usage.monthly_cap }})</div>
-  <table class="table table-sm mb-0"><thead><tr><th>ماژول</th><th>۳۰ روز اخیر</th><th>امروز</th><th>این ماه</th></tr></thead><tbody>
+  <table class="table table-sm mb-0"><thead><tr><th scope="col">ماژول</th><th scope="col">۳۰ روز اخیر</th><th scope="col">امروز</th><th scope="col">این ماه</th></tr></thead><tbody>
   {% for key, u in e.usage.modules.items %}<tr><td dir="ltr">{{ key }}</td><td>{{ u.last30 }}</td><td>{{ u.today }}</td><td>{{ u.month }}</td></tr>{% endfor %}</tbody></table>
 </div></div>
 {% empty %}<p class="text-muted">{% if only_expiring %}مدرسه‌ای با ماژول در حال انقضا نیست.{% else %}مدرسه‌ای ثبت نشده است.{% endif %}</p>{% endfor %}

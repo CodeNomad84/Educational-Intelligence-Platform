@@ -1,6 +1,6 @@
 {% extends 'dashboard/base.html' %}
 {% load eip_ui %}
-{% block title %}جزئیات دانش‌آموز{% endblock %}
+{% block title %}جزئیات دانش‌آموز{% endblock %}{% block page_title %}جزئیات دانش‌آموز{% endblock %}
 {% block content %}
 <div class="card">
     <div class="card-header bg-primary text-white">
@@ -55,14 +55,14 @@
             </div>
         </div>
         <hr>
-        <h5>نمرات</h5>
-        <table class="table table-sm"><tr><th>درس</th><th>نوع</th><th>نمره</th><th>تاریخ</th></tr>
+        <h2 class="h5">نمرات</h2>
+        <table class="table table-sm"><tr><th scope="col">درس</th><th scope="col">نوع</th><th scope="col">نمره</th><th scope="col">تاریخ</th></tr>
         {% for g in grades %}<tr><td>{{ g.get_subject_display }}</td><td>{{ g.get_exam_type_display }}</td><td>{{ g.score }}</td><td>{{ g.date }}</td></tr>{% empty %}<tr><td colspan="4">نمره‌ای ثبت نشده</td></tr>{% endfor %}</table>
-        <h5>توصیه‌های معلمان</h5>
+        <h2 class="h5">توصیه‌های معلمان</h2>
         {% for r in recommendations %}<div class="border rounded p-2 mb-2"><small class="text-muted">{{ r.created_at|jdate }}{% if r.subject %} — {{ r.get_subject_display }}{% endif %}</small><div>{{ r.text|linebreaksbr }}</div></div>{% empty %}<p class="text-muted">توصیه‌ای ثبت نشده</p>{% endfor %}
         {% if student.full_tier %}
-        <h5>حضور و غیاب</h5>
-        <table class="table table-sm"><tr><th>تاریخ</th><th>وضعیت</th><th>یادداشت</th></tr>
+        <h2 class="h5">حضور و غیاب</h2>
+        <table class="table table-sm"><tr><th scope="col">تاریخ</th><th scope="col">وضعیت</th><th scope="col">یادداشت</th></tr>
         {% for a in attendances %}<tr><td>{{ a.date }}</td><td>{{ a.get_status_display }}</td><td>{{ a.note }}</td></tr>{% empty %}<tr><td colspan="3">غیبتی ثبت نشده</td></tr>{% endfor %}</table>
         {% endif %}
     </div>

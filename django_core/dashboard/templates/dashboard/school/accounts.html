@@ -1,5 +1,5 @@
 {% extends 'dashboard/base.html' %}
-{% block title %}حساب‌های گروهی از اکسل{% endblock %}
+{% block title %}حساب‌های گروهی از اکسل{% endblock %}{% block page_title %}حساب‌های گروهی از اکسل{% endblock %}
 {% block content %}
 {% include 'dashboard/school/_nav.html' %}
 <div class="card mb-3"><div class="card-body">
@@ -12,7 +12,7 @@
 </div></div>
 <div class="card"><div class="card-header">بارگذاری فایل (پیش‌نمایش، بدون ثبت)</div><div class="card-body">
   <form method="post" enctype="multipart/form-data">{% csrf_token %}
-    <input type="file" name="file" accept=".xlsx" class="form-control mb-2" required>
+    <input type="file" name="file" accept=".xlsx" class="form-control mb-2" aria-label="فایل اکسل" required>
     <button class="btn btn-primary">پیش‌نمایش</button></form>
 </div></div>
 {% endblock %}

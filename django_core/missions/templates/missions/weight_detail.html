@@ -1,6 +1,6 @@
 {% extends 'dashboard/base.html' %}
 {% load eip_ui %}
-{% block title %}نسخهٔ {{ ws.version }} وزن‌ها{% endblock %}
+{% block title %}نسخهٔ {{ ws.version }} وزن‌ها{% endblock %}{% block page_title %}نسخهٔ {{ ws.version }} وزن‌ها{% endblock %}
 {% block content %}
 <a class="btn btn-link" href="{% url 'missions:weights' %}">← وزن‌های مأموریت‌محور</a>
 <div class="alert alert-warning">وزن‌ها و آستانه‌ها <strong>پیشنهاد اولیه و اعتبارسنجی‌نشده</strong> هستند. مسیر تغییر: پیش‌نویس ← شبیه‌سازی‌شده ← منتظر تأیید ← فعال. نسخهٔ فعال یا بازنشسته هرگز ویرایش نمی‌شود؛ از آن کپی بگیرید.</div>

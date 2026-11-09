@@ -1,5 +1,5 @@
 {% extends 'dashboard/base.html' %}
-{% block title %}جلسات فردی اولیا{% endblock %}
+{% block title %}جلسات فردی اولیا{% endblock %}{% block page_title %}جلسات فردی اولیا{% endblock %}
 {% block content %}
 <a class="btn btn-link" href="{% url 'missions:report' student.pk %}">← گزارش</a>
 <h4>جلسات فردی اولیا — {{ student.last_name }} {{ student.first_name }}</h4>

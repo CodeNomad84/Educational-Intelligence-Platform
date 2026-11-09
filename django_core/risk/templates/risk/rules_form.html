@@ -1,6 +1,6 @@
 {% extends 'dashboard/base.html' %}
 {% load eip_ui %}
-{% block title %}قاعده{% endblock %}
+{% block title %}قاعده{% endblock %}{% block page_title %}قاعده{% endblock %}
 {% block content %}
 {% include 'dashboard/school/_nav.html' %}
 <a class="btn btn-link" href="{% url 'rules:index' %}">← قواعد هشدار</a>

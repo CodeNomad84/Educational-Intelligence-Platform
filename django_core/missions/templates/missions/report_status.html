@@ -1,5 +1,5 @@
 {% extends 'dashboard/base.html' %}
-{% block title %}وضعیت مشاهدات{% endblock %}
+{% block title %}وضعیت مشاهدات{% endblock %}{% block page_title %}وضعیت مشاهدات{% endblock %}
 {% block content %}
 <a class="btn btn-link" href="{% url 'missions:students' %}">← دانش‌آموزان</a>
 <h4>{{ student.last_name }} {{ student.first_name }} — وضعیت مشاهدات من</h4>

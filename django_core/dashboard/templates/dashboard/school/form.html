@@ -1,5 +1,5 @@
 {% extends 'dashboard/base.html' %}
-{% block title %}{{ heading }}{% endblock %}
+{% block title %}{{ heading }}{% endblock %}{% block page_title %}{{ heading }}{% endblock %}
 {% block content %}
 {% include 'dashboard/school/_nav.html' %}
 <div class="card"><div class="card-header">{{ heading }}</div><div class="card-body">

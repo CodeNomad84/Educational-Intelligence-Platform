@@ -1,5 +1,5 @@
 {% extends 'dashboard/base.html' %}
-{% block title %}برنامهٔ مداخله برای {{ student.first_name }} {{ student.last_name }}{% endblock %}
+{% block title %}برنامهٔ مداخله برای {{ student.first_name }} {{ student.last_name }}{% endblock %}{% block page_title %}برنامهٔ مداخله برای {{ student.first_name }} {{ student.last_name }}{% endblock %}
 {% block content %}
 {% if alert %}<p class="small text-muted">بر پایهٔ هشدار پذیرفته‌شده{% if not alert.text_hidden %}: {{ alert.message }}{% endif %}</p>{% endif %}
 <form method="post" class="bg-white p-3 border rounded" style="max-width:40rem">{% csrf_token %}
@@ -7,7 +7,7 @@
   {% if strategies %}<div class="mb-3"><label class="form-label">شروع از کتابخانهٔ راهبردها (اختیاری)</label>
     <select name="strategy" id="strategy" class="form-select"><option value="">—</option>{% for s in strategies %}<option value="{{ s.pk }}" data-type="{{ s.intervention_type }}" data-days="{{ s.typical_days }}" data-title="{{ s.title }}" data-text="{{ s.description }}">سطح {{ s.tier }} · {{ s.title }}</option>{% endfor %}</select>
     <div class="form-text">فقط متن پیشنهادی را پر می‌کند؛ پیش از ثبت می‌توانید آن را ویرایش کنید.</div></div>{% endif %}
-  {% for field in form %}{% if field.name != 'owner' %}<div class="mb-3"><label class="form-label">{{ field.label }}</label>{{ field }}{% for e in field.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}</div>{% endif %}{% endfor %}
+  {% for field in form %}{% if field.name != 'owner' %}<div class="mb-3"><label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% include 'dashboard/_form_errors.html' %}</div>{% endif %}{% endfor %}
   {% if is_admin %}<div class="mb-3"><label class="form-label">مسئول (پیش‌فرض: خودتان)</label>
     <select name="owner" class="form-select"><option value="">—</option>{% for u in owners %}<option value="{{ u.pk }}">{{ u.get_full_name|default:u.username }}</option>{% endfor %}</select>
     <div class="form-text">برنامهٔ «عاطفی» را مدیر مدرسه نمی‌نویسد؛ آن را مشاور یا مسئول پایه ثبت می‌کند.</div></div>{% endif %}

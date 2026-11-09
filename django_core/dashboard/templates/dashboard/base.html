@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>پلتفرم هوشمند مدرسه</title>
+    <title>{% block title %}پلتفرم هوشمند مدرسه{% endblock %}</title>
     <link href="{% static 'dashboard/vendor/bootstrap-5.3.0/bootstrap.rtl.min.css' %}" rel="stylesheet">
     <link rel="stylesheet" href="{% static 'dashboard/vendor/bootstrap-icons-1.11.3/bootstrap-icons.min.css' %}">
     <link rel="stylesheet" href="{% static 'dashboard/css/eip.css' %}">
@@ -100,7 +100,7 @@
         <main id="eip-main" class="eip-content">
             {% block page_header %}
             <div class="eip-page-header">
-                <div><h1>{% block title %}پنل مدیریت{% endblock %}</h1>{% block subtitle %}{% endblock %}</div>
+                <div><h1>{% block page_title %}پنل مدیریت{% endblock %}</h1>{% block subtitle %}{% endblock %}</div>
                 <div class="eip-page-actions">{% block page_actions %}{% endblock %}</div>
             </div>
             {% endblock %}

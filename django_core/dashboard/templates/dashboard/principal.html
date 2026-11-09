@@ -1,6 +1,6 @@
 {% extends 'dashboard/base.html' %}
 {% load static eip_ui %}
-{% block title %}داشبورد مدرسه{% endblock %}
+{% block title %}داشبورد مدرسه{% endblock %}{% block page_title %}داشبورد مدرسه{% endblock %}
 {% block subtitle %}{% if school %}<p class="eip-subtitle">{{ school.name }}{% if year %} · سال تحصیلی {{ year.code }}{% endif %} · به‌روز تا {{ today|jdate:'long' }}</p>{% endif %}{% endblock %}
 {% block page_actions %}
 {% if my_schools|length > 1 %}<form method="get"><select name="school" class="form-select form-select-sm" onchange="this.form.submit()" aria-label="انتخاب مدرسه">{% for s in my_schools %}<option value="{{ s.pk }}" {% if s.pk == school.pk %}selected{% endif %}>{{ s.name }}</option>{% endfor %}</select></form>{% endif %}
@@ -47,7 +47,7 @@
   <div class="col-xl-8"><div class="card h-100 eip-table-card">
     <div class="card-header eip-card-head"><span>دانش‌آموزان نیازمند توجه</span><span class="eip-card-hint">{{ o.attention_total }} نفر در سطح ۲ یا ۳</span></div>
     {% if o.attention %}<div class="table-responsive"><table class="table table-hover">
-      <thead><tr><th>دانش‌آموز</th><th>کلاس</th><th>سطح حمایت</th><th>هشدار بررسی‌نشده</th><th>برنامهٔ باز</th><th>حضور ۳۰ روز</th><th>میانگین</th></tr></thead>
+      <thead><tr><th scope="col">دانش‌آموز</th><th scope="col">کلاس</th><th scope="col">سطح حمایت</th><th scope="col">هشدار بررسی‌نشده</th><th scope="col">برنامهٔ باز</th><th scope="col">حضور ۳۰ روز</th><th scope="col">میانگین</th></tr></thead>
       <tbody>{% for a in o.attention %}<tr>
         <td><a href="{% url 'dashboard:student_360' a.student.pk %}">{{ a.student.first_name }} {{ a.student.last_name }}</a></td>
         <td>{% if a.student.school_class %}{{ a.student.school_class.title }}{% else %}{{ a.student.class_name|default:"—" }}{% endif %}</td>
@@ -78,7 +78,7 @@
   <div class="col-xl-7"><div class="card eip-table-card h-100">
     <div class="card-header eip-card-head"><span>کلاس‌ها</span><span class="eip-card-hint">نرخ‌ها برای کلاس‌های کمتر از {{ o.min_group }} نفر نمایش داده نمی‌شود</span></div>
     <div class="table-responsive"><table class="table">
-      <thead><tr><th>کلاس</th><th>پایه</th><th>دانش‌آموزان</th><th>حضور ۳۰ روز</th><th>میانگین ۴۵ روز</th><th>سطح ۲</th><th>سطح ۳</th></tr></thead>
+      <thead><tr><th scope="col">کلاس</th><th scope="col">پایه</th><th scope="col">دانش‌آموزان</th><th scope="col">حضور ۳۰ روز</th><th scope="col">میانگین ۴۵ روز</th><th scope="col">سطح ۲</th><th scope="col">سطح ۳</th></tr></thead>
       <tbody>{% for c in o.classes %}<tr><td>{{ c.title }}</td><td>{{ c.grade|default:"—" }}</td><td>{{ c.students }}</td>
         <td>{% if c.attendance is not None %}{{ c.attendance }}٪{% else %}—{% endif %}</td><td>{% if c.average is not None %}{{ c.average }}{% else %}—{% endif %}</td>
         <td>{% if c.targeted %}<span class="eip-tier tier-2">{{ c.targeted }}</span>{% else %}۰{% endif %}</td>

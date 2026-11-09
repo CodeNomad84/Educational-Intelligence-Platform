@@ -1,9 +1,9 @@
 {% extends 'dashboard/base.html' %}
-{% block title %}{{ title }}{% endblock %}
+{% block title %}{{ title }}{% endblock %}{% block page_title %}{{ title }}{% endblock %}
 {% block content %}
 {% include 'dashboard/school/_nav.html' %}
 <table class="table table-sm bg-white">
-  <thead><tr><th>نام کاربری</th><th>نام</th><th>وضعیت</th><th></th></tr></thead>
+  <thead><tr><th scope="col">نام کاربری</th><th scope="col">نام</th><th scope="col">وضعیت</th><th scope="col"><span class="visually-hidden">اقدام‌ها</span></th></tr></thead>
   <tbody>
   {% for p in people %}
     <tr><td>{{ p.username }}</td><td>{{ p.first_name }} {{ p.last_name }}</td>

@@ -1,5 +1,5 @@
 {% extends 'dashboard/base.html' %}
-{% block title %}آمار آزمون‌ها{% endblock %}
+{% block title %}آمار آزمون‌ها{% endblock %}{% block page_title %}آمار آزمون‌ها{% endblock %}
 {% block content %}
 <div class="alert alert-info">{{ note }} فقط آمار تجمیعی، بدون نام؛ گروه کمتر از {{ group_floor }} نفر نمایش داده نمی‌شود.</div>
 {% for b in blocks %}<h5>{{ b.school.name }}</h5>

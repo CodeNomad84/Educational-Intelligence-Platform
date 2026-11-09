@@ -1,9 +1,9 @@
 {% extends 'dashboard/base.html' %}
 {% load eip_ui %}
-{% block title %}پرونده‌های ارجاعی{% endblock %}
+{% block title %}پرونده‌های ارجاعی{% endblock %}{% block page_title %}پرونده‌های ارجاعی{% endblock %}
 {% block content %}
 <table class="table table-sm bg-white">
-  <thead><tr><th>دانش‌آموز</th><th>کلاس</th><th>دلیل ارجاع</th><th>تاریخ</th><th></th></tr></thead>
+  <thead><tr><th scope="col">دانش‌آموز</th><th scope="col">کلاس</th><th scope="col">دلیل ارجاع</th><th scope="col">تاریخ</th><th scope="col"><span class="visually-hidden">اقدام‌ها</span></th></tr></thead>
   <tbody>
   {% for r in referrals %}
     <tr><td>{{ r.student.first_name }} {{ r.student.last_name }}</td><td>{{ r.student.class_name }}</td><td>{{ r.reason }}</td>

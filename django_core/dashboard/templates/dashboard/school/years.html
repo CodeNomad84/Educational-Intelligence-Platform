@@ -1,9 +1,9 @@
 {% extends 'dashboard/base.html' %}
-{% block title %}سال تحصیلی{% endblock %}
+{% block title %}سال تحصیلی{% endblock %}{% block page_title %}سال تحصیلی{% endblock %}
 {% block content %}
 {% include 'dashboard/school/_nav.html' %}
 <table class="table table-sm bg-white">
-  <thead><tr><th>کد</th><th>عنوان</th><th>شروع</th><th>پایان</th><th>وضعیت</th><th></th></tr></thead>
+  <thead><tr><th scope="col">کد</th><th scope="col">عنوان</th><th scope="col">شروع</th><th scope="col">پایان</th><th scope="col">وضعیت</th><th scope="col"><span class="visually-hidden">اقدام‌ها</span></th></tr></thead>
   <tbody>
   {% for y in years %}
     <tr><td>{{ y.code }}</td><td>{{ y.label }}</td><td>{{ y.start_date }}</td><td>{{ y.end_date }}</td>

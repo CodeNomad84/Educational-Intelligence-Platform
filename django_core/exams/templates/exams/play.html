@@ -1,5 +1,5 @@
 {% extends 'dashboard/base.html' %}
-{% block title %}{{ exam.title }}{% endblock %}
+{% block title %}{{ exam.title }}{% endblock %}{% block page_title %}{{ exam.title }}{% endblock %}
 {% block content %}
 <a class="btn btn-link" href="{% url 'exams:student_home' %}">← آزمون‌ها</a>
 <p class="text-muted">پرسش {{ index }} از {{ total }}</p>

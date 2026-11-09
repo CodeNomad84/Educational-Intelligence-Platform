@@ -1,5 +1,5 @@
 {% extends 'dashboard/base.html' %}
-{% block title %}{{ activity.title }} — ثبت مشاهدات{% endblock %}
+{% block title %}{{ activity.title }} — ثبت مشاهدات{% endblock %}{% block page_title %}{{ activity.title }} — ثبت مشاهدات{% endblock %}
 {% block content %}
 <a class="btn btn-link" href="{% url 'missions:activities' %}">← فعالیت‌ها</a>
 <div class="alert alert-warning">اولیه و اعتبارسنجی‌نشده؛ تصمیم نیست. فقط رفتار دیده‌شده را نمره بدهید. اگر فرصت مشاهده نبود، «مشاهده نشد» را انتخاب کنید (با نمرهٔ ۱ فرق دارد). فقط مشاهدات خودتان در این صفحه دیده و ویرایش می‌شود.</div>
