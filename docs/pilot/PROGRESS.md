@@ -55,6 +55,8 @@
 ### Test log tail
 - sqlite: `Ran 1577 tests in 1119.259s` / `OK (skipped=11)` / demo_intel `OK` →
   `ALL DJANGO CHECKS AND TESTS PASSED (FastAPI / PostgreSQL / Docker not covered)`
+- pg: `Ran 1577 tests in 1719.222s` / `OK (skipped=1)` →
+  `POSTGRESQL CHECKS AND TESTS PASSED (PostgreSQL 16 in a disposable container; FastAPI not covered)`
 
 ## FOUND (not fixed, out of scope)
 - F17 (`role="status"` for non-error messages + `aria-live` on the alert count) not done — not in the
