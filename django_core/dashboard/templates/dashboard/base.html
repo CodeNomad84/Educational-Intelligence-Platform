@@ -14,7 +14,7 @@
     <aside class="eip-sidebar offcanvas-md offcanvas-start" tabindex="-1" id="eipSidebar" aria-label="منو">
         <div class="d-flex align-items-center justify-content-between">
             <div class="eip-brand">
-                <span class="eip-brand-mark" aria-hidden="true"><i class="bi bi-mortarboard"></i></span>
+                <span class="eip-brand-mark" aria-hidden="true"><i class="bi bi-mortarboard" aria-hidden="true"></i></span>
                 <span><span class="eip-brand-name d-block">پلتفرم هوشمند مدرسه</span>{% if SCHOOL_NAME %}<span class="eip-brand-sub d-block">{{ SCHOOL_NAME }}</span>{% endif %}</span>
             </div>
             <button type="button" class="btn-close d-md-none ms-3" data-bs-dismiss="offcanvas" data-bs-target="#eipSidebar" aria-label="بستن منو"></button>
@@ -52,8 +52,8 @@
             {% if IS_SCHOOL_ADMIN %}{% nav_link 'exams:admin_overview' 'bar-chart-steps' 'آمار آزمون‌ها' %}{% endif %}
             {% if IS_STUDENT %}{% nav_link 'exams:student_home' 'patch-check' 'آزمون‌های من' %}{% endif %}
             {% endif %}
-            {% if IS_STUDENT %}{% for m in VISIBLE_MODULES %}{% if m.key == 'tutor_ai' %}<a href="{{ m.url }}" class="eip-nav-link"><i class="bi bi-lightbulb" aria-hidden="true"></i><span>دستیار مطالعه (نمایشی)</span>{% if not m.enabled %}<i class="bi bi-lock eip-lock" aria-label="قفل"></i>{% endif %}</a>{% endif %}{% endfor %}{% endif %}
-            {% if IS_SCHOOL_ADMIN %}{% for m in VISIBLE_MODULES %}<a href="{{ m.url }}" class="eip-nav-link{% if request.path == m.url %} active{% endif %}"><i class="bi bi-puzzle" aria-hidden="true"></i><span>{{ m.label }}</span>{% if not m.enabled %}<i class="bi bi-lock eip-lock" aria-label="قفل"></i>{% endif %}</a>{% endfor %}{% endif %}
+            {% if IS_STUDENT %}{% for m in VISIBLE_MODULES %}{% if m.key == 'tutor_ai' %}<a href="{{ m.url }}" class="eip-nav-link"><i class="bi bi-lightbulb" aria-hidden="true"></i><span>دستیار مطالعه (نمایشی)</span>{% if not m.enabled %}<i class="bi bi-lock eip-lock" aria-label="قفل" aria-hidden="true"></i>{% endif %}</a>{% endif %}{% endfor %}{% endif %}
+            {% if IS_SCHOOL_ADMIN %}{% for m in VISIBLE_MODULES %}<a href="{{ m.url }}" class="eip-nav-link{% if request.path == m.url %} active{% endif %}"><i class="bi bi-puzzle" aria-hidden="true"></i><span>{{ m.label }}</span>{% if not m.enabled %}<i class="bi bi-lock eip-lock" aria-label="قفل" aria-hidden="true"></i>{% endif %}</a>{% endfor %}{% endif %}
 
             {% if IS_SCHOOL_ADMIN or IS_GRADE_LEAD %}<div class="eip-nav-section">مدیریت</div>{% endif %}
             {% if IS_SCHOOL_ADMIN %}
@@ -81,18 +81,18 @@
     <div class="eip-main">
         {% if DEMO_MODE %}<div class="eip-demo-banner" role="note"><i class="bi bi-info-circle" aria-hidden="true"></i> نسخهٔ نمایشی: همهٔ نام‌ها و داده‌ها ساختگی است.</div>{% endif %}
         <header class="eip-topbar">
-            <button class="btn btn-light btn-sm d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#eipSidebar" aria-controls="eipSidebar" aria-label="باز کردن منو"><i class="bi bi-list fs-5"></i></button>
+            <button class="btn btn-light btn-sm d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#eipSidebar" aria-controls="eipSidebar" aria-label="باز کردن منو"><i class="bi bi-list fs-5" aria-hidden="true"></i></button>
             <div class="eip-topbar-title">{{ SCHOOL_NAME|default:"پلتفرم هوشمند مدرسه" }}</div>
             <div class="ms-auto d-flex align-items-center gap-2">
-            {% if IS_SCHOOL_ADMIN or IS_GRADE_LEAD or IS_COUNSELOR %}<a class="btn btn-light btn-sm position-relative" href="{% url 'dashboard:notifications' %}" aria-label="اعلان‌ها"><i class="bi bi-bell"></i>{% if NOTIF_COUNT %}<span class="badge text-bg-danger position-absolute top-0 start-0 translate-middle rounded-pill">{{ NOTIF_COUNT }}</span>{% endif %}</a>{% endif %}
+            {% if IS_SCHOOL_ADMIN or IS_GRADE_LEAD or IS_COUNSELOR %}<a class="btn btn-light btn-sm position-relative" href="{% url 'dashboard:notifications' %}" aria-label="اعلان‌ها"><i class="bi bi-bell" aria-hidden="true"></i>{% if NOTIF_COUNT %}<span class="badge text-bg-danger position-absolute top-0 start-0 translate-middle rounded-pill">{{ NOTIF_COUNT }}</span>{% endif %}</a>{% endif %}
             <div class="dropdown">
                 <button class="eip-user dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                    <span class="eip-avatar" aria-hidden="true"><i class="bi bi-person"></i></span>
+                    <span class="eip-avatar" aria-hidden="true"><i class="bi bi-person" aria-hidden="true"></i></span>
                     <span class="d-none d-sm-inline"><span class="eip-user-name">{{ user.get_full_name|default:user.username }}</span>{% if ROLE_LABEL %} <span class="text-muted">· {{ ROLE_LABEL }}</span>{% endif %}</span>
                 </button>
                 <ul class="dropdown-menu dropdown-menu-end">
-                    <li><a class="dropdown-item" href="{% url 'dashboard:profile' %}"><i class="bi bi-person-gear"></i> حساب من</a></li>
-                    <li><a class="dropdown-item text-danger" href="{% url 'dashboard:logout' %}"><i class="bi bi-box-arrow-right"></i> خروج</a></li>
+                    <li><a class="dropdown-item" href="{% url 'dashboard:profile' %}"><i class="bi bi-person-gear" aria-hidden="true"></i> حساب من</a></li>
+                    <li><a class="dropdown-item text-danger" href="{% url 'dashboard:logout' %}"><i class="bi bi-box-arrow-right" aria-hidden="true"></i> خروج</a></li>
                 </ul>
             </div>
             </div>

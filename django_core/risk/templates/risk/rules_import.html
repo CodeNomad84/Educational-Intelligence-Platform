@@ -8,11 +8,11 @@
   <input type="file" name="file" accept=".xlsx" class="form-control mb-2" required><button class="btn btn-primary">بررسی فایل</button></form>
 {% endif %}
 {% if preview or done %}
-<h5>{% if done %}نتیجهٔ درون‌ریزی{% else %}گزارش بررسی (هنوز چیزی ثبت نشده است){% endif %}</h5>
-<h6 class="mt-3">قاعده‌ها</h6>
-<table class="table table-sm bg-white small"><thead><tr><th>ردیف</th><th>وضعیت</th><th>کد / دلیل</th></tr></thead><tbody>{% for line, status, text in r_report %}<tr class="{% if status != 'ok' %}table-danger{% endif %}"><td>{{ line }}</td><td>{% if status == 'ok' %}مجاز{% else %}ردشده{% endif %}</td><td>{{ text }}</td></tr>{% empty %}<tr><td colspan="3" class="text-muted">ردیفی نبود.</td></tr>{% endfor %}</tbody></table>
-<h6>راهبردها</h6>
-<table class="table table-sm bg-white small"><thead><tr><th>ردیف</th><th>وضعیت</th><th>عنوان / دلیل</th></tr></thead><tbody>{% for line, status, text in s_report %}<tr class="{% if status != 'ok' %}table-danger{% endif %}"><td>{{ line }}</td><td>{% if status == 'ok' %}مجاز{% else %}ردشده{% endif %}</td><td>{{ text }}</td></tr>{% empty %}<tr><td colspan="3" class="text-muted">ردیفی نبود.</td></tr>{% endfor %}</tbody></table>
+<h2 class="h5">{% if done %}نتیجهٔ درون‌ریزی{% else %}گزارش بررسی (هنوز چیزی ثبت نشده است){% endif %}</h2>
+<h2 class="h6 mt-3">قاعده‌ها</h2>
+<table class="table table-sm bg-white small"><thead><tr><th scope="col">ردیف</th><th scope="col">وضعیت</th><th scope="col">کد / دلیل</th></tr></thead><tbody>{% for line, status, text in r_report %}<tr class="{% if status != 'ok' %}table-danger{% endif %}"><td>{{ line }}</td><td>{% if status == 'ok' %}مجاز{% else %}ردشده{% endif %}</td><td>{{ text }}</td></tr>{% empty %}<tr><td colspan="3" class="text-muted">ردیفی نبود.</td></tr>{% endfor %}</tbody></table>
+<h2 class="h6">راهبردها</h2>
+<table class="table table-sm bg-white small"><thead><tr><th scope="col">ردیف</th><th scope="col">وضعیت</th><th scope="col">عنوان / دلیل</th></tr></thead><tbody>{% for line, status, text in s_report %}<tr class="{% if status != 'ok' %}table-danger{% endif %}"><td>{{ line }}</td><td>{% if status == 'ok' %}مجاز{% else %}ردشده{% endif %}</td><td>{{ text }}</td></tr>{% empty %}<tr><td colspan="3" class="text-muted">ردیفی نبود.</td></tr>{% endfor %}</tbody></table>
 {% if preview and can_confirm %}<form method="post">{% csrf_token %}<input type="hidden" name="step" value="confirm"><input type="hidden" name="nonce" value="{{ nonce }}"><button class="btn btn-success">تأیید و ثبت ردیف‌های مجاز</button> <a class="btn btn-link" href="{% url 'rules:import' %}">انصراف</a></form>{% endif %}
 {% if done %}<a class="btn btn-primary" href="{% url 'rules:index' %}">بازگشت به قواعد</a>{% endif %}
 {% endif %}

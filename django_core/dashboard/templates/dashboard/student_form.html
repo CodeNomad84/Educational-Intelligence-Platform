@@ -3,7 +3,7 @@
 {% block content %}
 <div class="card">
     <div class="card-header bg-success text-white">
-        <h4>➕ افزودن دانش‌آموز جدید</h4>
+        <h2 class="h4">➕ افزودن دانش‌آموز جدید</h2>
     </div>
     <div class="card-body">
         <form method="post">
@@ -60,10 +60,10 @@
                 </div>
             </div>
             <button type="submit" class="btn btn-success">
-                <i class="bi bi-check-circle"></i> ذخیره
+                <i class="bi bi-check-circle" aria-hidden="true"></i> ذخیره
             </button>
             <a href="{% url 'dashboard:student_list' %}" class="btn btn-secondary">
-                <i class="bi bi-arrow-left"></i> بازگشت
+                <i class="bi bi-arrow-left" aria-hidden="true"></i> بازگشت
             </a>
         </form>
     </div>

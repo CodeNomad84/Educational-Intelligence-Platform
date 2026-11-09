@@ -4,8 +4,8 @@
 {% block subtitle %}{% if school %}<p class="eip-subtitle">{{ school.name }}{% if year %} · سال تحصیلی {{ year.code }}{% endif %} · به‌روز تا {{ today|jdate:'long' }}</p>{% endif %}{% endblock %}
 {% block page_actions %}
 {% if my_schools|length > 1 %}<form method="get"><select name="school" class="form-select form-select-sm" onchange="this.form.submit()" aria-label="انتخاب مدرسه">{% for s in my_schools %}<option value="{{ s.pk }}" {% if s.pk == school.pk %}selected{% endif %}>{{ s.name }}</option>{% endfor %}</select></form>{% endif %}
-<a class="btn btn-outline-primary btn-sm" href="{% url 'dashboard:alert_list' %}"><i class="bi bi-bell"></i> هشدارها</a>
-<a class="btn btn-primary btn-sm" href="{% url 'dashboard:plan_list' %}"><i class="bi bi-clipboard2-pulse"></i> برنامه‌های مداخله</a>
+<a class="btn btn-outline-primary btn-sm" href="{% url 'dashboard:alert_list' %}"><i class="bi bi-bell" aria-hidden="true"></i> هشدارها</a>
+<a class="btn btn-primary btn-sm" href="{% url 'dashboard:plan_list' %}"><i class="bi bi-clipboard2-pulse" aria-hidden="true"></i> برنامه‌های مداخله</a>
 {% endblock %}
 {% block content %}
 {% if no_school %}
@@ -16,15 +16,15 @@
 <div class="card">{% url 'dashboard:quickstart' as qs %}{% empty_state 'هنوز دانش‌آموزی ثبت نشده است' 'برای دیدن آمار مدرسه، سال تحصیلی، کلاس‌ها و دانش‌آموزان را از راهنمای شروع سریع وارد کنید.' 'people' qs 'راهنمای شروع سریع' %}</div>
 {% else %}
 <div class="row g-3 mb-3">
-  <div class="col-6 col-xl-3"><a class="eip-stat is-primary" href="{% url 'dashboard:student_list' %}"><span class="eip-stat-icon"><i class="bi bi-people"></i></span>
+  <div class="col-6 col-xl-3"><a class="eip-stat is-primary" href="{% url 'dashboard:student_list' %}"><span class="eip-stat-icon"><i class="bi bi-people" aria-hidden="true"></i></span>
     <span class="eip-stat-label">دانش‌آموزان</span><span class="eip-stat-value">{{ o.total }}</span><span class="eip-stat-hint">{{ o.classes|length }} کلاس</span></a></div>
-  <div class="col-6 col-xl-3"><div class="eip-stat {% if o.attendance is not None and o.attendance < 90 %}is-warning{% else %}is-success{% endif %}"><span class="eip-stat-icon"><i class="bi bi-calendar-check"></i></span>
+  <div class="col-6 col-xl-3"><div class="eip-stat {% if o.attendance is not None and o.attendance < 90 %}is-warning{% else %}is-success{% endif %}"><span class="eip-stat-icon"><i class="bi bi-calendar-check" aria-hidden="true"></i></span>
     <span class="eip-stat-label">حضور، ۳۰ روز اخیر</span><span class="eip-stat-value">{% if o.attendance is not None %}{{ o.attendance }}٪{% else %}—{% endif %}</span>
     <span class="eip-stat-hint">{% if o.attendance_before is not None %}۳۰ روز قبل: {{ o.attendance_before }}٪{% else %}دادهٔ کافی نیست{% endif %}</span></div></div>
-  <div class="col-6 col-xl-3"><div class="eip-stat is-info"><span class="eip-stat-icon"><i class="bi bi-graph-up"></i></span>
+  <div class="col-6 col-xl-3"><div class="eip-stat is-info"><span class="eip-stat-icon"><i class="bi bi-graph-up" aria-hidden="true"></i></span>
     <span class="eip-stat-label">میانگین نمره، ۴۵ روز اخیر</span><span class="eip-stat-value">{% if o.average is not None %}{{ o.average }}{% else %}—{% endif %}</span>
     <span class="eip-stat-hint">{% if o.average_before is not None %}۴۵ روز قبل: {{ o.average_before }}{% else %}دادهٔ کافی نیست{% endif %}</span></div></div>
-  <div class="col-6 col-xl-3"><a class="eip-stat {% if o.alerts.urgent %}is-danger{% elif o.alerts.new %}is-warning{% endif %}" href="{% url 'dashboard:alert_list' %}?status=new"><span class="eip-stat-icon"><i class="bi bi-bell"></i></span>
+  <div class="col-6 col-xl-3"><a class="eip-stat {% if o.alerts.urgent %}is-danger{% elif o.alerts.new %}is-warning{% endif %}" href="{% url 'dashboard:alert_list' %}?status=new"><span class="eip-stat-icon"><i class="bi bi-bell" aria-hidden="true"></i></span>
     <span class="eip-stat-label">هشدارهای بررسی‌نشده</span><span class="eip-stat-value">{{ o.alerts.new }}</span><span class="eip-stat-hint">{{ o.alerts.urgent }} مورد نیازمند مداخله</span></a></div>
 </div>
 

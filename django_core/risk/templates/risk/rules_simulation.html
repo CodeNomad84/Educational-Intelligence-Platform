@@ -7,7 +7,7 @@
 <div class="alert alert-warning">{{ unvalidated }}</div>
 <p class="small text-muted">نتیجه فقط شمارش تجمعی است: هیچ هشداری ثبت نشد، هیچ نامی نمایش داده نمی‌شود، و شمارش‌های کمتر از ۵ پنهان است (—).</p>
 <table class="table table-sm bg-white text-center">
-  <thead><tr><th>هفتهٔ منتهی به</th><th>ارزیابی‌شده</th><th>داده ناکافی</th><th>برقرار بود (کل)</th><th>به تفکیک پایه</th></tr></thead>
+  <thead><tr><th scope="col">هفتهٔ منتهی به</th><th scope="col">ارزیابی‌شده</th><th scope="col">داده ناکافی</th><th scope="col">برقرار بود (کل)</th><th scope="col">به تفکیک پایه</th></tr></thead>
   <tbody>{% for w in result %}<tr><td>{{ w.as_of|jdate }}</td><td>{{ w.evaluated }}</td><td>{{ w.insufficient }}</td>
     <td>{% if w.fired is None %}—{% else %}{{ w.fired }}{% endif %}</td>
     <td class="small">{% for g, n in w.by_grade.items %}پایه {{ g }}: {% if n is None %}—{% else %}{{ n }}{% endif %}{% if not forloop.last %}، {% endif %}{% endfor %}</td></tr>{% endfor %}</tbody>

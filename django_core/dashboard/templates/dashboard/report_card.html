@@ -4,7 +4,7 @@
 {% block subtitle %}<p class="eip-subtitle">{{ student.first_name }} {{ student.last_name }} · {{ student.get_grade_display }}{% if student.school_class %} · {{ student.school_class.title }}{% endif %}{% if year %} · سال تحصیلی {{ year.code }}{% endif %}</p>{% endblock %}
 {% block page_actions %}
 {% for t in terms %}<a class="btn btn-sm {% if t.0 == term.0 %}btn-primary{% else %}btn-outline-primary{% endif %}" href="?term={{ t.0 }}">{{ t.1 }}</a>{% endfor %}
-<button class="btn btn-sm btn-light" onclick="window.print()"><i class="bi bi-printer"></i> چاپ</button>
+<button class="btn btn-sm btn-light" onclick="window.print()"><i class="bi bi-printer" aria-hidden="true"></i> چاپ</button>
 {% endblock %}
 {% block content %}
 <div class="card">

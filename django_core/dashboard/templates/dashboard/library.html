@@ -19,7 +19,7 @@
                         <div class="form-text">حداکثر حجم: ۱۰ مگابایت</div>
                     </div>
                     <button type="submit" class="btn btn-success">
-                        <i class="bi bi-upload"></i> آپلود
+                        <i class="bi bi-upload" aria-hidden="true"></i> آپلود
                     </button>
                 </form>
             </div>
@@ -51,7 +51,7 @@
                                     {% csrf_token %}
                                     <input type="hidden" name="parent_id" value="{{ doc.parent_id }}">
                                     <button type="submit" class="btn btn-sm btn-outline-danger" title="حذف فایل">
-                                        <i class="bi bi-trash3"></i>
+                                        <i class="bi bi-trash3" aria-hidden="true"></i>
                                     </button>
                                 </form>
                             </div>
@@ -60,7 +60,7 @@
                     </ul>
                 {% else %}
                     <div class="alert alert-info">
-                        <i class="bi bi-info-circle"></i> هنوز سندی آپلود نشده است.
+                        <i class="bi bi-info-circle" aria-hidden="true"></i> هنوز سندی آپلود نشده است.
                     </div>
                 {% endif %}
             </div>

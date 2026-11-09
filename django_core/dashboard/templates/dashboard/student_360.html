@@ -45,13 +45,13 @@
 {% if account_form %}
 <div class="modal fade" id="accountModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog"><div class="modal-content">
   <form method="post" action="{% url 'dashboard:student_account' student.pk %}">{% csrf_token %}
-  <div class="modal-header"><h5 class="modal-title">ساخت حساب برای دانش‌آموز</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="بستن"></button></div>
+  <div class="modal-header"><h2 class="modal-title h5">ساخت حساب برای دانش‌آموز</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="بستن"></button></div>
   <div class="modal-body">{{ account_form.as_p }}</div>
   <div class="modal-footer"><button class="btn btn-secondary">ساخت حساب</button></div></form></div></div></div>
 {% endif %}
 {% if referral_form %}
 <div class="modal fade" id="referralModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog"><div class="modal-content">
-  <div class="modal-header"><h5 class="modal-title">ارجاع به مشاور</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="بستن"></button></div>
+  <div class="modal-header"><h2 class="modal-title h5">ارجاع به مشاور</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="بستن"></button></div>
   {% if referral_form.fields.counselor.queryset.exists %}
   <form method="post" action="{% url 'dashboard:student_refer' student.pk %}">{% csrf_token %}<div class="modal-body">{{ referral_form.as_p }}</div>
   <div class="modal-footer"><button class="btn btn-warning">ارجاع</button></div></form>

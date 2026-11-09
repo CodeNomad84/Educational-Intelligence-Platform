@@ -4,7 +4,7 @@
     {% if behavior_notes %}
     <ul class="list-group list-group-flush">
         {% for n in behavior_notes %}<li class="list-group-item d-flex flex-wrap gap-2 align-items-start">
-            {% if n.kind == 'positive' %}<span class="eip-badge is-success"><i class="bi bi-hand-thumbs-up"></i> {{ n.get_kind_display }}</span>{% else %}<span class="eip-badge is-warning"><i class="bi bi-exclamation-circle"></i> {{ n.get_kind_display }}</span>{% endif %}
+            {% if n.kind == 'positive' %}<span class="eip-badge is-success"><i class="bi bi-hand-thumbs-up" aria-hidden="true"></i> {{ n.get_kind_display }}</span>{% else %}<span class="eip-badge is-warning"><i class="bi bi-exclamation-circle" aria-hidden="true"></i> {{ n.get_kind_display }}</span>{% endif %}
             <span class="eip-badge">{{ n.get_category_display }}</span>
             <span class="flex-grow-1">{{ n.note }}</span>
             <span class="eip-note">{{ n.occurred_on|jdate }}</span>
