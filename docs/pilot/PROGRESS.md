@@ -27,8 +27,26 @@
 - pg: `Ran 1567 tests in 1560.797s` / `OK (skipped=1)` →
   `POSTGRESQL CHECKS AND TESTS PASSED (PostgreSQL 16 in a disposable container; FastAPI not covered)`
 
-## FOUND (not fixed, out of T3 scope)
+## T4 — L2 0037b "Guard rails" — DONE
+- Branch: `work/T4-0037b-guard-rails` · Commit `83a63ff`
+- Scope: four markup lint rules in `dashboard/test_template_guards.py` (th scope, icon
+  aria-hidden, canvas name, extends-base-has-title), scoped to dashboard+risk; completed F8
+  (aria-hidden on the remaining Bootstrap icons) and F5-minimal (role+aria-label on the
+  grade-dashboard canvases); scoped remaining risk `<th>`s and h4/h5 section/modal/card titles.
+- `test_a11y_render.py` now also asserts distinct titles, heading-order and no duplicate ids.
+- New `test_contrast_tokens.py` parses `eip.css` `:root` and asserts 4.5/3.0, with the explicit
+  `EXPECTED_FAILURES` list (6 pairs, regression marker until 0037c) + decorative card-border exemption.
+- New `docs/A11Y_UI_CHECKLIST.md`. Browser pass (`page_audit.mjs` + axe-core) is dev-only/manual — not wired.
+- `git diff --stat`: `22 files changed, 286 insertions(+), 60 deletions(-)`.
+
+### Test log tail
+- sqlite: `Ran 1577 tests in 1033.034s` / `OK (skipped=11)` / demo_intel `OK` →
+  `ALL DJANGO CHECKS AND TESTS PASSED (FastAPI / PostgreSQL / Docker not covered)`
+
+## FOUND (not fixed, out of scope)
+- F19 (table `<caption>`) not yet added (Low; deferred — the render test does not gate captions).
 - `risk/templates/risk/rules_index.html` had a broken `{% block title %}` block plus a full
-  duplicated "اجرای قواعد"/"کیفیت قواعد" section — fixed as part of F4/F12 (same file was in scope).
-- F19 (table `<caption>`) not yet added (Low; deferred to 0037b follow-up).
+  duplicated "اجرای قواعد"/"کیفیت قواعد" section — fixed as part of T3 F4/F12.
+
+
 
