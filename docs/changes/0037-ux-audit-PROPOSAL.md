@@ -148,7 +148,7 @@ The design tokens are largely sound. The failures below are almost all **hand-wr
 | **F18** | 3.3.1 (A) | Grade-sheet row validation writes its message into a `text-danger` cell in the *third* column, so the error is neither adjacent to its input nor linked to it. | `teacher/grades.html:14-15`. | **Low** |
 | **F19** | 1.3.1 (A) | No table has a `<caption>`, so on a page carrying up to 5 tables there is no per-table orientation. | 0 captions in 49 templates (C1); `/rules/` and `/students/*/360/` each render 5 tables. | **Low** |
 
-**Two claims I want to keep honest.** (a) F16 is *not* a WCAG **2.1** AA failure — 2.1 only requires the indicator to be visible (it is); the 3:1 number comes from 2.2 SC 2.4.13, and from 1.4.11 if you treat the ring as a UI component. (b) F13 is about reliability, not certainty: some browser/screen-reader pairs *do* read `::before` content, so the header row disappearing is the hard part and the pseudo-element label is a gamble.
+**Two claims I want to keep honest.** (a) F16 **is** a WCAG **2.1** AA failure: SC 1.4.11 Non-text Contrast requires the focus indicator (a UI-component state) to be ≥3:1 against adjacent colours, and it is 2.12:1 — so the ring fails 2.1 AA regardless of the 2.2 target. The stronger "Focus Appearance" criterion is 2.2 **2.4.13 (AAA)**, not AA. (b) F13 is about reliability, not certainty: some browser/screen-reader pairs *do* read `::before` content, so the header row disappearing is the hard part and the pseudo-element label is a gamble.
 
 Nothing in this section is a **Blocker** in the WCAG sense; F1–F8 are the ones that make a keyboard/screen-reader user guess, and they are all A-level.
 
@@ -207,7 +207,7 @@ Effort: **S** ≤ half a day, **M** ≤ 2 days, **L** > 2 days. "Policy" = needs
 
 ---
 
-**Total if all 26 ship: 20 S + 5 M + 1 L.** The six High findings that carry most of the user cost (F1, F2, F3, F4, F7, F8) are all **S** — that is the headline of this audit.
+**Total if all 26 ship: 20 S + 5 M + 1 L; severity 8 High + 10 Medium + 8 Low.** The eight High findings that carry most of the user cost (F1, F2, F3, F4, F5, F6, F7, F8) are all **S** except F1 and F5 (both **M**) — that is the headline of this audit.
 
 ---
 
@@ -215,9 +215,9 @@ Effort: **S** ≤ half a day, **M** ≤ 2 days, **L** > 2 days. "Policy" = needs
 
 All three are template/CSS/test work only. **None** touches `students/access.py`, entitlements, the audit rules, the database schema, or any URL/permission. No migration, no new endpoint, no new runtime dependency (batch B asks for `axe-core` as a *dev* dependency — your call, see §10).
 
-### 0037a — "Names and structure" (the 11 High/Medium A-level findings)
+### 0037a — "Names and structure" (the 12 A-level findings)
 
-Scope: F1, F2, F3, F4, F6, F9, F10, F11, F12, F18, F19.
+Scope: F1, F2, F3, F4, F6, F8, F9, F10, F11, F12, F18, F19.
 
 | Piece | Where |
 |---|---|
@@ -245,6 +245,8 @@ Scope: F1, F2, F3, F4, F6, F9, F10, F11, F12, F18, F19.
 | browser pass: `axe-core` per page/role inside the existing harness, plus a tab-order walk that asserts the focus ring is visible on every stop | `scripts/dev/page_audit.mjs` | manual, dev only |
 | write the rule down once | new `docs/A11Y_UI_CHECKLIST.md` (there is no UI guide today) | — |
 
+**Acceptance:** `test_contrast_tokens.py` ships with an explicit expected-failure list so "suite green" is achievable before 0037c: the pairs that still fail — `--eip-muted` on `--eip-surface-2` (4.40) and on the page background (4.26), `eip-soon` on `#e3e8ef` (3.74), the warning-meter fill on its track (1.94), the input border on white (1.46), and the `:focus-visible` ring (2.12) — are marked `expectedFailure`/`skip` until 0037c fixes them, then the skips are removed. The card border (1.14) is decorative and is asserted as exempt, not skipped.
+
 **Deliberately a separate batch:** a guard that fails on today's code would block everyone; 0037a clears the violations first, 0037b keeps them cleared.
 
 ### 0037c — "Colour and the two charts" (independent of a/b)
@@ -260,7 +262,7 @@ Scope: F5, F7, F13, F14, F15, F16, F17.
 | `role="img"` + `aria-label` + a `visually-hidden` numbers table from the existing `json_script` | `grade_dashboard.html`, `_nid_script.html` |
 | `role="status"` for non-error messages | `base.html`, `base_public.html` |
 
-**Risk:** the token change is the only place in this audit where every screen changes at once — hence the contrast test in 0037b should ideally land first (it is allowed to fail on the four known pairs until 0037c completes them).
+**Risk:** the token change is the only place in this audit where every screen changes at once — hence the contrast test in 0037b should ideally land first (it is allowed to fail on the known failing pairs listed in the 0037b acceptance until 0037c completes them).
 
 **S2/S4/S5/S1/S7 (the simplicity items) are not in any batch** — each changes what a user sees or how a workflow runs, so they need your decision before they get a proposal of their own (§10).
 
@@ -310,7 +312,7 @@ RULES = {
 
 ## 10. Questions for you (DECISION REQUIRED)
 
-1. **Target: WCAG 2.1 AA or 2.2 AA?** 2.2 adds two cheap wins (focus appearance, 24 px target size) and would pull F16 and part of S4 into scope. Recommendation: 2.2 AA, since the CSS is open anyway.
+1. **Target: WCAG 2.1 AA or 2.2 AA?** 2.2 AA adds six new criteria: 2.4.11 Focus Not Obscured, 2.5.7 Dragging Movements, 2.5.8 Target Size ≥24 px, 3.2.6 Consistent Help, 3.3.7 Redundant Entry, 3.3.8 Accessible Authentication. **Focus Appearance (2.4.13) is AAA, not AA**, so it is not part of the 2.2 AA target. F16 is already a 2.1 AA failure (1.4.11 non-text contrast); the 24 px target size (2.5.8) pulls S3/S4 into scope. Recommendation: 2.2 AA, since the CSS is open anyway.
 2. **May 0037c change the global `--eip-muted` value?** One variable, ~100 elements, every screen: "slightly darker captions everywhere". Widest-reaching change in the proposal.
 3. **Is `axe-core` allowed as a dev-only dependency** in `page_audit.mjs`? Nothing ships to production; `requirements.txt` untouched.
 4. **`حذف` on the grade sheet (S4):** confirm-modal, undo banner, or leave one-click? The modal is more consistent with the rest of the product; the undo banner is safer for a fast typist. I will not choose this for you.
@@ -319,16 +321,29 @@ RULES = {
 7. **Digits (S7):** Persian digits in dates (`۱۴۰۵/۰۸/۱۷`) or keep ASCII? A typography/culture call, not an accessibility one, and it touches `jdate` everywhere at once.
 8. **Who reads this product?** If a school inspector or ministry reviewer will, then F1–F4 move from "High" to "cannot ship", and 0037a should land before any new feature work.
 
+## 10a. Owner answers (2026-11-09)
+
+Answers to §10, recorded verbatim (no reinterpretation):
+
+1. 2.2 AA, but 0037a only implements the written findings
+2. yes, in 0037c, with before/after screenshots
+3. yes, dev-only
+4. confirm via native `<dialog>` or a server-side confirm page, no new JS
+5. freeze sidebar until after the pilot feedback
+6. yes, one label
+7. ...
+8. internal and co-founders only for now
+
 ---
 
 ## 11. Effort and risk summary
 
 | Batch | Scope | Files | New files | Effort | Risk | Depends on |
 |---|---|---|---|---|---|---|
-| 0037a | 11 findings, template-only | ~22 templates | `_form_errors.html` | **2 days** | low (no CSS change) | — |
+| 0037a | 12 findings, template-only | ~22 templates | `_form_errors.html` | **2.5 days** | low (no CSS change) | — |
 | 0037b | 4 guards + 1 doc | `test_template_guards.py`, `page_audit.mjs` | `test_a11y_render.py`, `test_contrast_tokens.py`, `docs/A11Y_UI_CHECKLIST.md` | **1.5 days** | none (tests only) | 0037a green; §10.3 |
 | 0037c | colour tokens, charts, message roles | `eip.css`, 3 templates | — | **1 day** | medium (global token) | §10.2 |
-| **total** | | | | **≈ 4.5 days** | | |
+| **total** | | | | **≈ 5 days** | | |
 
 Suite cost: the three new checks add ≈ 16 s to `scripts/run_tests.sh sqlite`. No existing test gets slower; none is deleted.
 
