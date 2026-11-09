@@ -16,6 +16,18 @@
   <div class="col-lg-6"><div class="card h-100"><div class="card-header">توزیع نمرات</div><div class="card-body"><div style="height:220px"><canvas id="scoreChart" role="img" aria-label="نمودار توزیع نمرات"></canvas></div></div></div></div>
   <div class="col-lg-6"><div class="card h-100"><div class="card-header">روند غیبت هفتگی (٪)</div><div class="card-body"><div style="height:220px"><canvas id="absChart" role="img" aria-label="نمودار روند غیبت هفتگی"></canvas></div></div></div></div>
 </div>
+<div class="visually-hidden">
+  <table>
+    <caption>توزیع نمرات</caption>
+    <thead><tr><th scope="col">بازهٔ نمره</th><th scope="col">تعداد دانش‌آموز</th></tr></thead>
+    <tbody>{% for label, value in o.score_buckets.rows %}<tr><td>{{ label }}</td><td>{{ value }}</td></tr>{% endfor %}</tbody>
+  </table>
+  <table>
+    <caption>روند غیبت هفتگی (٪)</caption>
+    <thead><tr><th scope="col">هفتهٔ منتهی به</th><th scope="col">درصد غیبت</th></tr></thead>
+    <tbody>{% for label, value in o.absence_trend.rows %}<tr><td>{{ label }}</td><td>{% if value is None %}—{% else %}{{ value }}٪{% endif %}</td></tr>{% endfor %}</tbody>
+  </table>
+</div>
 <div class="row g-3">
   <div class="col-lg-7"><div class="card h-100"><div class="card-header">دانش‌آموزان نیازمند توجه</div>
     <table class="table table-sm mb-0"><thead><tr><th scope="col">نام</th><th scope="col">کلاس</th><th scope="col">دلیل</th><th scope="col"><span class="visually-hidden">اقدام‌ها</span></th></tr></thead><tbody>

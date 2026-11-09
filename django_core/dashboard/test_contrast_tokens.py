@@ -1,11 +1,6 @@
-"""Token-contrast guard (0037b): parse the ``:root`` custom properties of ``eip.css`` and assert the
-real foreground/background pairs against the WCAG 2.x thresholds (4.5:1 text, 3:1 non-text/graphics).
-Pure arithmetic, no browser, no dependency.
-
-The six pairs that still fail today are listed explicitly in ``EXPECTED_FAILURES`` and are asserted to
-*still* be below threshold; 0037c fixes them, at which point that regression marker fails and the pair
-is moved up into ``PASSING_TEXT``/``PASSING_GRAPHIC``. The card border is decorative and is recorded as
-exempt, not a failure.
+"""Token-contrast guard (0037): parse the ``:root`` custom properties of ``eip.css`` and assert the real
+foreground/background pairs against the WCAG 2.x thresholds (4.5:1 text, 3:1 non-text/graphics). Pure
+arithmetic, no browser, no dependency. The card border is decorative and is recorded as exempt.
 """
 import re
 from pathlib import Path
@@ -15,12 +10,15 @@ from django.test import SimpleTestCase
 
 CSS = Path(settings.BASE_DIR) / 'dashboard/static/dashboard/css/eip.css'
 
-# Text pairs that must be >= 4.5:1 (WCAG 1.4.3). Referenced by :root token name.
+# Text pairs that must be >= 4.5:1 (WCAG 1.4.3). A ``--foo`` value resolves from :root; otherwise hex.
 PASSING_TEXT = [
     ('body ink on page bg', '--eip-ink', '--eip-bg'),
     ('ink-2 on page bg', '--eip-ink-2', '--eip-bg'),
+    ('muted on page bg', '--eip-muted', '--eip-bg'),
+    ('muted on surface-2', '--eip-muted', '--eip-surface-2'),
     ('primary on surface', '--eip-primary', '--eip-surface'),
     ('primary-ink on primary-soft', '--eip-primary-ink', '--eip-primary-soft'),
+    ('eip-soon pill (ink-2 on border)', '--eip-ink-2', '--eip-border'),
     ('success on success-soft', '--eip-success', '--eip-success-soft'),
     ('warning on warning-soft', '--eip-warning', '--eip-warning-soft'),
     ('danger on danger-soft', '--eip-danger', '--eip-danger-soft'),
@@ -28,19 +26,16 @@ PASSING_TEXT = [
     ('neutral on neutral-soft', '--eip-neutral', '--eip-neutral-soft'),
 ]
 
-# Explicit expected-failure list (resolved in 0037c / T5). (name, fg hex, bg hex, threshold).
-EXPECTED_FAILURES = [
-    ('muted on surface-2 (text)', '#6b7686', '#f8fafc', 4.5),
-    ('muted on page bg (text)', '#6b7686', '#f4f6fa', 4.5),
-    ('eip-soon pill (text)', '#6b7686', '#e3e8ef', 4.5),
-    ('warning meter fill (graphic)', '#e0a43a', '#eef1f5', 3.0),
-    ('input border on white (graphic)', '#cfd6e1', '#ffffff', 3.0),
-    ('focus ring on white (graphic)', '#9cb3df', '#ffffff', 3.0),  # rgba(36,87,184,.45) blended on white
+# Non-text / graphic pairs that must be >= 3:1 (WCAG 1.4.11).
+PASSING_GRAPHIC = [
+    ('warning meter fill on track', '#b8791f', '--eip-neutral-soft'),
+    ('input border on surface', '--eip-border-strong', '--eip-surface'),
+    ('focus ring on surface', '#2457b8', '#ffffff'),
 ]
 
 # Decorative non-text edges, intentionally below 3:1 (exempt, not a failure).
 DECORATIVE_EXEMPT = [
-    ('card border on page bg', '#e3e8ef', '#f4f6fa'),
+    ('card border on page bg', '--eip-border', '--eip-bg'),
 ]
 
 
@@ -53,6 +48,10 @@ def _tokens():
         if re.fullmatch(r'#[0-9a-f]{3}(?:[0-9a-f]{3})?', val):
             tokens[name] = val
     return tokens
+
+
+def _resolve(value, tokens):
+    return tokens[value] if value.startswith('--') else value
 
 
 def _hex_to_rgb(h):
@@ -80,18 +79,18 @@ class ContrastTokenTests(SimpleTestCase):
     def test_passing_text_pairs_meet_4_5(self):
         tokens = _tokens()
         for name, fg, bg in PASSING_TEXT:
-            self.assertIn(fg, tokens, f'missing token {fg}')
-            self.assertIn(bg, tokens, f'missing token {bg}')
-            ratio = _ratio(tokens[fg], tokens[bg])
+            ratio = _ratio(_resolve(fg, tokens), _resolve(bg, tokens))
             self.assertGreaterEqual(ratio, 4.5, f'{name}: {ratio:.2f}')
 
-    def test_expected_failures_still_below_threshold(self):
-        # Regression marker: these must stay below threshold until 0037c fixes them; when one is
-        # fixed this fails, reminding us to move it into PASSING_TEXT / PASSING_GRAPHIC.
-        for name, fg, bg, threshold in EXPECTED_FAILURES:
-            ratio = _ratio(fg, bg)
-            self.assertLess(ratio, threshold, f'{name} now passes ({ratio:.2f} >= {threshold}); move it up')
+    def test_passing_graphic_pairs_meet_3_0(self):
+        tokens = _tokens()
+        for name, fg, bg in PASSING_GRAPHIC:
+            ratio = _ratio(_resolve(fg, tokens), _resolve(bg, tokens))
+            self.assertGreaterEqual(ratio, 3.0, f'{name}: {ratio:.2f}')
 
     def test_decorative_border_recorded(self):
+        tokens = _tokens()
         for name, fg, bg in DECORATIVE_EXEMPT:
-            self.assertLess(_ratio(fg, bg), 3.0, f'{name} is no longer below 3:1; review the exemption')
+            ratio = _ratio(_resolve(fg, tokens), _resolve(bg, tokens))
+            self.assertLess(ratio, 3.0, f'{name} is no longer below 3:1; review the exemption')
+

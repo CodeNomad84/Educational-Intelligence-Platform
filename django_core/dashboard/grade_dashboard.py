@@ -61,6 +61,10 @@ def grade_overview(user, today=None):
         start, end = today - timedelta(days=7 * (weeks_ago + 1)), today - timedelta(days=7 * weeks_ago)
         week = list(attendances.filter(date__gt=start, date__lte=end).values_list('status', flat=True))
         weekly.append({'label': end.isoformat(), 'value': round(100 * week.count('absent') / len(week)) if week else None})
+    score_labels = ['۰–۵', '۵–۱۰', '۱۰–۱۵', '۱۵–۲۰']
+    score_values = [sum(1 for x in scores if lo <= x < hi) for lo, hi in BUCKETS]
+    trend_labels = [w['label'] for w in weekly]
+    trend_values = [w['value'] for w in weekly]
     return {
         'total': len(students),
         'average': round(sum(scores) / len(scores), 2) if scores else None,
@@ -68,9 +72,10 @@ def grade_overview(user, today=None):
         'attention_count': len(attention),
         'classes': class_rows,
         'attention': sorted(attention, key=lambda a: (-len(a['reasons']), a['avg'] if a['avg'] is not None else 99))[:10],
-        'score_buckets': {'labels': ['۰–۵', '۵–۱۰', '۱۰–۱۵', '۱۵–۲۰'],
-                          'values': [sum(1 for x in scores if lo <= x < hi) for lo, hi in BUCKETS]},
-        'absence_trend': {'labels': [w['label'] for w in weekly], 'values': [w['value'] for w in weekly]},
+        'score_buckets': {'labels': score_labels, 'values': score_values,
+                          'rows': list(zip(score_labels, score_values))},
+        'absence_trend': {'labels': trend_labels, 'values': trend_values,
+                          'rows': list(zip(trend_labels, trend_values))},
     }
 
 
