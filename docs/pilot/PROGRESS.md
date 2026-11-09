@@ -43,10 +43,24 @@
 - sqlite: `Ran 1577 tests in 1033.034s` / `OK (skipped=11)` / demo_intel `OK` →
   `ALL DJANGO CHECKS AND TESTS PASSED (FastAPI / PostgreSQL / Docker not covered)`
 
+## T5 — L2 0037c "Colour and the two charts" — DONE
+- Branch: `work/T5-0037c-colour-and-charts` · Commit `c4ad3fb`
+- Scope: `--eip-muted` #6b7686→#5f6b7a (F7); `--eip-border-strong`→#8a94a6 and warning meter
+  fill→#b8791f to ≥3:1 (F14); `.eip-soon` uses `ink-2` on the border tint (F15); focus ring solid
+  2px `#2457b8` (F16); `.eip-stack thead` kept in the DOM (visually hidden) on mobile (F13);
+  visually-hidden fallback tables for the two Grade-Lead charts (F5, view exposes zipped `rows`).
+- `test_contrast_tokens.py` drops `EXPECTED_FAILURES`; all pairs assert natively (text ≥4.5, graphic ≥3.0).
+- `git diff --stat`: `4 files changed, 54 insertions(+), 37 deletions(-)`.
+
+### Test log tail
+- sqlite: `Ran 1577 tests in 1119.259s` / `OK (skipped=11)` / demo_intel `OK` →
+  `ALL DJANGO CHECKS AND TESTS PASSED (FastAPI / PostgreSQL / Docker not covered)`
+
 ## FOUND (not fixed, out of scope)
-- F19 (table `<caption>`) not yet added (Low; deferred — the render test does not gate captions).
-- `risk/templates/risk/rules_index.html` had a broken `{% block title %}` block plus a full
-  duplicated "اجرای قواعد"/"کیفیت قواعد" section — fixed as part of T3 F4/F12.
+- F17 (`role="status"` for non-error messages + `aria-live` on the alert count) not done — not in the
+  T5 scope list. F19 (table `<caption>`) still deferred. `risk/rules_index.html` title/duplicate was
+  fixed in T3.
+
 
 
 
