@@ -21,15 +21,22 @@ rule is violated, `scripts/run_tests.sh sqlite` fails. Keep this list and the te
   `h2 class="h5"`, not `h5`).
 - No duplicate `id` on a page.
 
-## Colour / contrast (0037b — `dashboard/test_contrast_tokens.py`)
+## Colour / contrast (0037b–0037c — `dashboard/test_contrast_tokens.py`)
 
-- Text pairs are ≥ 4.5:1; non-text (graphic) pairs are ≥ 3:1. The known-failing pairs are listed in
-  `EXPECTED_FAILURES` and are fixed by 0037c; then the list is cleared.
+- Text pairs are ≥ 4.5:1; non-text (graphic) pairs are ≥ 3:1. The temporary `EXPECTED_FAILURES`
+  list shipped in 0037b was removed in 0037c; every pair now asserts natively, so a contrast
+  regression fails the suite.
 
 ## Forms (0037a)
 
 - Hand-written Django forms use `for="{{ field.id_for_label }}"` and the shared error include
   `dashboard/_form_errors.html` (which gives each error a real `id` + `role="alert"`).
+
+## Deferred (not yet guarded)
+
+- F17 — `role="status"` for non-error messages + `aria-live` on the alert count.
+- F19 — table `<caption>`.
+Both are Low severity; tracked in `docs/changes/0037-ux-audit-REPORT.md` §4.
 
 ## When you add a new page
 
