@@ -58,6 +58,18 @@
 - pg: `Ran 1577 tests in 1719.222s` / `OK (skipped=1)` →
   `POSTGRESQL CHECKS AND TESTS PASSED (PostgreSQL 16 in a disposable container; FastAPI not covered)`
 
+## T6 — L1 wrap-up "Documentation & integration" — DONE
+- Branch: `work/T6-0037-wrap-up` (from `work/T5-0037c-colour-and-charts` @ `76f718c`) · Commit `a41767d`
+- Scope: `docs/changes/0037-ux-audit-REPORT.md` — catalogues F1–F16 + F18 resolved and F17/F19 deferred
+  (with rationale); `docs/A11Y_UI_CHECKLIST.md` re-synced to the three active guards
+  (`test_template_guards.py`, `test_a11y_render.py`, `test_contrast_tokens.py`; `EXPECTED_FAILURES` cleared
+  in 0037c); `docs/CHANGE_GUIDE.md` Verified-at note + look-and-feel a11y-guard pointers.
+- `git diff --stat`: `3 files changed, 83 insertions(+), 5 deletions(-)`.
+
+### Test log tail (T6 final sanity check)
+- sqlite: `Ran 1577 tests in 1533.473s` / `OK (skipped=11)`; demo_intel `Ran 62 tests in 231.760s` / `OK` →
+  `ALL DJANGO CHECKS AND TESTS PASSED (FastAPI / PostgreSQL / Docker not covered)`
+
 ## FOUND (not fixed, out of scope)
 - F17 (`role="status"` for non-error messages + `aria-live` on the alert count) not done — not in the
   T5 scope list. F19 (table `<caption>`) still deferred. `risk/rules_index.html` title/duplicate was
