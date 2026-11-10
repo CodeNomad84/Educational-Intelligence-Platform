@@ -70,6 +70,22 @@
 - sqlite: `Ran 1577 tests in 1533.473s` / `OK (skipped=11)`; demo_intel `Ran 62 tests in 231.760s` / `OK` →
   `ALL DJANGO CHECKS AND TESTS PASSED (FastAPI / PostgreSQL / Docker not covered)`
 
+## T6 — L1 pilot-config (PILOT QUEUE) — DONE
+- Branch: `work/T6-pilot-config` (from `phase-1/boot-security` @ `c9e1fdf`) · Commit `45e9cb4`
+- Scope: flags `PILOT_MODE` / `ENABLE_AI_FEATURES` (False) / `ENABLE_COUNSELOR_ROLE` (False) / `FEEDBACK_URL`
+  in `config/settings/base.py` (fail-closed; `development.py` re-enables them for dev/demo/tests);
+  `dashboard.decorators.require_pilot_flag` gates the Counselor/referral routes (`counselor_views.py`) and the
+  assistant routes (`student_views.py` `tutor_ai`, `docqa/views.py` `advisor_ai`) to 403 when off;
+  `fastapi_core/auth.py::disabled_in_phase1` is now config-driven (403 while `ENABLE_AI_FEATURES` is off);
+  footer feedback link from `FEEDBACK_URL` (`base.html` + context processor); `docs/pilot/PILOT_CONFIG.md`
+  (flags + "one server, two isolated instances" answer); `test_pilot_config.py` (Django + FastAPI).
+- `git diff --stat phase-1/boot-security`: `12 files changed, 277 insertions(+), 10 deletions(-)`.
+
+### Test log tail (module tests only, per task)
+- Django: `Ran 44 tests in 4.591s` / `OK`  (test_pilot_config + test_counselor + test_student_me + test_modules)
+- Django docqa: `Ran 24 tests in 6.001s` / `OK`
+- FastAPI: `Ran 40 tests in 1.460s` / `OK`  (tests.test_pilot_config + tests.test_security)
+
 ## FOUND (not fixed, out of scope)
 - F17 (`role="status"` for non-error messages + `aria-live` on the alert count) not done — not in the
   T5 scope list. F19 (table `<caption>`) still deferred. `risk/rules_index.html` title/duplicate was
