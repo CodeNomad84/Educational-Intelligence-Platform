@@ -29,6 +29,11 @@ _PLACEHOLDER_PREFIXES = ("django-insecure", "changeme", "change-me", "change_me"
 MIN_DISTINCT_CHARS = 10
 
 
+def _env_flag(name, default=False):
+    """Parse an environment flag; the default is fail-closed (False)."""
+    return os.environ.get(name, '1' if default else '0').strip().lower() in ('1', 'true', 'yes', 'on')
+
+
 def _is_weak(secret: str) -> bool:
     """Too short, a known placeholder, or obviously low-entropy (e.g. 'aaaa...')."""
     return (
@@ -89,13 +94,17 @@ def verify_jwt(
 
 
 def disabled_in_phase1(payload: dict = Depends(verify_jwt)) -> dict:
-    """Dependency for routes switched off in Phase 1 (RAG chat / ingestion / search).
+    """Dependency for the AI routes (RAG chat / ingestion / search).
 
-    The caller is still authenticated first (anonymous -> 401); every role, Admin included, gets 403.
-    Re-enabling a route means swapping this dependency for ``require_roles(...)`` once the embedding
-    model, vector dimension and document-level authorization are verified.
+    The caller is still authenticated first (anonymous -> 401); every role, Admin included, gets 403
+    while ENABLE_AI_FEATURES is off (the pilot default). Turning the flag on does NOT by itself
+    enable RAG: the embedding model, vector dimension and document-level authorization are still
+    unverified, so this dependency keeps refusing 403. Re-enabling a route means swapping this
+    dependency for ``require_roles(...)`` once those are verified.
     """
-    raise HTTPException(status_code=403, detail="This feature is disabled in Phase 1.")
+    if not _env_flag('ENABLE_AI_FEATURES'):
+        raise HTTPException(status_code=403, detail="AI features are disabled.")
+    raise HTTPException(status_code=403, detail="AI features are not available yet.")
 
 
 AI_SCOPE = "ai"      # a token minted by Django for ONE AI call carries scope "ai": valid only on routes that opt in (review F8)

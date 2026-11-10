@@ -20,3 +20,9 @@ LANGUAGE_CODE = 'fa-ir'
 TIME_ZONE = 'Asia/Tehran'
 USE_I18N = True
 USE_TZ = True
+
+# Local dev / demo / tests keep the pre-pilot behaviour: AI assistants and the Counselor role stay
+# reachable (still gated by roles and entitlements). The pilot/production defaults (base.py) leave
+# both OFF until an operator opts in.
+ENABLE_AI_FEATURES = True
+ENABLE_COUNSELOR_ROLE = True

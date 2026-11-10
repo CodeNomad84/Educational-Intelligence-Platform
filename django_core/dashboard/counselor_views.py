@@ -14,7 +14,7 @@ from students.models import CounselorNote, Referral
 
 from schools import audit
 
-from .decorators import role_required
+from .decorators import require_pilot_flag, role_required
 from .school_forms import staff_queryset
 from .student360 import summary_context
 
@@ -43,6 +43,7 @@ class NoteForm(forms.Form):
 
 
 @role_required(ADMIN, GRADE_LEAD)
+@require_pilot_flag('ENABLE_COUNSELOR_ROLE')
 @require_POST
 def student_refer(request, pk):
     student = get_object_or_404(visible_students(request.user).filter(full_tier=True).select_related('school'), pk=pk)
@@ -58,6 +59,7 @@ def student_refer(request, pk):
 
 
 @role_required(COUNSELOR)
+@require_pilot_flag('ENABLE_COUNSELOR_ROLE')
 def home(request):
     referrals = visible_referrals(request.user).filter(counselor=request.user).select_related('student')
     audit.record_list(request.user, 'referrals', referrals)
@@ -71,6 +73,7 @@ def _case(request, pk):
 
 
 @role_required(COUNSELOR)
+@require_pilot_flag('ENABLE_COUNSELOR_ROLE')
 def case(request, pk):
     referral, student = _case(request, pk)
     form = NoteForm(request.POST or None)
@@ -90,6 +93,7 @@ def case(request, pk):
 
 
 @role_required(COUNSELOR)
+@require_pilot_flag('ENABLE_COUNSELOR_ROLE')
 @require_POST
 def case_close(request, pk):
     referral, _student = _case(request, pk)

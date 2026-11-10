@@ -119,6 +119,11 @@
             {% block content %}{% endblock %}
         </main>
     </div>
+    {% if FEEDBACK_URL %}
+    <footer class="eip-footer border-top text-center py-3 mt-3">
+        <a href="{{ FEEDBACK_URL }}"><i class="bi bi-chat-left-text" aria-hidden="true"></i> بازخورد و پیشنهاد</a>
+    </footer>
+    {% endif %}
 </div>
 <script src="{% static 'dashboard/vendor/bootstrap-5.3.0/bootstrap.bundle.min.js' %}"></script>
 <script src="{% static 'dashboard/js/eip-jdate.js' %}"></script>

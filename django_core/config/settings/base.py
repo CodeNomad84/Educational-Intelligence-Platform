@@ -103,3 +103,22 @@ REST_FRAMEWORK = {
 # AI trial guard defaults (schools/ai_guard.py); a School can override both. Not billing.
 AI_DEFAULT_DAILY_CAP = 100
 AI_DEFAULT_MONTHLY_CAP = 1000
+
+
+# --- Pilot configuration (T6, docs/pilot/PILOT_CONFIG.md) ---
+def _env_bool(name, default=False):
+    """Parse an environment flag; the default is fail-closed (False)."""
+    return os.environ.get(name, '1' if default else '0').strip().lower() in ('1', 'true', 'yes', 'on')
+
+
+# Operator switches for the pilot deployment. The defaults are the SAFE (fail-closed) state: AI
+# assistants and the Counselor role are OFF until an operator explicitly enables them.
+# development.py turns them back ON for local dev/demo/tests; production (this file's defaults)
+# stays off. PILOT_MODE is a marker only — the real gates are ENABLE_AI_FEATURES and
+# ENABLE_COUNSELOR_ROLE.
+PILOT_MODE = _env_bool('PILOT_MODE', False)
+ENABLE_AI_FEATURES = _env_bool('ENABLE_AI_FEATURES', False)
+ENABLE_COUNSELOR_ROLE = _env_bool('ENABLE_COUNSELOR_ROLE', False)
+# Global feedback link shown in the footer of every authenticated page. Empty = hidden. Rendered
+# verbatim: it MUST be a fixed, student-data-free URL (a form/survey link), never a URL carrying ids.
+FEEDBACK_URL = os.environ.get('FEEDBACK_URL', '').strip()

@@ -6,7 +6,7 @@ from django.db import IntegrityError
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods, require_POST
 
-from dashboard.decorators import role_required
+from dashboard.decorators import require_pilot_flag, role_required
 from schools import audit
 from schools.entitlements import module_enabled, user_school_ids
 from schools.models import School
@@ -44,6 +44,7 @@ def _school(request, admin_only=False):
 
 
 @role_required(*STAFF, module=MODULE)
+@require_pilot_flag('ENABLE_AI_FEATURES')
 @require_http_methods(['GET', 'POST'])
 def home(request):
     school = _school(request)
@@ -66,6 +67,7 @@ def home(request):
 
 
 @role_required(ADMIN, module=MODULE)
+@require_pilot_flag('ENABLE_AI_FEATURES')
 @require_http_methods(['GET', 'POST'])
 def documents(request):
     school = _school(request, admin_only=True)
@@ -102,6 +104,7 @@ def documents(request):
 
 
 @role_required(ADMIN, module=MODULE)
+@require_pilot_flag('ENABLE_AI_FEATURES')
 @require_POST
 def document_action(request, pk):
     school = _school(request, admin_only=True)
@@ -118,6 +121,7 @@ def document_action(request, pk):
 
 
 @role_required(ADMIN, module=MODULE)
+@require_pilot_flag('ENABLE_AI_FEATURES')
 @require_POST
 def ai_setting(request):
     school = _school(request, admin_only=True)

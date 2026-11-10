@@ -16,7 +16,7 @@ from schools import ai_guard
 from students import study_assistant
 from students.access import ADMIN, STUDENT, visible_grades, visible_recommendations, visible_students
 
-from .decorators import role_required
+from .decorators import require_pilot_flag, role_required
 from .student360 import grades_by_year
 
 User = get_user_model()
@@ -45,6 +45,7 @@ class QuestionForm(forms.Form):
 
 
 @role_required(STUDENT, module='tutor_ai')
+@require_pilot_flag('ENABLE_AI_FEATURES')
 def assistant(request):
     student = _me(request)
     form = QuestionForm(request.POST or None)

@@ -1,4 +1,5 @@
 """Template context: role group names come from the constants, never from literals in templates."""
+from django.conf import settings
 from django.urls import NoReverseMatch, reverse
 
 from schools.entitlements import MODULES, enabled_modules_for_user, trial_notices, user_school_ids
@@ -58,4 +59,7 @@ def role_names(request):
                                 for k in MODULES],
             # SchoolAdmin banner: trials with <= 14 days left or just ended
             'TRIAL_NOTICES': [{'label': label(k), 'kind': kind, 'days': days} for k, kind, days in trial_notices(school_ids)]
-            if school_ids else []}
+            if school_ids else [],
+            # Pilot config (T6): the global feedback link and the pilot marker for templates.
+            'FEEDBACK_URL': getattr(settings, 'FEEDBACK_URL', ''),
+            'PILOT_MODE': getattr(settings, 'PILOT_MODE', False)}
