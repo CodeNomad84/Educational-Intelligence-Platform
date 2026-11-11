@@ -104,7 +104,7 @@
   §5.2 lists 4 **DECISION REQUIRED** owner questions; §6 gives the T8 fix order.
 - **No application code, setting, migration or test was changed** — every fix is DEFERRED to T8.
   Tests deliberately **not** run (nothing to test; constraint of the task).
-- `git diff --stat phase-1/boot-security`: `2 files changed, 507 insertions(+)` — this report + this entry, nothing else.
+- `git diff --stat phase-1/boot-security`: `2 files changed, 509 insertions(+)` — this report + this entry, nothing else.
 
 ## FOUND (not fixed, out of scope)
 - F17 (`role="status"` for non-error messages + `aria-live` on the alert count) not done — not in the

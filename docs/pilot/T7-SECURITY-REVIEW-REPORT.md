@@ -117,7 +117,9 @@ HIGH, not CRITICAL. It is scriptable: no rate limit exists on uploads.
 `http://fastapi:8001/upload-document/` with `timeout=3000` (50 minutes). That route is Phase-1 disabled
 (`fastapi_core/auth.py::disabled_in_phase1` answers `403`), so today the call returns immediately and the
 long timeout is dormant. `delete_document_view` (`:297-301`) uses 5 s and `library_view` (`:222-224`) uses
-5 s — this call is the outlier by three orders of magnitude.
+5 s — this call is the outlier by three orders of magnitude. The inline comment on `:263` says
+`افزایش timeout به ۳۰۰ ثانیه` ("raise the timeout to 300 seconds"), so the value is most likely a unit typo
+rather than a deliberate 50-minute choice.
 
 **Risk impact.** A Django worker is blocked for the whole timeout. If the AI container hangs, is slow, or a
 proxy black-holes the connection, each SchoolAdmin POST pins one gunicorn worker for up to 50 minutes; with
