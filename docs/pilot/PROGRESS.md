@@ -86,6 +86,26 @@
 - Django docqa: `Ran 24 tests in 6.001s` / `OK`
 - FastAPI: `Ran 40 tests in 1.460s` / `OK`  (tests.test_pilot_config + tests.test_security)
 
+## T7 — L1 whole-branch security review (read-only) — DONE (report only, no code)
+- Branch: `work/T7-security-review` (from `phase-1/boot-security` @ `4a516c2`) · Commit `e2a7342`
+- Scope: `docs/pilot/T7-SECURITY-REVIEW-REPORT.md` — static review of `config/settings/*`, both URL maps,
+  `students/access.py` + `student_school`, the access decorators, DRF (`views`/`serializers`/`permissions`),
+  every upload path, the Django→FastAPI service-token bridge (`config/service_auth.py`,
+  `fastapi_core/auth.py`), `llm_adapter`, `docqa/`, the legacy library routes, throttling / forced-password
+  middleware / password reset / bulk views, `docker-compose.yml` + `fastapi_core/Dockerfile` +
+  `deploy/postgres/*.sql`, and every template that renders server data. IDOR sweep was exhaustive: all 41
+  `get_object_or_404` hits in `dashboard/ risk/ missions/ exams/ docqa/` were read.
+- Result: **no CRITICAL.** 1 HIGH — `students/views.py:248-272` reads an unbounded import upload (no byte cap;
+  OOM/disk exhaustion for all tenants). 5 MEDIUM — 3000 s timeout on the legacy library upload
+  (`dashboard/views.py:263`); AI service logs at DEBUG incl. document text (`fastapi_core/main.py:37,292-295`);
+  raw exception text / upstream bodies returned to clients; an unauthenticated second FastAPI app shipped in
+  the image (`main_HuggingFace.py`, = deferral item 7, reachable only if adopted); no audit event on the bulk
+  PII import. 11 LOW (§2 table). §4 lists 17 areas checked and clean; §5.1 lists what is **NOT VERIFIED**;
+  §5.2 lists 4 **DECISION REQUIRED** owner questions; §6 gives the T8 fix order.
+- **No application code, setting, migration or test was changed** — every fix is DEFERRED to T8.
+  Tests deliberately **not** run (nothing to test; constraint of the task).
+- `git diff --stat phase-1/boot-security`: `2 files changed, 507 insertions(+)` — this report + this entry, nothing else.
+
 ## FOUND (not fixed, out of scope)
 - F17 (`role="status"` for non-error messages + `aria-live` on the alert count) not done — not in the
   T5 scope list. F19 (table `<caption>`) still deferred. `risk/rules_index.html` title/duplicate was
