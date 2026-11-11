@@ -126,7 +126,8 @@
   `DATA_UPLOAD_MAX_MEMORY_SIZE` does not cover file fields — T7 §3 H-1 item 4 needs that caveat.
 - Decisions to answer (each with a recommended option in §13 of the proposal): **D0** scope, **D1** H-1 ceiling,
   **D2** M-4 keep vs delete the untracked files, **D3** L-5 storage, **D4** M-5 audit vocabulary.
-- `git diff --stat phase-1/boot-security`: documentation only — this entry + `docs/changes/0039-t8-security-fixes-PROPOSAL.md`.
+- `git diff --stat phase-1/boot-security`: documentation only — this entry + `docs/changes/0039-t8-security-fixes-PROPOSAL.md`
+  (`2 files changed, 216 insertions(+)`, commit `d50f0ac`; amended by the commit that records this line).
 
 
 
