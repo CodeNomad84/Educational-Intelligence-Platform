@@ -105,6 +105,30 @@
 - **No application code, setting, migration or test was changed** — every fix is DEFERRED to T8.
   Tests deliberately **not** run (nothing to test; constraint of the task).
 - `git diff --stat phase-1/boot-security`: `2 files changed, 509 insertions(+)` — this report + this entry, nothing else.
+## T8 — L2 security fixes after T7 — BLOCKED: owner decisions D0–D4 (proposal written, no code changed)
+- Branch: `work/T8-security-fixes` (from `phase-1/boot-security` @ `af41c59`)
+- Deliverable this task: `docs/changes/0039-t8-security-fixes-PROPOSAL.md` (L2 proposal, status
+  **BLOCKED — DECISION REQUIRED**) + this entry. **No application code, setting, migration or test was changed, and no
+  test was run** (nothing to test yet).
+- Why BLOCKED: `QUEUE.md` T8 row — "fix ONLY Critical/High findings of T7 … If a fix needs a design decision …:
+  BLOCKED". T7 §2 has **no CRITICAL** and exactly one HIGH (H-1), and T7 §5.2 item 4 leaves H-1's ceiling to the owner
+  ("so T8 does not invent the policy"). The session brief names H-1 **and** M-1…M-5 (MEDIUM) and L-5 (LOW), which the
+  queue does not put in T8 → the scope must be decided before any commit (D0).
+- Verified CURRENT while writing the proposal (commands quoted in §2 of it): `POST /api/students/import/` has **no**
+  byte cap and **no** row cap (`students/views.py:250-277`, `len(df)` only in the response at `:409`) and
+  `FileUploadSerializer.file` has no validator (`serializers.py:87-90`); `config/settings/` has **no**
+  `FILE_UPLOAD_MAX_MEMORY_SIZE` / `DATA_UPLOAD_MAX_MEMORY_SIZE`; `dashboard/views.py:263 timeout=3000`;
+  `fastapi_core/main.py:37` DEBUG + `:295` logs the first document chunk; `main_HuggingFace.py` and
+  `rag_service_HuggingFace_Models.py` are **untracked** (`.git/info/exclude:19-20`) yet copied into the image by
+  `fastapi_core/Dockerfile`'s `COPY . .`; `dashboard/bulk_views.py:48` puts the parsed rows in the session;
+  `AuditEvent.action` is `max_length=40`, so a new action needs no migration.
+- Correction recorded in the proposal: `FILE_UPLOAD_MAX_MEMORY_SIZE` is not a byte cap and
+  `DATA_UPLOAD_MAX_MEMORY_SIZE` does not cover file fields — T7 §3 H-1 item 4 needs that caveat.
+- Decisions to answer (each with a recommended option in §13 of the proposal): **D0** scope, **D1** H-1 ceiling,
+  **D2** M-4 keep vs delete the untracked files, **D3** L-5 storage, **D4** M-5 audit vocabulary.
+- `git diff --stat phase-1/boot-security`: documentation only — this entry + `docs/changes/0039-t8-security-fixes-PROPOSAL.md`.
+
+
 
 ## FOUND (not fixed, out of scope)
 - F17 (`role="status"` for non-error messages + `aria-live` on the alert count) not done — not in the
