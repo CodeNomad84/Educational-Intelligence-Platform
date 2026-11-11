@@ -105,6 +105,7 @@
 - **No application code, setting, migration or test was changed** — every fix is DEFERRED to T8.
   Tests deliberately **not** run (nothing to test; constraint of the task).
 - `git diff --stat phase-1/boot-security`: `2 files changed, 509 insertions(+)` — this report + this entry, nothing else.
+
 ## T8 — L2 security fixes after T7 — BLOCKED: owner decisions D0–D4 (proposal written, no code changed)
 - Branch: `work/T8-security-fixes` (from `phase-1/boot-security` @ `af41c59`)
 - Deliverable this task: `docs/changes/0039-t8-security-fixes-PROPOSAL.md` (L2 proposal, status
@@ -127,8 +128,8 @@
 - Decisions to answer (each with a recommended option in §13 of the proposal): **D0** scope, **D1** H-1 ceiling,
   **D2** M-4 keep vs delete the untracked files, **D3** L-5 storage, **D4** M-5 audit vocabulary.
 - `git diff --stat phase-1/boot-security`: documentation only — `docs/changes/0039-t8-security-fixes-PROPOSAL.md` (192
-  lines) + this entry, in commit `d50f0ac` (`2 files changed, 216 insertions(+)`), plus the one-line edit in the commit
-  that records this sentence. No code, setting, migration or test in any of them.
+  lines) + this entry, in commit `d50f0ac` (`2 files changed, 216 insertions(+)`), plus the small edits in the commits
+  that record this sentence. No code, setting, migration or test in any of them.
 
 
 
