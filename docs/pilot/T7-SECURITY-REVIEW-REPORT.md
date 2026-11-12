@@ -4,8 +4,9 @@
 template or test was modified by this task.**
 
 > **T8 update (2026-11-11):** H-1, M-1, M-2, M-3, M-4, M-5 and L-5 are **fixed** on `work/T8-security-fixes` (§2, `Status`
-> column, one commit per finding with a test that fails without it). L-1…L-4 and L-6…L-11 remain **OPEN**: they are outside
-> the scope the owner approved for T8 (`D0=b`), and `scripts/run_tests.sh pg` is the last gate of that task.
+> column, one commit per finding with a test that fails without it), and the three suites are green there: sqlite 1607 OK +
+> `demo_intel` 62 OK, PostgreSQL 1607 OK, FastAPI 74 OK. L-1…L-4 and L-6…L-11 remain **OPEN**: they are outside the scope the
+> owner approved for T8 (`D0=b`). Nothing is merged or pushed.
 
 | Item | Value |
 |---|---|

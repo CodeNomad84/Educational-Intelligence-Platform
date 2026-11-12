@@ -220,5 +220,9 @@ Deviations from §9, all deliberate:
   exists locally".
 
 Still open and out of scope (`D0=b`): L-1, L-2, L-3, L-4, L-6, L-7, L-8, L-9, L-10, L-11 — see
-`docs/pilot/T7-SECURITY-REVIEW-REPORT.md` §2 (`Status`: OPEN). The PostgreSQL gate (`scripts/run_tests.sh pg`) closes T8.
+`docs/pilot/T7-SECURITY-REVIEW-REPORT.md` §2 (`Status`: OPEN).
+
+**Test gate (CURRENT, run at the end of T8):** `scripts/run_tests.sh sqlite` → 1607 tests `OK (skipped=11)` + `demo_intel` 62
+`OK`; `DJANGO_IMAGE=eip-test-django:local scripts/run_tests.sh pg` → 1607 tests `OK (skipped=1)`; FastAPI in the image with
+`--network none` → 74 tests `OK (skipped=7)`. Nothing is merged or pushed.
 

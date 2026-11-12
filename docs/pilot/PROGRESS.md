@@ -106,7 +106,7 @@
   Tests deliberately **not** run (nothing to test; constraint of the task).
 - `git diff --stat phase-1/boot-security`: `2 files changed, 509 insertions(+)` — this report + this entry, nothing else.
 
-## T8 — L2 security fixes after T7 — IN PROGRESS: 7 fix commits, the PostgreSQL gate is the only step left
+## T8 — L2 security fixes after T7 — READY FOR REVIEW: 7 findings fixed, all three suites green, not merged
 - Branch: `work/T8-security-fixes` (from `phase-1/boot-security` @ `af41c59`)
 - Deliverable this task: `docs/changes/0039-t8-security-fixes-PROPOSAL.md` (L2 proposal, status
   **BLOCKED — DECISION REQUIRED**) + this entry. **No application code, setting, migration or test was changed, and no
@@ -158,8 +158,17 @@
 - Test evidence so far (CURRENT, real runs read from a file, not assumed): `dashboard.tests` 34 OK,
   `dashboard.test_bulk_accounts` 30 OK, `fastapi_core/tests/test_exposure.py` 7 OK (native run; the class skips inside the
   image where the repository root is not mounted), FastAPI suite 72 OK in Docker with `--network none`.
-- **NOT YET RUN:** the closing gate `scripts/run_tests.sh sqlite` then `scripts/run_tests.sh pg` — the next line of this
-  entry will quote its last lines. No "done" is claimed before that.
+- **The closing gate has now been run (CURRENT, output redirected to a file and read back):**
+  - `scripts/run_tests.sh sqlite` → `Ran 1607 tests in 1423.000s` / `OK (skipped=11)` and `demo_intel`
+    `Ran 62 tests in 204.430s` / `OK` — last line `ALL DJANGO CHECKS AND TESTS PASSED (FastAPI / PostgreSQL / Docker not
+    covered)`.
+  - `DJANGO_IMAGE=eip-test-django:local scripts/run_tests.sh pg` → `Ran 1607 tests in 1335.585s` / `OK (skipped=1)` — last
+    line `POSTGRESQL CHECKS AND TESTS PASSED (PostgreSQL 16 in a disposable container; FastAPI not covered)`; the
+    throw-away container and its internal network were removed by the script (`docker ps -a` has no `eip-test-*` left).
+  - FastAPI in the image, `--network none`: `Ran 74 tests` / `OK (skipped=7)` (`test_exposure.SingleApplicationTests`
+    skips there, it needs the repository root; it is green natively).
+- Merged? **No.** Pushed? **No.** `main` untouched. `/tmp/t8_full_sqlite.txt`, `/tmp/t8_full_pg.txt` and
+  `/tmp/t8_fastapi_full.txt` hold the raw output of the three runs above.
 - Not merged and not pushed: `git log --oneline phase-1/boot-security..HEAD` lists the 7 fix commits plus the 4 proposal
   commits; `main` is untouched.
 
