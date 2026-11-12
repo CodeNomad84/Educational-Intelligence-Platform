@@ -425,6 +425,10 @@ class StudentViewSet(viewsets.ModelViewSet):
                     write(item, plan)
 
             errors = [message for _index, message in sorted(row_errors, key=lambda pair: pair[0])]
+            # M-5 (T7): the bulk PII import is auditable, like the bulk account creation. Counts only - never a name
+            # or a national id; object = the target School; one event per accepted import (decision D4=yes).
+            audit.record(request.user, audit.STUDENT_IMPORT, school=import_school_id,
+                         detail=f's{created_count}u{updated_count}e{len(errors)}')
             return Response({
                 'status': 'success',
                 'created': created_count,

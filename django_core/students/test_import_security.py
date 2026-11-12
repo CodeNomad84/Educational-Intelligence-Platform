@@ -88,6 +88,37 @@ class UploadSizeLimitTests(ImportSecurityCase):
         self.assertEqual(AuditEvent.objects.count(), 0)
 
 
+class ImportAuditTests(ImportSecurityCase):
+    """M-5 (decision D4=yes): one ``student_import`` event per accepted import — who, which school, counts only."""
+
+    def test_a_successful_import_writes_one_count_only_event(self):
+        response = self.post(csv_upload(HEADER + ',padding\n' + csv_row('9000000103')))
+        self.assertEqual(response.json()['created'], 1)
+        event = AuditEvent.objects.get()
+        self.assertEqual(event.action, 'student_import')
+        self.assertEqual(event.school_id, School.objects.get().pk)
+        self.assertEqual(event.username, self.admin.username)
+        self.assertEqual(event.detail, 's1u0e0')
+        self.assertNotIn('9000000103', f'{event.detail}{event.object_type}{event.object_id}')
+
+    def test_the_event_counts_failed_rows_but_carries_no_row_data(self):
+        text = (HEADER + ',padding\n' + csv_row('9000000104') + 'Sara,Karimi,,8,7-A,9120000002,Dr,Nurse,0\n')
+        response = self.post(csv_upload(text))
+        self.assertEqual((response.json()['created'], len(response.json()['errors'])), (1, 1))
+        event = AuditEvent.objects.get()
+        self.assertEqual(event.detail, 's1u0e1')
+        self.assertNotIn('Karimi', f'{event.detail}{event.object_type}{event.object_id}')
+
+    def test_the_vocabulary_fits_the_model(self):
+        from schools import audit
+        from schools.models import AuditEvent as Model
+
+        self.assertEqual(audit.STUDENT_IMPORT, 'student_import')
+        limit = Model._meta.get_field('action').max_length
+        self.assertLessEqual(len(audit.STUDENT_IMPORT), limit)
+        self.assertLessEqual(len('s9999u9999e9999'), Model._meta.get_field('detail').max_length)
+
+
 class BoundedReadTests(TestCase):
     """H-1: the declared size is a hint; the bounded read is the enforcement (a client can lie about ``size``)."""
 
