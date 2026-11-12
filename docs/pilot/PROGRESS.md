@@ -109,7 +109,8 @@
 ## T8 — L2 security fixes after T7 — READY FOR REVIEW: 7 findings fixed, all three suites green, not merged
 - Branch: `work/T8-security-fixes` (from `phase-1/boot-security` @ `af41c59`)
 - Deliverable this task: `docs/changes/0039-t8-security-fixes-PROPOSAL.md` (L2 proposal, status
-  **BLOCKED — DECISION REQUIRED**) + this entry. **No application code, setting, migration or test was changed, and no
+  **BLOCKED — DECISION REQUIRED** — history, superseded by the owner answers below) + this entry. **No application code,
+  setting, migration or test was changed, and no
   test was run** (nothing to test yet).
 - Why BLOCKED: `QUEUE.md` T8 row — "fix ONLY Critical/High findings of T7 … If a fix needs a design decision …:
   BLOCKED". T7 §2 has **no CRITICAL** and exactly one HIGH (H-1), and T7 §5.2 item 4 leaves H-1's ceiling to the owner
@@ -155,9 +156,9 @@
     cache entry is what authorises a token, so another school's admin cannot replay one.
 - `docs/pilot/T7-SECURITY-REVIEW-REPORT.md` §2 now carries the `Status` column (per-finding commit), and its header says
   which findings are fixed and which are still open.
-- Test evidence so far (CURRENT, real runs read from a file, not assumed): `dashboard.tests` 34 OK,
+- Test evidence per module, before the full gate (CURRENT, real runs read from a file, not assumed): `dashboard.tests` 34 OK,
   `dashboard.test_bulk_accounts` 30 OK, `fastapi_core/tests/test_exposure.py` 7 OK (native run; the class skips inside the
-  image where the repository root is not mounted), FastAPI suite 72 OK in Docker with `--network none`.
+  image where the repository root is not mounted).
 - **The closing gate has now been run (CURRENT, output redirected to a file and read back):**
   - `scripts/run_tests.sh sqlite` → `Ran 1607 tests in 1423.000s` / `OK (skipped=11)` and `demo_intel`
     `Ran 62 tests in 204.430s` / `OK` — last line `ALL DJANGO CHECKS AND TESTS PASSED (FastAPI / PostgreSQL / Docker not
@@ -168,9 +169,9 @@
   - FastAPI in the image, `--network none`: `Ran 74 tests` / `OK (skipped=7)` (`test_exposure.SingleApplicationTests`
     skips there, it needs the repository root; it is green natively).
 - Merged? **No.** Pushed? **No.** `main` untouched. `/tmp/t8_full_sqlite.txt`, `/tmp/t8_full_pg.txt` and
-  `/tmp/t8_fastapi_full.txt` hold the raw output of the three runs above.
-- Not merged and not pushed: `git log --oneline phase-1/boot-security..HEAD` lists the 7 fix commits plus the 4 proposal
-  commits; `main` is untouched.
+  `/tmp/t8_fastapi_full.txt` hold the raw output of the three runs above. `git log --oneline
+  phase-1/boot-security..HEAD` has 14 commits: the 7 fixes above plus 7 proposal/status commits whose last one is the one that
+  records these results.
 
 
 
