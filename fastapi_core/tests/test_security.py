@@ -8,6 +8,7 @@ replaced by tiny fakes declared below so the tests are deterministic and need no
 PostgreSQL. This verifies routing/auth/validation wiring ONLY -- not model loading or RAG.
 All data is synthetic; the signing secret is generated per run.
 """
+import ast
 import logging
 import os
 import re
@@ -136,6 +137,51 @@ PREDICT = [r for r in STAFF_READS if 'predict' in r[1]]
 DISABLED = [r for r in STAFF_READS if r[1] in ('/chat/', '/documents/search/')] + MUTATIONS[:2]
 ADMIN_ONLY = [('get', '/documents/list/', {})] + MUTATIONS[2:]
 OTHER_ROLES = (['Parent'], [], ['Counselor'], ['Mentor'], ['Manager'], ['Student'])
+
+
+class LoggingTests(unittest.TestCase):
+    """M-2 (T7): the level comes from LOG_LEVEL with a WARNING default, and no log line carries document text.
+
+    The AST checks read ``main.py`` itself: a behavioural test cannot prove the *absence* of a content-bearing log
+    call on a route that is disabled in Phase 1."""
+
+    CONTENT_WORDS = ('documents_to_add[', 'file.filename', 'chunk.strip()')
+
+    def source(self):
+        return (ROOT / 'main.py').read_text(encoding='utf-8')
+
+    def log_calls(self):
+        for node in ast.walk(ast.parse(self.source())):
+            if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                    and isinstance(node.func.value, ast.Name) and node.func.value.id == 'logger'):
+                yield node
+
+    def test_the_default_level_is_warning(self):
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop('LOG_LEVEL', None)
+            self.assertEqual(main._log_level(), logging.WARNING)
+
+    def test_the_log_level_env_is_honoured(self):
+        with mock.patch.dict(os.environ, {'LOG_LEVEL': 'debug'}):
+            self.assertEqual(main._log_level(), logging.DEBUG)
+        with mock.patch.dict(os.environ, {'LOG_LEVEL': 'nonsense'}):
+            self.assertEqual(main._log_level(), logging.WARNING)
+
+    def test_no_log_call_receives_document_text(self):
+        offenders = [(call.lineno, ast.unparse(arg)) for call in self.log_calls() for arg in call.args
+                     if any(word in ast.unparse(arg) for word in self.CONTENT_WORDS)]
+        self.assertEqual(offenders, [], 'a log line carries document text or a filename')
+
+    def test_the_root_logger_is_not_hard_wired_to_debug(self):
+        for node in ast.walk(ast.parse(self.source())):
+            if not isinstance(node, ast.Call):
+                continue
+            if getattr(node.func, 'attr', '') != 'basicConfig':
+                continue
+            for kw in node.keywords:
+                if kw.arg == 'level':
+                    self.assertFalse(isinstance(kw.value, ast.Attribute) and kw.value.attr == 'DEBUG',
+                                     f'basicConfig(level=logging.DEBUG) at main.py:{node.lineno}')
 
 
 class BaseCase(unittest.TestCase):

@@ -33,8 +33,21 @@ from rag_service import (
 from train_nn_model import StudentRiskModel
 import llm_adapter
 
-# ---------- تنظیمات لاگ با سطح DEBUG برای عیب‌یابی ----------
-logging.basicConfig(level=logging.DEBUG)
+# ---------- تنظیمات لاگ ----------
+# M-2 (T7): the level comes from LOG_LEVEL and defaults to WARNING. It used to be hard-wired DEBUG, which put every
+# urllib3/psycopg2 line (and, before this change, document text) into the container log. No log line carries document
+# content or a filename.
+LOG_LEVEL_DEFAULT = 'WARNING'
+
+
+def _log_level():
+    """``LOG_LEVEL`` as a logging level, WARNING for anything unrecognised (a typo must not fall back to DEBUG)."""
+    name = (os.getenv('LOG_LEVEL') or LOG_LEVEL_DEFAULT).strip().upper()
+    level = logging.getLevelName(name)
+    return level if isinstance(level, int) else logging.WARNING
+
+
+logging.basicConfig(level=_log_level())
 logger = logging.getLogger(__name__)
 
 
@@ -241,7 +254,7 @@ async def search_documents_endpoint(query: str, top_k: int = 3, payload: dict = 
 @app.post("/upload-document/", response_model=UploadResponse)
 async def upload_document(file: UploadFile = File(...), payload: dict = Depends(disabled_in_phase1)):  # ingestion disabled: no embedding model
     try:
-        logger.info(f"دریافت فایل: {file.filename}")
+        logger.info('document upload received')
 
         suffix = os.path.splitext(file.filename)[1].lower()
         if suffix not in ['.pdf', '.docx', '.doc']:
@@ -295,13 +308,11 @@ async def upload_document(file: UploadFile = File(...), payload: dict = Depends(
                 }
                 documents_to_add.append((chunk_title, chunk, metadata, parent_id))
 
-        logger.debug(f"تعداد اسناد برای افزودن: {len(documents_to_add)}")
+        logger.debug('chunks to store: %d', len(documents_to_add))
         if documents_to_add:
-            # بررسی ساختار اولین سند برای اطمینان
-            logger.debug(f"نمونه سند اول: {documents_to_add[0]}")
             add_documents_batch(documents_to_add, school_id=_single_school(payload))
 
-        logger.info(f"فایل {file.filename} با موفقیت پردازش شد. تعداد قطعات: {len(chunks)}")
+        logger.info('document processed: %d chunks', len(chunks))
 
         return UploadResponse(
             status="success",
@@ -338,5 +349,4 @@ async def delete_document_by_parent_endpoint(parent_id: str, payload: dict = Dep
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"خطا در حذف فایل: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal error while deleting the file.")
+        raise _internal_error(e, 'delete_document_by_parent')
