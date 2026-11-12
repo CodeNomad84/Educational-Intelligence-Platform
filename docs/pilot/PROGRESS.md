@@ -106,7 +106,7 @@
   Tests deliberately **not** run (nothing to test; constraint of the task).
 - `git diff --stat phase-1/boot-security`: `2 files changed, 509 insertions(+)` — this report + this entry, nothing else.
 
-## T8 — L2 security fixes after T7 — BLOCKED: owner decisions D0–D4 (proposal written, no code changed)
+## T8 — L2 security fixes after T7 — IN PROGRESS: 7 fix commits, the PostgreSQL gate is the only step left
 - Branch: `work/T8-security-fixes` (from `phase-1/boot-security` @ `af41c59`)
 - Deliverable this task: `docs/changes/0039-t8-security-fixes-PROPOSAL.md` (L2 proposal, status
   **BLOCKED — DECISION REQUIRED**) + this entry. **No application code, setting, migration or test was changed, and no
@@ -130,6 +130,38 @@
 - `git diff --stat phase-1/boot-security`: documentation only — `docs/changes/0039-t8-security-fixes-PROPOSAL.md` (192
   lines) + this entry, in commit `d50f0ac` (`2 files changed, 216 insertions(+)`), plus the small edits in the commits
   that record this sentence. No code, setting, migration or test in any of them.
+
+### Owner answers (2026-11-11): `D0=b D1=a D2=a D3=b D4=yes`
+- Scope = H-1, M-1…M-5, L-5. The `QUEUE.md` T8 row still says "Critical/High only"; that file is owner-owned, so the
+  amendment note is yours, not mine.
+- Implementation: one commit per finding on `work/T8-security-fixes`, each behind a test that fails without it.
+  - **C1 `547ca2d` H-1** — `IMPORT_MAX_BYTES = 2 MB` + a bounded read in `students/views.py`; the extension/format check now
+    runs *before* the bytes are read. A module constant, not a setting (`D1=a`).
+  - **C2 `cb003da` M-5** — `audit.STUDENT_IMPORT = 'student_import'`, detail `s<n>u<n>e<n>` (counts only), object = the
+    target School, one event per accepted import and none for a refused upload (`D4=yes`; no migration: `action` is 40 chars).
+  - **C3 `26c774c` M-3** — no exception text or upstream body reaches a client: Django (`students/views.py` fixed row/file
+    messages + `logger.warning/exception`), `dashboard/views.py` (all five AI call sites), FastAPI (`_internal_error()`
+    returns a fixed sentence and an `X-Correlation-Id`).
+  - **C4 `9d13241` M-2** — FastAPI level comes from `LOG_LEVEL` (default `WARNING`); document text and filename are gone
+    from every log line.
+  - **C5 `5131c53` M-1** — the legacy library upload's `timeout=3000` is now `AI_UPLOAD_TIMEOUT = 30`, and a timeout shows
+    one fixed sentence (`dashboard.tests.LegacyUploadTimeoutTests`).
+  - **C6 `f524ab2` M-4** — `fastapi_core/.dockerignore` excludes `main_HuggingFace.py` and
+    `rag_service_HuggingFace_Models.py`; the local files stay on disk (`D2=a`). `test_exposure.SingleApplicationTests`
+    fails if a second `FastAPI(` application is in the build context (it reads `.dockerignore` to decide what "the build
+    context" means). `docs/PHASE1_DEFERRED_ITEMS.md` item 7 is closed.
+  - **C7 `6ab08c8` L-5** — `bulk_views.py` keeps the parsed rows in the cache (30-minute TTL; Redis in production, LocMem in
+    a dev/demo run) and the session row holds only a 43-character random token (`D3=b`). The school id stored *inside* the
+    cache entry is what authorises a token, so another school's admin cannot replay one.
+- `docs/pilot/T7-SECURITY-REVIEW-REPORT.md` §2 now carries the `Status` column (per-finding commit), and its header says
+  which findings are fixed and which are still open.
+- Test evidence so far (CURRENT, real runs read from a file, not assumed): `dashboard.tests` 34 OK,
+  `dashboard.test_bulk_accounts` 30 OK, `fastapi_core/tests/test_exposure.py` 7 OK (native run; the class skips inside the
+  image where the repository root is not mounted), FastAPI suite 72 OK in Docker with `--network none`.
+- **NOT YET RUN:** the closing gate `scripts/run_tests.sh sqlite` then `scripts/run_tests.sh pg` — the next line of this
+  entry will quote its last lines. No "done" is claimed before that.
+- Not merged and not pushed: `git log --oneline phase-1/boot-security..HEAD` lists the 7 fix commits plus the 4 proposal
+  commits; `main` is untouched.
 
 
 

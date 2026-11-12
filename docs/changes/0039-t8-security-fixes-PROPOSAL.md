@@ -188,5 +188,37 @@ commit with a failing test first, exactly as `QUEUE.md` requires.
 
 ---
 
-*Nothing above was implemented. Branch `work/T8-security-fixes` exists only to hold this proposal and the PROGRESS entry;
-`git diff --stat phase-1/boot-security` on it shows documentation only.*
+*Nothing above was implemented when this proposal was written (see §14 for what was implemented after the answers). Branch
+`work/T8-security-fixes` existed only to hold this proposal and the PROGRESS entry; `git diff --stat
+phase-1/boot-security` on it showed documentation only.*
+
+---
+
+## 14. Implementation report (added after the owner answered, 2026-11-11)
+
+**Answers:** `D0=b D1=a D2=a D3=b D4=yes`. Scope = H-1 + M-1…M-5 + L-5; the seven commits below are on
+`work/T8-security-fixes` (nothing merged, nothing pushed, `main` untouched), each with the test that fails without it.
+
+| # | Finding | Commit | What changed | Module test result (real run) |
+|---|---|---|---|---|
+| C1 | H-1 | `547ca2d` | `IMPORT_MAX_BYTES = 2 MB` + bounded read; format check before the read | `students.test_import_security` — see the `PROGRESS.md` entry |
+| C2 | M-5 | `cb003da` | `audit.STUDENT_IMPORT`, detail `s<n>u<n>e<n>`, object = School | same module |
+| C3 | M-3 | `26c774c` | fixed sentences + logging in Django; `_internal_error()` + `X-Correlation-Id` in FastAPI | Django + FastAPI |
+| C4 | M-2 | `9d13241` | `LOG_LEVEL` (default `WARNING`); no document text or filename in logs | FastAPI 72 OK |
+| C5 | M-1 | `5131c53` | `AI_UPLOAD_TIMEOUT = 30`, fixed sentence on `Timeout` | `dashboard.tests` 34 OK |
+| C6 | M-4 | `f524ab2` | `.dockerignore` entries + `SingleApplicationTests` guard | `test_exposure` 7 OK |
+| C7 | L-5 | `6ab08c8` | rows in the cache (30 min), session = random token | `dashboard.test_bulk_accounts` 30 OK |
+
+Deviations from §9, all deliberate:
+- The L-5 tests live in `dashboard/test_bulk_accounts.py` (next to the existing upload/preview/confirm and
+  "passwords exist only in the download" tests) instead of `dashboard/tests.py`; `dashboard/tests.py` keeps the M-1 and M-3
+  cases. The proposal's §9 item 3 named one file for both.
+- `SingleApplicationTests` skips when `fastapi_core/` is not visible from the test's working tree (the Docker test run mounts
+  only `fastapi_core` as `/app`, so the repository root is not there); it is validated natively and by CI when a CI exists.
+- The M-4 guard reads `.dockerignore` instead of scanning every `.py` under `fastapi_core/`: the point of `D2=a` is that the
+  local files stay on the owner's disk, so the question the test must answer is "what would the image contain", not "what
+  exists locally".
+
+Still open and out of scope (`D0=b`): L-1, L-2, L-3, L-4, L-6, L-7, L-8, L-9, L-10, L-11 — see
+`docs/pilot/T7-SECURITY-REVIEW-REPORT.md` §2 (`Status`: OPEN). The PostgreSQL gate (`scripts/run_tests.sh pg`) closes T8.
+

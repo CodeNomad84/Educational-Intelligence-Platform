@@ -1,7 +1,11 @@
 # T7 — Whole-branch security review (Phase 1 pilot)
 
-**Status: REPORT ONLY — every fix is DEFERRED to T8. No application code, settings, migration, template or
-test was modified by this task.**
+**Status: REPORT ONLY — every fix was DEFERRED to T8 at the time of writing. No application code, settings, migration,
+template or test was modified by this task.**
+
+> **T8 update (2026-11-11):** H-1, M-1, M-2, M-3, M-4, M-5 and L-5 are **fixed** on `work/T8-security-fixes` (§2, `Status`
+> column, one commit per finding with a test that fails without it). L-1…L-4 and L-6…L-11 remain **OPEN**: they are outside
+> the scope the owner approved for T8 (`D0=b`), and `scripts/run_tests.sh pg` is the last gate of that task.
 
 | Item | Value |
 |---|---|
@@ -41,25 +45,28 @@ that each finding below has a real line reference. The IDOR sweep was exhaustive
 
 ## 2. Summary
 
-| ID | Severity | Finding | Location |
-|---|---|---|---|
-| H-1 | **HIGH** | Student import reads an unbounded upload (no byte cap) — memory/disk exhaustion, platform-wide | `django_core/students/views.py:248-272` |
-| M-1 | MEDIUM | Legacy library upload calls the AI service with a 3000-second timeout | `django_core/dashboard/views.py:259-264` |
-| M-2 | MEDIUM | AI service logs at DEBUG, including uploaded document text | `fastapi_core/main.py:37, :292-295` |
-| M-3 | MEDIUM | Raw exception text / upstream response bodies returned to clients | `students/views.py:367,385,419`; `dashboard/views.py:163,168,205,281,310`; `fastapi_core/main.py:149,199,209,219,233` |
-| M-4 | MEDIUM | Second, unauthenticated FastAPI application shipped in the image (`main_HuggingFace.py`) with an unscoped RAG backend | `fastapi_core/main_HuggingFace.py:98-256` |
-| M-5 | MEDIUM | Bulk student import (API) writes PII with no audit event | `django_core/students/views.py:248-419` |
-| L-1 | LOW | Logout works over GET (CSRF-free logout) | `django_core/dashboard/views.py:50-52` |
-| L-2 | LOW | AI service `/docs` and `/openapi.json` are unauthenticated | `fastapi_core/main.py:57` |
-| L-3 | LOW | Disabled AI upload route buffers the whole file with no size cap | `fastapi_core/main.py:235-247` |
-| L-4 | LOW | `FEEDBACK_URL` is not scheme-validated before being rendered into `href` | `config/settings/base.py:124`; `dashboard/templates/dashboard/base.html:124` |
-| L-5 | LOW | Parsed national ids held in the DB session row for up to 30 minutes | `django_core/dashboard/bulk_views.py:23-33,48` |
-| L-6 | LOW | Bare `except: pass` hides AI-service failures | `django_core/dashboard/views.py:227-228` |
-| L-7 | LOW | Docstring claims the superuser sees all students; the code grants nothing | `django_core/students/access.py:169-171` vs `:130-137` |
-| L-8 | LOW | `TokenRefreshView` is unthrottled and refresh tokens are not blacklisted on logout | `django_core/config/urls.py:19-20` |
-| L-9 | LOW | Image default command runs uvicorn with `--reload` | `fastapi_core/Dockerfile` (final `CMD`) |
-| L-10 | LOW | No fail-closed `DEFAULT_PERMISSION_CLASSES` for DRF | `config/settings/base.py:90-102` |
-| L-11 | LOW | Every container runs as root; the Django image default command is `runserver` | `django_core/Dockerfile:1-15`, `fastapi_core/Dockerfile:1-27`, `docker-compose.yml:27-188` |
+| ID | Severity | Finding | Location | Status |
+|---|---|---|---|---|
+| H-1 | **HIGH** | Student import reads an unbounded upload (no byte cap) — memory/disk exhaustion, platform-wide | `django_core/students/views.py:248-272` | **FIXED** `547ca2d` (T8 C1) |
+| M-1 | MEDIUM | Legacy library upload calls the AI service with a 3000-second timeout | `django_core/dashboard/views.py:259-264` | **FIXED** `5131c53` (T8 C5) |
+| M-2 | MEDIUM | AI service logs at DEBUG, including uploaded document text | `fastapi_core/main.py:37, :292-295` | **FIXED** `9d13241` (T8 C4) |
+| M-3 | MEDIUM | Raw exception text / upstream response bodies returned to clients | `students/views.py:367,385,419`; `dashboard/views.py:163,168,205,281,310`; `fastapi_core/main.py:149,199,209,219,233` | **FIXED** `26c774c` (T8 C3) |
+| M-4 | MEDIUM | Second, unauthenticated FastAPI application shipped in the image (`main_HuggingFace.py`) with an unscoped RAG backend | `fastapi_core/main_HuggingFace.py:98-256` | **FIXED** `f524ab2` (T8 C6) |
+| M-5 | MEDIUM | Bulk student import (API) writes PII with no audit event | `django_core/students/views.py:248-419` | **FIXED** `cb003da` (T8 C2) |
+| L-1 | LOW | Logout works over GET (CSRF-free logout) | `django_core/dashboard/views.py:50-52` | OPEN — outside T8 scope (`D0=b`) |
+| L-2 | LOW | AI service `/docs` and `/openapi.json` are unauthenticated | `fastapi_core/main.py:57` | OPEN — outside T8 scope (`D0=b`) |
+| L-3 | LOW | Disabled AI upload route buffers the whole file with no size cap | `fastapi_core/main.py:235-247` | OPEN — outside T8 scope (`D0=b`) |
+| L-4 | LOW | `FEEDBACK_URL` is not scheme-validated before being rendered into `href` | `config/settings/base.py:124`; `dashboard/templates/dashboard/base.html:124` | OPEN — outside T8 scope (`D0=b`) |
+| L-5 | LOW | Parsed national ids held in the DB session row for up to 30 minutes | `django_core/dashboard/bulk_views.py:23-33,48` | **FIXED** `6ab08c8` (T8 C7) |
+| L-6 | LOW | Bare `except: pass` hides AI-service failures | `django_core/dashboard/views.py:227-228` | OPEN — outside T8 scope (`D0=b`) |
+| L-7 | LOW | Docstring claims the superuser sees all students; the code grants nothing | `django_core/students/access.py:169-171` vs `:130-137` | OPEN — outside T8 scope (`D0=b`) |
+| L-8 | LOW | `TokenRefreshView` is unthrottled and refresh tokens are not blacklisted on logout | `django_core/config/urls.py:19-20` | OPEN — outside T8 scope (`D0=b`) |
+| L-9 | LOW | Image default command runs uvicorn with `--reload` | `fastapi_core/Dockerfile` (final `CMD`) | OPEN — outside T8 scope (`D0=b`) |
+| L-10 | LOW | No fail-closed `DEFAULT_PERMISSION_CLASSES` for DRF | `config/settings/base.py:90-102` | OPEN — outside T8 scope (`D0=b`) |
+| L-11 | LOW | Every container runs as root; the Django image default command is `runserver` | `django_core/Dockerfile:1-15`, `fastapi_core/Dockerfile:1-27`, `docker-compose.yml:27-188` | OPEN — outside T8 scope (`D0=b`) |
+
+*Status column added in T8 (report §6 acceptance). `FIXED` = code + a test that fails without it, committed on
+`work/T8-security-fixes`; **not merged**, and the PostgreSQL gate is the last step of T8 (see `PROGRESS.md`).*
 
 **CRITICAL: none found.** No unauthenticated data path, no cross-tenant read/write, and no secret exposure
 was found on this branch; §4 lists what was checked and came back clean.
