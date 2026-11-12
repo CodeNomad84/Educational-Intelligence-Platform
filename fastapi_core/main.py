@@ -37,6 +37,17 @@ import llm_adapter
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
+
+def _internal_error(exc, where, detail='internal_error'):
+    """M-3 (T7): a 500 tells the client nothing about the failure and carries a correlation id.
+
+    The exception text (and its traceback) can name hosts, paths or upstream providers; it goes to the log, where the
+    id in ``X-Correlation-Id`` finds the exact line. Callers write ``raise _internal_error(e, 'predict')``."""
+    cid = uuid.uuid4().hex[:12]
+    logger.error('%s failed (correlation %s): %s', where, cid, exc, exc_info=True)
+    return HTTPException(status_code=500, detail=detail, headers={'X-Correlation-Id': cid})
+
+
 # ---------- بارگذاری مدل PyTorch ----------
 MODEL_DIR = Path(__file__).parent / "models"
 model_path = MODEL_DIR / "student_risk_model.pth"
@@ -145,8 +156,7 @@ async def predict_risk(features: StudentFeatures, payload: dict = Depends(requir
             "message": "دانش‌آموز در معرض ریسک افت تحصیلی است." if is_risk else "دانش‌آموز وضعیت مطلوبی دارد."
         }
     except Exception as e:
-        logger.error(f"خطا در پیش‌بینی: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"خطا در پردازش پیش‌بینی: {str(e)}")
+        raise _internal_error(e, 'predict')
 app.include_router(router_v1)
 
 class LLMRequest(BaseModel):
@@ -196,8 +206,7 @@ async def chat_endpoint(request: ChatRequest, payload: dict = Depends(disabled_i
         result = chat(request.query, school_ids(payload))   # ACL before retrieval (route disabled in Phase 1)
         return result
     except Exception as e:
-        logger.error(f"خطا در چت: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"خطا در پردازش سؤال: {str(e)}")
+        raise _internal_error(e, 'chat')
 
 @app.post("/documents/")
 async def add_document_endpoint(request: DocumentRequest, payload: dict = Depends(disabled_in_phase1)):  # ingestion disabled: no embedding model
@@ -205,8 +214,7 @@ async def add_document_endpoint(request: DocumentRequest, payload: dict = Depend
         add_document(request.title, request.content, school_id=_single_school(payload), metadata=request.metadata)
         return {"status": "success", "message": "سند با موفقیت اضافه شد."}
     except Exception as e:
-        logger.error(f"خطا در افزودن سند: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"خطا در افزودن سند: {str(e)}")
+        raise _internal_error(e, 'add_document')
 
 @app.get("/documents/list/")
 async def list_documents(payload: dict = Depends(require_roles_with_schools(ADMIN))):  # only the caller's schools (token claim)
@@ -215,8 +223,7 @@ async def list_documents(payload: dict = Depends(require_roles_with_schools(ADMI
         docs = get_all_documents(payload["schools"])
         return {"documents": docs}
     except Exception as e:
-        logger.error(f"خطا در دریافت لیست اسناد: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"خطا در دریافت لیست اسناد: {str(e)}")
+        raise _internal_error(e, 'list_documents')
 
 @app.get("/documents/search/")
 async def search_documents_endpoint(query: str, top_k: int = 3, payload: dict = Depends(disabled_in_phase1)):  # embedding-based; RAG out of Phase 1 scope
@@ -229,8 +236,7 @@ async def search_documents_endpoint(query: str, top_k: int = 3, payload: dict = 
             ]
         }
     except Exception as e:
-        logger.error(f"خطا در جستجوی اسناد: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"خطا در جستجوی اسناد: {str(e)}")
+        raise _internal_error(e, 'search_documents')
 
 @app.post("/upload-document/", response_model=UploadResponse)
 async def upload_document(file: UploadFile = File(...), payload: dict = Depends(disabled_in_phase1)):  # ingestion disabled: no embedding model
@@ -306,8 +312,7 @@ async def upload_document(file: UploadFile = File(...), payload: dict = Depends(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"خطا در پردازش فایل: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"خطا در پردازش فایل: {str(e)}")
+        raise _internal_error(e, 'upload_document')
 
 @app.delete("/documents/{doc_id}")
 async def delete_document_endpoint(doc_id: int, payload: dict = Depends(require_roles_with_schools(ADMIN))):
@@ -320,8 +325,7 @@ async def delete_document_endpoint(doc_id: int, payload: dict = Depends(require_
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"خطا در حذف سند: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal error while deleting the document.")
+        raise _internal_error(e, 'delete_document', detail='Internal error while deleting the document.')
 
 @app.delete("/documents/parent/{parent_id}")
 async def delete_document_by_parent_endpoint(parent_id: str, payload: dict = Depends(require_roles_with_schools(ADMIN))):

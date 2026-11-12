@@ -1,4 +1,5 @@
 # students/views.py
+import logging
 import re
 import pandas as pd
 from io import BytesIO, TextIOWrapper
@@ -43,6 +44,13 @@ UNMATCHED_VALUE_MAX = 100
 # resource guard, not a school preference (decision D1=a).
 IMPORT_MAX_BYTES = 2 * 1024 * 1024
 IMPORT_TOO_LARGE = 'حجم فایل بیش از حد مجاز است (حداکثر ۲ مگابایت).'
+# M-3 (T7): what the importer is told when a row or the whole file fails. The exception text goes to the log only: it
+# can carry file paths, driver messages or column/DB internals that mean nothing to a school admin.
+IMPORT_ROW_FAILED = 'خطا در پردازش این ردیف.'
+IMPORT_FILE_FAILED = 'خطا در پردازش فایل. جزئیات در گزارش سرور ثبت شد.'
+
+logger = logging.getLogger(__name__)
+
 
 ImportRow = namedtuple('ImportRow', 'index national_id data class_cell')
 
@@ -388,7 +396,8 @@ class StudentViewSet(viewsets.ModelViewSet):
                     parsed.append(ImportRow(index, national_id, data, row.get('class_name')))
 
                 except Exception as e:
-                    row_errors.append((index, f"ردیف {index+2}: خطا - {str(e)}"))
+                    logger.warning('import row %s (file row %s) failed to parse: %s', index, index + 2, e, exc_info=True)
+                    row_errors.append((index, f"ردیف {index+2}: {IMPORT_ROW_FAILED}"))
 
             # Each row has its own transaction: a failing row never rolls back the others.
             linked_ids = set()
@@ -406,7 +415,9 @@ class StudentViewSet(viewsets.ModelViewSet):
                 except ImportSchoolConflict as e:
                     row_errors.append((item.index, f"ردیف {item.index+2}: {e}"))
                 except Exception as e:
-                    row_errors.append((item.index, f"ردیف {item.index+2}: خطا - {str(e)}"))
+                    logger.warning('import row %s (file row %s) failed to write: %s', item.index, item.index + 2, e,
+                                   exc_info=True)
+                    row_errors.append((item.index, f"ردیف {item.index+2}: {IMPORT_ROW_FAILED}"))
 
             # Pass 2a: students that ALREADY have a class are written first. Their rows never change a link,
             # but may change a grade, and class decisions must see the grades that were really stored.
@@ -443,8 +454,9 @@ class StudentViewSet(viewsets.ModelViewSet):
             }, status=status.HTTP_200_OK)
 
         except Exception as e:
+            logger.exception('student import failed while processing the uploaded file: %s', e)
             return Response(
-                {'error': f'خطا در پردازش فایل: {str(e)}'},
+                {'error': IMPORT_FILE_FAILED},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
     @action(detail=True, methods=['get'], url_path='features')

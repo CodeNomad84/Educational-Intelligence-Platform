@@ -119,6 +119,33 @@ class ImportAuditTests(ImportSecurityCase):
         self.assertLessEqual(len('s9999u9999e9999'), Model._meta.get_field('detail').max_length)
 
 
+class ErrorLeakTests(ImportSecurityCase):
+    """M-3: a failure is reported with a fixed message; the exception text goes to the server log only."""
+
+    ROW_ERROR = 'ردیف 2: خطا در پردازش این ردیف.'
+    FILE_ERROR = 'خطا در پردازش فایل. جزئیات در گزارش سرور ثبت شد.'
+
+    def test_a_failing_row_reports_a_fixed_message_and_logs_the_detail(self):
+        boom = RuntimeError('secret-row-detail-42')
+        with mock.patch('students.views._write_import_row', side_effect=boom):
+            with self.assertLogs('students.views', level='WARNING') as logs:
+                response = self.post(csv_upload(HEADER + ',padding\n' + csv_row('9000000105')))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['errors'], [self.ROW_ERROR])
+        self.assertNotIn('secret-row-detail-42', response.content.decode())
+        self.assertIn('secret-row-detail-42', '\n'.join(logs.output))
+
+    def test_a_parser_failure_is_a_fixed_500_and_the_detail_stays_in_the_log(self):
+        boom = RuntimeError('secret-parser-detail-7')
+        with mock.patch('students.views.pd.read_csv', side_effect=boom):
+            with self.assertLogs('students.views', level='ERROR') as logs:
+                response = self.post(csv_upload(HEADER + ',padding\n' + csv_row('9000000106')))
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(response.json(), {'error': self.FILE_ERROR})
+        self.assertNotIn('secret-parser-detail-7', response.content.decode())
+        self.assertIn('secret-parser-detail-7', '\n'.join(logs.output))
+
+
 class BoundedReadTests(TestCase):
     """H-1: the declared size is a hint; the bounded read is the enforcement (a client can lie about ``size``)."""
 

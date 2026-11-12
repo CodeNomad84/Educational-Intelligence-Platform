@@ -1,4 +1,6 @@
 # Create your views here.
+import logging
+
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import login, authenticate, logout
@@ -20,6 +22,13 @@ from . import throttle
 from .decorators import role_required
 from .home import home_url_for, safe_next
 from students.enrollment_sync import ensure_current_enrollment
+
+# M-3 (T7): the AI service's error text (response body or exception) is never shown to a user - it can carry DB hosts,
+# model paths or provider messages. The user gets these fixed sentences; the detail goes to the server log.
+AI_SERVICE_ERROR = 'خطا در سرویس هوش مصنوعی (کد {status}).'
+AI_UNREACHABLE = 'خطا در ارتباط با سرویس هوش مصنوعی.'
+
+logger = logging.getLogger(__name__)
 
 # صفحه‌ی ورود
 def login_view(request):
@@ -159,13 +168,13 @@ def student_detail_view(request, pk):
             if response.status_code == 200:
                 prediction_result = response.json()
             else:
-                prediction_result = {
-                    "error": f"خطا در سرویس AI: {response.status_code} - {response.text}"
-                }
+                logger.warning('AI predict failed with status %s: %s', response.status_code, response.text[:200])
+                prediction_result = {"error": AI_SERVICE_ERROR.format(status=response.status_code)}
         except ImproperlyConfigured:
             prediction_result = {"error": "سرویس AI پیکربندی نشده است."}
         except requests.exceptions.RequestException as e:
-            prediction_result = {"error": f"خطا در ارتباط با سرویس AI: {str(e)}"}
+            logger.warning('AI predict is unreachable: %s', e, exc_info=True)
+            prediction_result = {"error": AI_UNREACHABLE}
 
     context = {
         'student': student,
@@ -198,11 +207,13 @@ def chat_view(request):
                         'sources': result.get('sources', [])
                     })
                 else:
-                    error_msg = f"خطا در سرویس AI: {response.status_code}"
+                    logger.warning('AI chat failed with status %s', response.status_code)
+                    error_msg = AI_SERVICE_ERROR.format(status=response.status_code)
             except ImproperlyConfigured:
                 error_msg = "سرویس AI پیکربندی نشده است."
             except requests.exceptions.RequestException as e:
-                error_msg = f"خطا در ارتباط با سرویس AI: {str(e)}"
+                logger.warning('AI chat is unreachable: %s', e, exc_info=True)
+                error_msg = AI_UNREACHABLE
             
             return render(request, 'dashboard/chat.html', {
                 'query': query,
@@ -278,7 +289,8 @@ def upload_document_view(request):
     except requests.exceptions.Timeout:
         messages.error(request, 'زمان پردازش فایل بیش از حد مجاز بود. لطفاً فایل کوچک‌تری انتخاب کنید.')
     except requests.exceptions.RequestException as e:
-        messages.error(request, f"خطا در ارتباط با سرویس AI: {str(e)}")
+        logger.warning('AI document upload is unreachable: %s', e, exc_info=True)
+        messages.error(request, AI_UNREACHABLE)
     
     return redirect('dashboard:library')
 
@@ -307,7 +319,8 @@ def delete_document_view(request):
     except ImproperlyConfigured:
         messages.error(request, 'سرویس AI پیکربندی نشده است.')
     except requests.exceptions.RequestException as e:
-        messages.error(request, f'خطا در ارتباط با سرویس AI: {str(e)}')
+        logger.warning('AI document delete is unreachable: %s', e, exc_info=True)
+        messages.error(request, AI_UNREACHABLE)
     
     return redirect('dashboard:library')
 

@@ -7,6 +7,7 @@ from unittest import mock
 
 import jwt
 from django.core.exceptions import ImproperlyConfigured
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
@@ -288,3 +289,51 @@ class AdminRoleContextTests(TestCase):
         upload = reverse('dashboard:school_accounts')
         self.assertIn(upload, self.render_base(ADMIN))
         self.assertNotIn(upload, self.render_base(PARENT))
+
+
+class AIErrorLeakTests(TestCase):
+    """M-3: the AI service's error text is never rendered into a page - the user gets a fixed sentence, the log the detail."""
+
+    def setUp(self):
+        self.school = School.objects.create(name='Leak School', code='leak')
+        self.admin = make_user('leak_admin', ADMIN)
+        SchoolMembership.objects.create(user=self.admin, school=self.school)
+        self.student = make_student('0000000009', first='Leak', school=self.school)
+        self.client.force_login(self.admin)
+
+    def detail(self, **kwargs):
+        with override_settings(SERVICE_JWT_SECRET=secrets.token_urlsafe(48)):
+            with mock.patch('dashboard.views.requests.post', **kwargs):
+                return self.client.get(reverse('dashboard:student_detail', args=(self.student.pk,)), {'predict': 'true'})
+
+    def test_an_upstream_error_body_is_not_rendered(self):
+        fake = mock.Mock(status_code=500, text='secret-upstream-body')
+        resp = self.detail(return_value=fake)
+        self.assertEqual(resp.status_code, 200)
+        self.assertNotContains(resp, 'secret-upstream-body')
+        self.assertEqual(resp.context['prediction']['error'], 'خطا در سرویس هوش مصنوعی (کد 500).')
+
+    def test_a_connection_error_does_not_render_the_exception_text(self):
+        import requests as http
+
+        boom = http.exceptions.ConnectionError('secret-host-10.0.0.5')
+        with self.assertLogs('dashboard.views', level='WARNING'):
+            resp = self.detail(side_effect=boom)
+        self.assertEqual(resp.status_code, 200)
+        self.assertNotContains(resp, 'secret-host-10.0.0.5')
+        self.assertEqual(resp.context['prediction']['error'], 'خطا در ارتباط با سرویس هوش مصنوعی.')
+
+    def test_a_document_upload_failure_does_not_render_the_exception_text(self):
+        import requests as http
+
+        upload = SimpleUploadedFile('roster.pdf', b'%PDF-1.4 minimal', content_type='application/pdf')
+        boom = http.exceptions.RequestException('secret-upload-detail')
+        with override_settings(SERVICE_JWT_SECRET=secrets.token_urlsafe(48)):
+            with mock.patch('dashboard.views.requests.post', side_effect=boom):
+                with self.assertLogs('dashboard.views', level='WARNING'):
+                    resp = self.client.post(reverse('dashboard:upload_document'), {'document_file': upload},
+                                            follow=True)
+        self.assertEqual(resp.status_code, 200)
+        self.assertNotContains(resp, 'secret-upload-detail')
+        self.assertContains(resp, 'خطا در ارتباط با سرویس هوش مصنوعی.')
+

@@ -337,6 +337,33 @@ class AuthorizationTests(BaseCase):
             self.assertEqual(self.client.delete('/documents/999999', headers=h).status_code, 404)
             self.assertEqual(self.client.delete('/documents/parent/none', headers=h).status_code, 404)
 
+    def test_internal_errors_are_fixed_and_carry_a_correlation_id(self):
+        """M-3: a 500 says nothing about the failure (no exception text, no stack) and carries an id that ties it to
+        exactly one log line, so support can find the detail without it ever reaching the client."""
+        def boom(*_a, **_k):
+            raise RuntimeError('db-host-secret-detail')
+
+        cases = [
+            ('post', '/predict/', {'json': FEATURES}, lambda: mock.patch.object(main.scaler, 'transform', boom)),
+            ('get', '/documents/list/', {}, lambda: mock.patch.object(main, 'get_all_documents', boom)),
+        ]
+        logging.disable(logging.NOTSET)          # setUpModule silences the service logger; this test needs the record
+        try:
+            for method, path, kw, patcher in cases:
+                with patcher():
+                    with self.assertLogs('main', level='ERROR') as logs:
+                        resp = getattr(self.client, method)(path, headers=bearer([ADMIN_ROLE]), **kw)
+                self.assertEqual(resp.status_code, 500, path)
+                self.assertEqual(resp.json(), {'detail': 'internal_error'}, path)
+                self.assertNotIn('db-host-secret-detail', resp.text, path)
+                self.assertNotIn('Traceback', resp.text, path)
+                cid = resp.headers.get('X-Correlation-Id')
+                self.assertTrue(cid and len(cid) == 12, (path, cid))
+                self.assertIn(cid, '\n'.join(logs.output), path)
+                self.assertIn('db-host-secret-detail', '\n'.join(logs.output), path)
+        finally:
+            logging.disable(logging.CRITICAL)
+
     def test_delete_internal_error_is_500_without_leaking_details(self):
         def boom(*_):
             raise RuntimeError('db-host-secret-detail')
