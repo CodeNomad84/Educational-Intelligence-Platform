@@ -1,11 +1,29 @@
 """The FastAPI service (incl. /llm/complete/) must not be reachable from browsers or the public network (owner 2026-11-02):
 no published port in docker-compose.yml, no reverse-proxy rule to it, and a service token on every route. Static checks over the
 repository files; they need only the standard library (the repository root is the parent of fastapi_core/)."""
+import ast
+import fnmatch
 import re
 import unittest
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
+SERVICE_ROOT = REPO / 'fastapi_core'
+
+
+def dockerignored(path, patterns):
+    """True when ``path`` (under fastapi_core/) matches a ``.dockerignore`` entry.
+
+    Only the entries this repository uses are handled: a bare name (``.env``), a glob (``*.pyc``) and a directory
+    (``venv/``, matched against the first path component)."""
+    rel = path.relative_to(SERVICE_ROOT).as_posix()
+    for pattern in patterns:
+        name = pattern.strip().strip('/')
+        if not name:
+            continue
+        if fnmatch.fnmatch(rel, name) or rel.split('/')[0] == name:
+            return True
+    return False
 
 
 def service_block(text, name):
@@ -59,6 +77,42 @@ class ExposureTests(unittest.TestCase):
             text = (REPO / rel).read_text(encoding='utf-8')
             for url in re.findall(r'https?://[^"\']*8001[^"\']*', text):
                 self.assertTrue(url.startswith('http://fastapi:8001/'), url)
+
+
+@unittest.skipUnless(SERVICE_ROOT.exists(), 'fastapi_core/ not visible from this location (image run)')
+class SingleApplicationTests(unittest.TestCase):
+    """M-4 (T7): exactly one FastAPI application may ship in the image, and it must be the authenticated one.
+
+    ``main_HuggingFace.py`` (untracked, local) is a second, entirely unauthenticated application with an unscoped RAG
+    backend: no route declares a dependency, and its backend has no ``school_id``. It is not in git but the Dockerfile
+    ends with ``COPY . .``, so it *would* ship. These checks read the build context as ``.dockerignore`` defines it."""
+
+    NAMES = ('main_HuggingFace.py', 'rag_service_HuggingFace_Models.py')
+
+    def ignore_patterns(self):
+        return (SERVICE_ROOT / '.dockerignore').read_text(encoding='utf-8').splitlines()
+
+    def applications(self):
+        found = {}
+        for path in sorted(SERVICE_ROOT.glob('*.py')):
+            if dockerignored(path, self.ignore_patterns()):
+                continue
+            tree = ast.parse(path.read_text(encoding='utf-8'))
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Call) and getattr(node.func, 'id', '') == 'FastAPI':
+                    found.setdefault(path.name, []).append(node.lineno)
+        return found
+
+    def test_only_one_fastapi_application_is_in_the_build_context(self):
+        found = self.applications()
+        self.assertEqual(sorted(found), ['main.py'], f'a second FastAPI application would ship: {found}')
+
+    def test_the_huggingface_variants_are_excluded_from_the_build_context(self):
+        patterns = self.ignore_patterns()
+        for name in self.NAMES:
+            path = SERVICE_ROOT / name
+            if path.exists():
+                self.assertTrue(dockerignored(path, patterns), f'{name} is still copied into the image')
 
 
 if __name__ == '__main__':
