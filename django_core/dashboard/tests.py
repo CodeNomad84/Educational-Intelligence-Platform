@@ -6,6 +6,7 @@ import secrets
 from unittest import mock
 
 import jwt
+import requests
 from django.core.exceptions import ImproperlyConfigured
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
@@ -289,6 +290,33 @@ class AdminRoleContextTests(TestCase):
         upload = reverse('dashboard:school_accounts')
         self.assertIn(upload, self.render_base(ADMIN))
         self.assertNotIn(upload, self.render_base(PARENT))
+
+
+class LegacyUploadTimeoutTests(TestCase):
+    """M-1 (T7): the legacy library upload forwards to a disabled route with a bounded timeout.
+
+    It was `timeout=3000` (50 minutes) while every neighbour uses 5 s; compose also starts gunicorn with
+    `--timeout 3000`, so a hanging AI container pinned a worker for the whole 50 minutes."""
+
+    def test_the_ai_upload_timeout_is_bounded(self):
+        self.client.force_login(make_user('timeout_admin', ADMIN))
+        upload = SimpleUploadedFile('roster.pdf', b'%PDF-1.4 minimal', content_type='application/pdf')
+        fake = mock.Mock(status_code=403, json=lambda: {'detail': 'disabled in phase 1'})
+        with override_settings(SERVICE_JWT_SECRET=secrets.token_urlsafe(48)):
+            with mock.patch('dashboard.views.requests.post', return_value=fake) as post:
+                self.client.post(reverse('dashboard:upload_document'), {'document_file': upload})
+        post.assert_called_once()
+        self.assertLessEqual(post.call_args.kwargs['timeout'], 30)
+
+    def test_a_timeout_gets_a_fixed_sentence(self):
+        self.client.force_login(make_user('timeout_admin2', ADMIN))
+        upload = SimpleUploadedFile('roster.pdf', b'%PDF-1.4 minimal', content_type='application/pdf')
+        with override_settings(SERVICE_JWT_SECRET=secrets.token_urlsafe(48)):
+            with mock.patch('dashboard.views.requests.post',
+                            side_effect=requests.exceptions.Timeout('read timed out')):
+                resp = self.client.post(reverse('dashboard:upload_document'), {'document_file': upload},
+                                        follow=True)
+        self.assertContains(resp, 'سرویس هوش مصنوعی پاسخ نداد؛ دوباره تلاش کنید.')
 
 
 class AIErrorLeakTests(TestCase):

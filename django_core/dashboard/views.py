@@ -27,6 +27,11 @@ from students.enrollment_sync import ensure_current_enrollment
 # model paths or provider messages. The user gets these fixed sentences; the detail goes to the server log.
 AI_SERVICE_ERROR = 'خطا در سرویس هوش مصنوعی (کد {status}).'
 AI_UNREACHABLE = 'خطا در ارتباط با سرویس هوش مصنوعی.'
+AI_TIMED_OUT = 'سرویس هوش مصنوعی پاسخ نداد؛ دوباره تلاش کنید.'
+# M-1 (T7): the legacy library upload forwarded to the disabled ingestion route with timeout=3000 (50 minutes) while
+# every neighbour uses 5 s, and compose starts gunicorn with --timeout 3000, so a hung AI container pinned a worker for
+# the whole window. 30 s matches the slowest real call (docqa's LLM complete: 65 s is the outlier, this route is off).
+AI_UPLOAD_TIMEOUT = 30
 
 logger = logging.getLogger(__name__)
 
@@ -271,7 +276,7 @@ def upload_document_view(request):
             "http://fastapi:8001/upload-document/",
             files=files,
             headers=service_headers(request.user),
-            timeout=3000  # افزایش timeout به ۳۰۰ ثانیه
+            timeout=AI_UPLOAD_TIMEOUT
         )
         
         if response.status_code == 200:
@@ -287,7 +292,8 @@ def upload_document_view(request):
     except ImproperlyConfigured:
         messages.error(request, 'سرویس AI پیکربندی نشده است.')
     except requests.exceptions.Timeout:
-        messages.error(request, 'زمان پردازش فایل بیش از حد مجاز بود. لطفاً فایل کوچک‌تری انتخاب کنید.')
+        logger.warning('AI document upload timed out after %ss', AI_UPLOAD_TIMEOUT)
+        messages.error(request, AI_TIMED_OUT)
     except requests.exceptions.RequestException as e:
         logger.warning('AI document upload is unreachable: %s', e, exc_info=True)
         messages.error(request, AI_UNREACHABLE)
