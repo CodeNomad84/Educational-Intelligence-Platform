@@ -1,11 +1,19 @@
 """SchoolAdmin pages: bulk accounts from Excel (dry-run preview, then confirm) and staff roles. Same gate as the other
 school pages (``school_page``: role SchoolAdmin + a school from the user's own memberships); everything is written for that
-school only. The uploaded rows live in the session until confirmed or cancelled (30 minutes); passwords are never stored."""
-import time
+school only. Passwords are never stored.
+
+The parsed rows of an upload live in the **cache** for 30 minutes (until confirmed or cancelled); the session row holds only a
+random token that names the cache entry. Before T8/L-5 the parsed rows -- names and national ids of every uploaded student,
+parent and teacher -- sat in the session, and with the database-backed session backend that is a second plaintext copy of the
+same PII in a database table, with no control over its lifetime. The cache is the store ``dashboard/throttle.py`` already
+uses: Redis in production (``settings/production.py``), so every worker sees the entry; a dev/demo run falls back to Django's
+per-process LocMemCache, which is single-worker and therefore enough for the only deployment this project supports."""
+import secrets
 
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.core.cache import cache
 from django.db import transaction
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect
@@ -21,16 +29,35 @@ from .school_views import _render, school_page
 
 User = get_user_model()
 SESSION_KEY = 'bulk_accounts'
-SESSION_SECONDS = 30 * 60
+SESSION_SECONDS = 30 * 60              # the cache TTL is the only expiry: there is no timestamp to trust in the session
+CACHE_KEY = 'bulk_accounts:{}'         # the token is 43 random characters, so one key can never collide with another
+TOKEN_BYTES = 32
 XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 
 
+def _forget(request):
+    """Drop the token from the session and the parsed rows from the cache."""
+    token = (request.session.pop(SESSION_KEY, None) or {}).get('token')
+    if token:
+        cache.delete(CACHE_KEY.format(token))
+
+
+def _store(request, school, rows):
+    """Keep ``rows`` in the cache, return a fresh token in the session (a second upload replaces the first)."""
+    _forget(request)
+    token = secrets.token_urlsafe(TOKEN_BYTES)
+    cache.set(CACHE_KEY.format(token), {'school': school.pk, 'rows': rows}, SESSION_SECONDS)
+    request.session[SESSION_KEY] = {'token': token}
+
+
 def _stored(request, school):
-    data = request.session.get(SESSION_KEY)
-    if not data or data.get('school') != school.pk or time.time() - data.get('ts', 0) > SESSION_SECONDS:
-        request.session.pop(SESSION_KEY, None)
+    """Rows of this school's pending upload, or None (expired, cancelled, or another school's token)."""
+    token = (request.session.get(SESSION_KEY) or {}).get('token')
+    entry = cache.get(CACHE_KEY.format(token)) if token else None
+    if not entry or entry.get('school') != school.pk:
+        _forget(request)
         return None
-    return data['rows']
+    return entry['rows']
 
 
 @school_page
@@ -45,7 +72,7 @@ def accounts(request, school):
         except bulk.BadFile as exc:
             messages.error(request, str(exc))
             return redirect('dashboard:school_accounts')
-        request.session[SESSION_KEY] = {'school': school.pk, 'ts': time.time(), 'rows': parsed}
+        _store(request, school, parsed)
         return redirect('dashboard:school_accounts_preview')
     return _render(request, school, 'accounts.html', max_new=bulk.MAX_NEW_ACCOUNTS)
 
@@ -72,7 +99,7 @@ def accounts_preview(request, school):
 @school_page
 @require_POST
 def accounts_cancel(request, school):
-    request.session.pop(SESSION_KEY, None)
+    _forget(request)
     return redirect('dashboard:school_accounts')
 
 
@@ -89,7 +116,7 @@ def accounts_confirm(request, school):
     except bulk.BadFile as exc:
         messages.error(request, str(exc))
         return redirect('dashboard:school_accounts_preview')
-    request.session.pop(SESSION_KEY, None)
+    _forget(request)
     audit.record(request.user, audit.BULK_ACCOUNTS, school=school, detail='s{}p{}t{}e{}f{}'.format(
         counts['student_accounts'], counts['parent_accounts'], counts['teacher_accounts'], len(plan.errors),
         counts['failed']))

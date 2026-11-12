@@ -363,6 +363,62 @@ class CollisionTests(Base):
         self.assertNotIn('9000000101', ''.join(r.message for r in plan.rows))
 
 
+class UploadedRowsLiveInTheCacheTests(Base):
+    """L-5 (T7): the session row names the upload, it does not contain it -- and the cache entry is what the views read."""
+
+    ROW = ['Ali Test', '9000000001', 7, '7-A', '9000000101', '9000000201', 'Father One', 'Mother One']
+
+    def token(self):
+        return dict(self.client.session)['bulk_accounts']
+
+    def test_the_session_holds_only_a_random_token(self):
+        self.assertEqual(self.upload(xlsx([self.ROW])).status_code, 302)
+        self.assertEqual(set(self.token()), {'token'})
+        blob = repr(dict(self.client.session))
+        for value in ('9000000001', '9000000101', 'Ali Test', 'Father One'):
+            self.assertNotIn(value, blob)
+        self.assertGreaterEqual(len(self.token()['token']), 32)
+
+    def test_the_preview_reads_the_rows_from_the_cache(self):
+        self.upload(xlsx([self.ROW]))
+        response = self.client.get(reverse('dashboard:school_accounts_preview'))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([r.status for r in response.context['plan'].rows], ['create'])
+        self.assertContains(response, '9000000001')
+
+    def test_cancel_forgets_the_entry(self):
+        from django.core.cache import cache
+        self.upload(xlsx([self.ROW]))
+        key = 'bulk_accounts:{}'.format(self.token()['token'])
+        self.assertIsNotNone(cache.get(key))
+        self.client.post(reverse('dashboard:school_accounts_cancel'))
+        self.assertIsNone(cache.get(key))
+        self.assertNotIn('bulk_accounts', self.client.session)
+
+    def test_confirm_forgets_the_entry(self):
+        from django.core.cache import cache
+        self.upload(xlsx([self.ROW]))
+        key = 'bulk_accounts:{}'.format(self.token()['token'])
+        self.assertEqual(self.client.post(reverse('dashboard:school_accounts_confirm')).status_code, 200)
+        self.assertIsNone(cache.get(key))
+        self.assertNotIn('bulk_accounts', self.client.session)
+        self.assertEqual(Student.objects.count(), 1)
+
+    def test_another_school_cannot_use_the_token(self):
+        self.upload(xlsx([self.ROW]))
+        token = self.token()['token']
+        other = Client()
+        other.force_login(self.admin_b)
+        session = other.session
+        session['bulk_accounts'] = {'token': token}
+        session.save()
+        response = other.get(reverse('dashboard:school_accounts_preview'))
+        self.assertEqual(response.status_code, 302)                      # nothing to preview for school B
+        self.assertEqual(Student.objects.count(), 0)
+        self.assertEqual(other.post(reverse('dashboard:school_accounts_confirm')).status_code, 302)
+        self.assertEqual(Student.objects.count(), 0)
+
+
 class LoginSheetOnceTests(Base):
     def test_passwords_exist_only_in_the_download(self):
         import os
