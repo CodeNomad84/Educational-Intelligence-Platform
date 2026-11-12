@@ -38,6 +38,11 @@ from .access import search_students, visible_attendances, visible_grades, visibl
 IMPORT_CHUNK = 500
 UNMATCHED_LIST_LIMIT = 200
 UNMATCHED_VALUE_MAX = 100
+# H-1 (T7): a real roster is a few tens of KB; 2 MB is ≳10 000 rows of this schema and is the same ceiling the school
+# bulk-account upload already uses (dashboard/bulk_accounts.MAX_FILE_BYTES). A module constant, not a setting: this is a
+# resource guard, not a school preference (decision D1=a).
+IMPORT_MAX_BYTES = 2 * 1024 * 1024
+IMPORT_TOO_LARGE = 'حجم فایل بیش از حد مجاز است (حداکثر ۲ مگابایت).'
 
 ImportRow = namedtuple('ImportRow', 'index national_id data class_cell')
 
@@ -48,6 +53,18 @@ TEXT_COLUMNS = {'national_id': str, 'phone_number': str}
 NATIONAL_ID_MAX_LENGTH = 10   # mirrors Student.national_id max_length
 _NAN_LIKE = {'nan', 'none', 'null'}
 _DIGIT_MAP = str.maketrans('۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩', '01234567890123456789')
+
+
+def _bounded_upload(file):
+    """The bytes of an upload, or ``None`` when it exceeds ``IMPORT_MAX_BYTES`` (H-1).
+
+    The declared ``size`` is checked first, so an honest oversized upload is refused without a read; the bounded read
+    is what actually enforces the ceiling, because a request can understate (or omit) its size. At most
+    ``IMPORT_MAX_BYTES + 1`` bytes are ever held in memory, whatever the upload claims to be."""
+    if (getattr(file, 'size', 0) or 0) > IMPORT_MAX_BYTES:
+        return None
+    payload = file.read(IMPORT_MAX_BYTES + 1)
+    return None if len(payload) > IMPORT_MAX_BYTES else payload
 
 
 def _clean_national_id(value):
@@ -262,19 +279,26 @@ class StudentViewSet(viewsets.ModelViewSet):
 
         file = serializer.validated_data['file']
         file_extension = file.name.split('.')[-1].lower()
-        
+
+        # Format first: a file we cannot parse is refused before a single byte is read.
+        if file_extension not in ('csv', 'xlsx', 'xls'):
+            return Response(
+                {'error': 'فرمت فایل پشتیبانی نمی‌شود. فقط csv, xlsx, xls مجاز است.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # H-1: the size ceiling is enforced HERE, on the bytes, before pandas sees anything.
+        payload = _bounded_upload(file)
+        if payload is None:
+            return Response({'error': IMPORT_TOO_LARGE}, status=status.HTTP_400_BAD_REQUEST)
+
         try:
             # خواندن فایل بر اساس پسوند
             if file_extension == 'csv':
                 # برای CSV باید encoding را utf-8-sig در نظر بگیریم تا فارسی به درستی خوانده شود
-                df = pd.read_csv(TextIOWrapper(file, encoding='utf-8-sig'), converters=TEXT_COLUMNS)
-            elif file_extension in ['xlsx', 'xls']:
-                df = pd.read_excel(BytesIO(file.read()), converters=TEXT_COLUMNS)
+                df = pd.read_csv(TextIOWrapper(BytesIO(payload), encoding='utf-8-sig'), converters=TEXT_COLUMNS)
             else:
-                return Response(
-                    {'error': 'فرمت فایل پشتیبانی نمی‌شود. فقط csv, xlsx, xls مجاز است.'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+                df = pd.read_excel(BytesIO(payload), converters=TEXT_COLUMNS)
 
             # حذف رکوردهای خالی (NaN) برای جلوگیری از خطا
             df = df.dropna(how='all')
