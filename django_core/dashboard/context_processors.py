@@ -62,4 +62,7 @@ def role_names(request):
             if school_ids else [],
             # Pilot config (T6): the global feedback link and the pilot marker for templates.
             'FEEDBACK_URL': getattr(settings, 'FEEDBACK_URL', ''),
-            'PILOT_MODE': getattr(settings, 'PILOT_MODE', False)}
+            'PILOT_MODE': getattr(settings, 'PILOT_MODE', False),
+            # Platform branding (T10): read from settings, so no template carries the product name as a literal.
+            'PLATFORM_NAME': getattr(settings, 'PLATFORM_NAME', ''),
+            'PLATFORM_NAME_EN': getattr(settings, 'PLATFORM_NAME_EN', '')}

@@ -212,6 +212,31 @@
   T5 scope list. F19 (table `<caption>`) still deferred. `risk/rules_index.html` title/duplicate was
   fixed in T3.
 
+## T10 — L1 pilot release readiness gate + branding (release freeze) — DONE
+- Branch: `work/T10-pilot-release-readiness` from `phase-1/boot-security` after the T9 merge (`e0b4156`).
+- Numbering note: `docs/pilot/QUEUE.md` reserves "T10" for the L3 password/2FA proposal and is owner-owned; it was
+  **not** edited. This T10 follows the owner's chat instruction; which number the 2FA proposal takes is
+  `DECISION REQUIRED` (recorded in `docs/pilot/T10-RELEASE-READINESS.md` §7 D5).
+- Branding (L1, no behaviour change): `PLATFORM_NAME = 'سکوی آموزشی-تربیتی آرمان نو'` and
+  `PLATFORM_NAME_EN = 'Arman-e-No Educational & Upbringing Platform'` in `config/settings/base.py` (env override
+  `EIP_PLATFORM_NAME` / `EIP_PLATFORM_NAME_EN`), exposed by `dashboard/context_processors.role_names`; the literals are
+  gone from `base.html` (title, `application-name`/`description` meta, sidebar brand, top-bar fallback),
+  `base_public.html` (title, meta, `<h1>`), `demo_intel/base_demo.html`, `demo_intel/login.html` and the demo welcome
+  e-mail body (`students/tasks.py`). `SCHOOL_NAME` still comes from the `School` row.
+- New `dashboard/test_branding.py` (3 tests): settings non-empty, no template in nine app template trees holds the old
+  literal or a hard-coded new name, and a real `GET /login/` renders the name in `<h1>`, `<title>`, `application-name`
+  and `description`. `dashboard/test_a11y_render.py` now takes its expected bare title from the setting.
+- Deliverable `docs/pilot/T10-RELEASE-READINESS.md`: release manifest (apps, 53 migrations, settings modules,
+  self-hosted assets, scripts), the freeze rules, an 18-row security gate checklist with truth labels
+  (G1-G12 `CURRENT`, G13/G17/G18 `NOT VERIFIED`, G14/G16 `DEFERRED`, G15 `DECISION REQUIRED`), open decisions D1-D7 and
+  a verdict. **No gate changed status**: G15/G16 remain owner decisions.
+- Gate: `scripts/run_tests.sh sqlite` → check `no issues`, makemigrations `No changes detected`,
+  `Ran 1610 tests in 1228.920s / OK (skipped=11)` for the nine apps and `Ran 62 tests in 299.486s / OK` for
+  `demo_intel`. First demo pass had one failure — the leak test's substring check hit the brand («آرمان» is also a
+  seeded student's first name); fixed in the test only (`PLATFORM_NAME` stripped before the check), then re-run green.
+  `scripts/run_tests.sh pg` **not run** on this branch (`NOT VERIFIED`). Detail: `docs/pilot/T10-RELEASE-READINESS.md` §6.
+- Merged? **No.** Pushed? **No.** `main` untouched.
+
 
 
 

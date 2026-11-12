@@ -8,6 +8,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 SECRET_KEY = os.environ.get('SECRET_KEY', '')
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
+# Platform branding (T10): ONE source for every template, exposed as PLATFORM_NAME / PLATFORM_NAME_EN by
+# dashboard.context_processors.role_names. Never a literal in a template and never a school-specific value
+# (CLAUDE.md §7): the school's own name comes from the School row (SCHOOL_NAME), this is the product name.
+PLATFORM_NAME = os.environ.get('EIP_PLATFORM_NAME', 'سکوی آموزشی-تربیتی آرمان نو')
+PLATFORM_NAME_EN = os.environ.get('EIP_PLATFORM_NAME_EN', 'Arman-e-No Educational & Upbringing Platform')
+
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',

@@ -6,6 +6,7 @@ from html.parser import HTMLParser
 from io import StringIO
 from urllib.parse import urljoin, urlsplit
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.test import TestCase
@@ -126,7 +127,8 @@ def _feed(parser, html):
     return parser
 
 
-BARE_TITLE = 'پلتفرم هوشمند مدرسه'
+# The <title> a page gets when its own template defines no {% block title %}: the bare platform name (T10).
+BARE_TITLE = settings.PLATFORM_NAME
 
 
 class A11yRenderTests(TestCase):
