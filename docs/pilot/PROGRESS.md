@@ -175,6 +175,38 @@
 
 
 
+## T9 — L1 multi-school readiness audit (read-only) — DONE (report only, no code)
+- Branch: `work/T9-multi-school-readiness` from `phase-1/boot-security` @ `dd9ed5b`.
+- Deliverable: `docs/pilot/T9-MULTI-SCHOOL-READINESS-REPORT.md` (inventory by surface, the isolation model with
+  `path:line`, findings, onboarding checklist, verdict). **Docs only**: no application code, settings, migration,
+  template or test touched.
+- Evidence, not fixtures: a throw-away two-school SQLite DB in `/tmp` built with `create_school alpha|bravo`
+  (`EIP_DEMO_DB`, synthetic data only). `create_school` + `seed_rules` created **per school**: 30 vocabulary terms and
+  5 starter rules each. A real `POST /login/` as alpha's SchoolAdmin (`302 /school/`) then walked 30 URLs: 200 on every
+  page alpha may see (`/dashboard/`, `/students/`, `/alerts/`, `/interventions/`, `/school/*`, `/rules/*`), `403` on
+  `/grade/`, `/platform/modules/`, `/exams/*`, `/mission/*`, `/assistant/*` (role/module gates), and **zero traces of
+  bravo's students on any page**. Bravo's students: `detail`/`360`/`report-card` → 404; five write POSTs
+  (`behavior/new`, `alert`, `plan/new`, `refer`, `account`) → 404 with `behavior/plan/alert` row counts unchanged
+  `(0,0,0) → (0,0,0)`; `?search=BRAVO` → no match; own three students still visible (probe not vacuous).
+- Read-only checks on that DB, all exit 0, `writes: none`: `check_student_school_ready` `ready:true`,
+  `check_access_switch_ready --multi-school` `verdict:READY` / `multi_school_passed:true` / `blockers_nonzero {}` /
+  `info_school_admins_per_school {"2":1,"3":1}`, `compare_access_parity --multi-school` `verdict:PASS` /
+  `students_leaked 0` / `info_other_school_students_hidden 6`, `check_school_memberships` `orphan_active_total 0`,
+  `check_class_links` `6 linked / 0 candidates`, `check_academic_years` `overlapping_ranges 0`,
+  `check_assignment_subjects` `assignments 0`, `check_enrollment_backfill` `6 already with enrollment`.
+- Findings (no HIGH): T9-F1 LOW new school gets no modules → 403 until enabled; T9-F2 LOW fresh install has an empty
+  `default` school and no `SchoolAdmin` group (`setup_staff_roles` creates only Teacher/GradeLead/Counselor); T9-F3
+  MEDIUM `national_id` globally unique (S7 `DECISION REQUIRED`, `changes/0020`); T9-F4 LOW DRF writes keep
+  `IsAdminUser` so a SchoolAdmin reads but cannot write through the API; T9-F5 MEDIUM superusers see all schools until
+  S8 (`DEFERRED`); T9-F6 LOW legacy library isolates only in the FastAPI service (signed `schools` claim) and the
+  unscoped `main_HuggingFace.py` / `rag_service_HuggingFace_Models.py` must stay out of the image.
+- Gate (CURRENT, read from the file): `scripts/run_tests.sh sqlite` → `Ran 1607 tests in 2265.340s` / `OK (skipped=11)`,
+  `demo_intel` `Ran 62 tests` / `OK`, last line `ALL DJANGO CHECKS AND TESTS PASSED (FastAPI / PostgreSQL / Docker not
+  covered)`; `DJANGO_IMAGE=eip-test-django:local scripts/run_tests.sh pg` → `Ran 1607 tests in 1424.983s` /
+  `OK (skipped=1)`, last line `POSTGRESQL CHECKS AND TESTS PASSED (PostgreSQL 16 in a disposable container; FastAPI not
+  covered)`.
+- Merged? **No.** Pushed? **No.** `main` untouched.
+
 ## FOUND (not fixed, out of scope)
 - F17 (`role="status"` for non-error messages + `aria-live` on the alert count) not done — not in the
   T5 scope list. F19 (table `<caption>`) still deferred. `risk/rules_index.html` title/duplicate was
