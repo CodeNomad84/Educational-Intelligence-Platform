@@ -1,0 +1,58 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+@custom-variant dark (&:is(.dark *));
+@theme inline {
+  --font-sans: "Vazirmatn", "IRANSansX", system-ui, sans-serif;
+  --radius-lg: var(--radius); --radius-xl: calc(var(--radius) + 4px); --radius-2xl: calc(var(--radius) + 8px);
+  --color-background: var(--background); --color-foreground: var(--foreground);
+  --color-card: var(--card); --color-card-foreground: var(--foreground);
+  --color-primary: var(--primary); --color-primary-foreground: var(--primary-foreground);
+  --color-gold: var(--gold); --color-cyan: var(--cyan); --color-indigo-deep: var(--indigo-deep);
+  --color-muted: var(--muted); --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent); --color-accent-foreground: var(--foreground);
+  --color-border: var(--border); --color-input: var(--border); --color-ring: var(--primary);
+}
+:root {
+  --radius: 0.9rem;
+  --background: #090D16;
+  --foreground: oklch(0.97 0.01 250);
+  --card: oklch(0.21 0.04 265 / 55%);
+  --primary: #10B981;
+  --primary-foreground: oklch(0.15 0.04 160);
+  --gold: #F59E0B;
+  --indigo-deep: oklch(0.32 0.14 275);
+  --muted: oklch(0.25 0.04 265);
+  --muted-foreground: oklch(0.7 0.03 255);
+  --accent: oklch(0.28 0.08 275);
+  --border: oklch(1 0 0 / 9%);
+  --cyan: #06B6D4;
+}
+@utility glass { background: var(--card); backdrop-filter: blur(18px); border: 1px solid var(--border); border-radius: var(--radius-2xl); box-shadow: 0 20px 40px -20px oklch(0 0 0 / 60%); }
+@utility glow-primary { box-shadow: 0 0 30px -6px color-mix(in oklab, var(--primary) 60%, transparent); }
+@utility hero-bg { background: radial-gradient(ellipse at 20% 0%, color-mix(in oklab, var(--indigo-deep) 80%, transparent), transparent 60%), radial-gradient(ellipse at 90% 30%, color-mix(in oklab, var(--primary) 18%, transparent), transparent 50%); }
+@utility grid-bg { background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 40px 40px; }
+@keyframes floaty { 50% { transform: translateY(-10px); } }
+@utility float { animation: floaty 5s ease-in-out infinite; }
+@layer base { * { border-color: var(--color-border); } body { background: var(--color-background); color: var(--color-foreground); font-family: var(--font-sans); } }
+@keyframes sway { 0%,100% { transform: rotate(-2deg); } 50% { transform: rotate(2deg); } }
+@keyframes lean { 0%,100% { transform: rotate(-5deg) translateX(-4px); } 50% { transform: rotate(-3deg) translateX(-2px); } }
+@keyframes adjust { 0%,100% { transform: translateY(0); } 30% { transform: translateY(-5px) rotate(1deg); } 60% { transform: translateY(2px); } }
+@keyframes wave { 0%,100% { transform: rotate(0); } 25% { transform: rotate(-20deg); } 75% { transform: rotate(15deg); } }
+@keyframes flare { from { transform: translateX(0); opacity: 0.9; } to { transform: translateX(240%); opacity: 0; } }
+@keyframes blink { 0%,100% { transform: scaleY(0.1); } 40%,60% { transform: scaleY(1); } }
+@keyframes pop { from { transform: translate(50%, 6px) scale(0.8); opacity: 0; } to { transform: translate(50%, 0) scale(1); opacity: 1; } }
+@keyframes dot { 0%,100% { transform: translateY(0); opacity: 0.4; } 50% { transform: translateY(-6px); opacity: 1; } }
+@keyframes pulseglow { 0%,100% { box-shadow: 0 0 20px -6px var(--primary); } 50% { box-shadow: 0 0 40px -2px var(--cyan); } }
+@utility mascot-idle { transform-origin: 50% 90%; animation: sway 4s ease-in-out infinite; }
+@utility mascot-thinking { transform-origin: 50% 90%; animation: lean 2s ease-in-out infinite; }
+@utility mascot-glasses { animation: adjust 1.4s ease-in-out infinite; }
+@utility mascot-salute { transform-origin: 50% 90%; animation: sway 1.6s ease-in-out infinite; }
+@utility mascot-wink { transform-origin: 50% 90%; animation: sway 3s ease-in-out infinite; }
+@utility lens-glow { background: color-mix(in oklab, var(--primary) 45%, transparent); filter: blur(10px); mix-blend-mode: screen; transition: opacity .4s; }
+@utility lens-flare { background: linear-gradient(90deg, transparent, oklch(1 0 0 / 80%), transparent); animation: flare 1.4s ease-out infinite; mix-blend-mode: screen; }
+@utility wink-lid { background: var(--background); animation: blink 1s ease-in-out; transform-origin: center; }
+@utility wave-hand { transform-origin: bottom center; animation: wave 0.8s ease-in-out infinite; }
+@utility badge-pop { animation: pop .35s ease-out both; }
+@utility think-dot { animation: dot 1s ease-in-out infinite; }
+@utility ai-focus { &:focus-within { animation: pulseglow 1.8s ease-in-out infinite; } }

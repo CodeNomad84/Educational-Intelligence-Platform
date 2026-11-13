@@ -103,8 +103,8 @@ token, so a test must re-read `/api/auth/csrf/`), CORS reflected for a listed or
 on `CORS_ALLOWED_ORIGINS`), the exact `/me/` key set with no private field, and multi-school `?school=` (null without a
 choice, 400 for a school outside the user's set). `eip.E007` cases are pure settings tests. Run it alone with
 `DJANGO_SETTINGS_MODULE=config.settings.test_sqlite django_core/.venv/bin/python manage.py test dashboard.test_auth_api dashboard.test_deploy_checks`.
-The two frontends (`frontend-men/`, `frontend-women/`) are **not** covered by any suite here — they are untracked, not in
-CI, and no JS toolchain exists on the development host.
+The two frontends (`frontend-men/`, `frontend-women/`) are **not** covered by any suite here — they are tracked since
+2026-11-13 (monorepo decision, ADR-0014 note) but not in CI, and no JS toolchain exists on the development host.
 
 
 Unit → integration/API → permission/RBAC → data integrity → AI/RAG evaluation → frontend → E2E → regression. Weight toward permission and API tests first.

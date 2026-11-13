@@ -183,9 +183,10 @@ auth surface. Rules, all enforced by tests in `dashboard/test_auth_api.py`:
   makes no network call. `AI_GOVERNANCE.md`/ADR-0008 still gate any real model path.
 - **Not audited (DECISION REQUIRED, D7=a):** a login writes no `AuditEvent`, because `AuditEvent.school` is non-nullable and
   a platform operator has no school. Adding it needs its own L2 proposal.
-- **Frontends are untracked and outside the test gate.** `frontend-men/`, `frontend-women/` are not built by
-  `scripts/run_tests.sh` and are not in CI; their `src/lib/api.ts` and `vite.config.ts` changes were not executed here
-  (no JS toolchain on the development host — **NOT VERIFIED**).
+- **Frontends are tracked but outside the test gate.** `frontend-men/`, `frontend-women/` were added to this repository
+  on 2026-11-13 (monorepo decision, ADR-0014 note; the two nested `.git` repos were removed first), so their code is now
+  reviewable here. They are still not built by `scripts/run_tests.sh` and have no CI job, and their `src/lib/api.ts` and
+  `vite.config.ts` were not executed here (no JS toolchain on the development host — **NOT VERIFIED**).
 
 ## R-04 status (P9, 2026-11-02)
 The application no longer needs a PostgreSQL superuser: `school_app` (DML only) at runtime, `school_owner` for migrations, `school_admin` for maintenance (`DEPLOYMENT.md` 4a, decision 65). `CURRENT` in the repository and rehearsed in throw-away containers (`scripts/test_db_roles.sh`, CI job `dbroles`); `NOT VERIFIED` on a real server (nothing is deployed). Residual: Redis without authentication (internal network only); the bootstrap superuser exists and must have its own strong password; `school_app` can read every table of the installation (school isolation is enforced in the application, not by row-level security).

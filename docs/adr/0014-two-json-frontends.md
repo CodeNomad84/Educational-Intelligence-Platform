@@ -8,7 +8,9 @@
 
 ## Context
 `frontend-men/` (boys' school) and `frontend-women/` (girls' school) are two TanStack Start + React 19 dashboards that
-live in this repository as **untracked** directories, are not built by `scripts/run_tests.sh`, are not in CI, and until
+live in this repository (as **tracked** directories since the monorepo decision of 2026-11-13, see the decision note at
+the end: the two nested `.git` repos were removed and the trees added on the same branch), are not built by
+`scripts/run_tests.sh`, are not in CI, and until
 this change called no Django endpoint at all: every number and name on screen is a constant in `src/routes/index.tsx` and
 `src/data/school.ts`. They were produced on a third-party builder platform, which is also why `frontend-women` shipped a
 server function that sent roster data and counselling notes to an external AI gateway (`@lovable.dev/ai-gateway`).
@@ -65,8 +67,18 @@ exist (only `/api/token/`, a throttled JWT pair); no `BasicAuthentication`; `DEF
   `dashboard/test_deploy_checks.py`. The pre-existing suite is unchanged.
 - Customization: each deployment names its own origins through the environment; no school-specific value in code. The two
   apps own their own theme at build time (`frontend-*/README.md`), so no theme field is introduced.
-- Cost: two extra dev servers and one new dependency (`django-cors-headers==4.9.0`). The frontends are still untracked and
-  outside the test gate: a change in them is only as safe as its review.
+- Cost: two extra dev servers and one new dependency (`django-cors-headers==4.9.0`). The frontends are tracked
+  (monorepo decision, 2026-11-13) but outside the test gate: a change in them is only as safe as its review.
+
+## Decision note — the two apps become part of this repository (2026-11-13)
+Owner decision after delivery (resolves D13 of `docs/changes/0040-dual-frontend-integration-PROPOSAL.md` as **(a)**):
+`frontend-men/` and `frontend-women/` each shipped with their **own** `.git` (branch `main`, one commit), which is why
+`git add` inside them was a silent no-op and the 0040 frontend work could not be reviewed from this repository. The
+nested `.git` directories were removed (their history was saved first as bundles, `/tmp/frontend-history/*.bundle`) and
+both trees are now committed on `work/dual-frontend-integration`. Consequences: the frontend code is reviewable and
+rollback-able here; each app keeps its own `.gitignore` (`node_modules`, `dist`, `.output`, `.wrangler`, `*.local`);
+`scripts/run_tests.sh` still does not build them, so a JS toolchain (lint/typecheck/build) remains a **TARGET**, not a
+CURRENT gate. No new dependency was added to either `package.json`.
 
 ## Evidence (files)
 `django_core/dashboard/auth_api.py` (the four views), `django_core/config/urls.py` (`/api/auth/` include),

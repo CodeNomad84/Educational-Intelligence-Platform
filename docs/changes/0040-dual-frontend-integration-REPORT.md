@@ -25,8 +25,9 @@ Truth labels used below: **CURRENT** = verified by a command in this session; **
 | Frontend | `MascotAssistant.tsx` reads `public/assets/mascot/*` instead of Lovable asset manifests | **NOT VERIFIED** |
 | Docs | ADR-0014, `ARCHITECTURE.md` §Auth API, `SECURITY.md`, `TESTING.md`, `CHANGE_GUIDE.md`, `README.md` | CURRENT |
 
-The four `Frontend` rows live in **separate git repositories** inside `frontend-men/` and `frontend-women/`; each app's
-own repo now has a local branch `work/0040-json-api-client` with exactly that work — see §5.2.
+The four `Frontend` rows were, until 2026-11-13, in **separate git repositories** inside `frontend-men/` and
+`frontend-women/`. On the owner's decision both nested `.git` directories were removed and the trees are now **tracked in
+this repository** on the same branch — see §5.2.
 
 ## 2. Security-relevant decisions as implemented
 
@@ -51,37 +52,38 @@ own repo now has a local branch `work/0040-json-api-client` with exactly that wo
 | `scripts/run_tests.sh sqlite` (check + `makemigrations --check --dry-run` + 11 apps + demo) | `Ran 1635 tests ... OK (skipped=11)`, `Ran 62 tests ... OK`, `ALL DJANGO CHECKS AND TESTS PASSED` (CURRENT) |
 | `manage.py check --deploy --fail-level WARNING` with production settings, `CORS_ALLOWED_ORIGINS=http://men.example.ir` | exit 1, `(eip.E007) CORS_ALLOWED_ORIGINS entry 'http://men.example.ir' must be an https:// origin` (CURRENT) |
 | same command with `https://men.example.ir,https://women.example.ir` | exit 0, only the staged-HSTS info `eip.I006` (CURRENT) |
-| `scripts/run_tests.sh pg` | see §4 |
-| Frontend `npm ci` / `tsc` / `vitest` | **NOT VERIFIED** — no Node/JS toolchain on this host; each app is its own git repository (§5.2), so nothing in this repo's CI builds them either |
+| `scripts/run_tests.sh pg` (PostgreSQL 16 container) | exit 0, `Ran 1635 tests in 1625.180s`, `OK (skipped=1)`, `POSTGRESQL CHECKS AND TESTS PASSED` (CURRENT) — §4 |
+| Frontend `npm ci` / `tsc` / `vitest` | **NOT VERIFIED** — no Node/JS toolchain on this host; the code is now tracked here (§5.2) but no CI job builds it |
 
-## 4. PostgreSQL leg
+## 4. PostgreSQL leg — CURRENT
 
-`scripts/run_tests.sh pg` was started (it rebuilds `eip-test-django:local` from `requirements.txt` — so the new
-`django-cors-headers==4.9.0` pin really was installed by pip — then runs the same 1635 tests in a container against
-`pgvector/pgvector:pg16`). At the moment this report was written the container had been running for 22 minutes with
-**no `FAIL:`/`ERROR:` line in the log** and **no exit code yet**:
+`scripts/run_tests.sh pg` rebuilt `eip-test-django:local` from `requirements.txt` (so pip really installed the new
+`django-cors-headers==4.9.0` pin) and ran the same suite in a disposable `pgvector/pgvector:pg16` container:
 
-**NOT VERIFIED.** The run was still in flight, so no pass is claimed for it. To settle it, one command is enough:
+| Command | Result |
+|---|---|
+| `scripts/run_tests.sh pg` | exit **0**; `Ran 1635 tests in 1625.180s`; `OK (skipped=1)`; `POSTGRESQL CHECKS AND TESTS PASSED (PostgreSQL 16 in a disposable container; FastAPI not covered)` (CURRENT, `/tmp/full_pg.log`) |
 
-```
-cat /tmp/full_pg.exit; tail -n 20 /tmp/full_pg.log     # 0 + "ALL DJANGO CHECKS AND TESTS PASSED" = pass
-```
+Same 1635 tests as the sqlite leg; the skip counts differ (sqlite `skipped=11`, pg `skipped=1`) because several tests are
+conditional, e.g. `students/test_tooling.py:417` runs only in the PostgreSQL container
+(`@unittest.skipUnless(os.environ.get("EIP_TEST_CONTAINER") == "1", …)`). Both legs now pass, so the auth API, the CORS
+settings and `eip.E007` are verified on SQLite **and** PostgreSQL.
 
 ## 5. Known gaps / follow-ups (DEFERRED)
 
 1. **No login page in the frontends yet**: `apiLogin()` exists in `src/lib/api.ts` but no route consumes it (D11 — the
    pages come in a follow-up change). Until then the client is dead code from the app's point of view.
-2. **The frontends are separate git repositories** — `frontend-men/` and `frontend-women/` each contain their **own
-   `.git`** (branch `main`, a single commit "Add project README"). Git therefore refuses to descend into them: a
-   `git add frontend-men/src/lib/api.ts` is a silent no-op, and **no file of either app can enter this repository's
-   history** as plain files (`git status` just shows `?? frontend-men/`, `?? frontend-women/`). The frontend work is
-   committed **inside each app's own repository** on a local branch `work/0040-json-api-client` — `108d345`
-   (men: `src/lib/api.ts`, `vite.config.ts`, `MascotAssistant.tsx`, `public/assets/mascot/*`) and `603f78d`
-   (women: `src/lib/api.ts`, `vite.config.ts`, `mentor-chat.functions.ts`, `package.json`, the removed gateway files) —
-   with `main` untouched and nothing pushed in either repository.
-   **DECISION REQUIRED:** how the two apps relate to this repo long-term — git submodule, keep as separate repositories
-   with their own CI, or strip `.git` and vendor them. Until then they are invisible to `scripts/run_tests.sh`, to the
-   platform's CI and to a review of this branch.
+2. **Frontend version control — RESOLVED 2026-11-13 (monorepo, owner decision).** History: `frontend-men/` and
+   `frontend-women/` each contained their **own `.git`** (branch `main`, a single "Add project README" commit), so
+   `git add` on any path inside them was a silent no-op and no frontend file could enter this repository's history. The
+   work was first committed inside each app's repo (`work/0040-json-api-client`: `108d345` men, `603f78d` women). The
+   owner then chose **Option A — monorepo**: both `.git` directories were removed (history saved first as bundles,
+   `/tmp/frontend-history/frontend-men.bundle`, `frontend-women.bundle`), and both trees are committed here as plain
+   files — 174 files, incl. `src/lib/api.ts`, `vite.config.ts`, `MascotAssistant.tsx`, `mentor-chat.functions.ts`,
+   `package.json`, `bun.lock`, `.gitignore`, `.lovable/project.json` (metadata, no credential) and the four
+   `public/assets/mascot/*.png`; `node_modules`/`dist` are excluded by each app's own `.gitignore`. Recorded in ADR-0014
+   (decision note) and corrected in `SECURITY.md`/`TESTING.md`. Still open: `scripts/run_tests.sh` builds no JS
+   (**TARGET**) — a lint/typecheck/build job remains a follow-up.
 3. **`@lovable.dev/vite-tanstack-config` may override `server.strictPort`** via its sandbox detection; unknown without a
    JS toolchain. Consequence would be a port drift, not a security issue.
 4. `/api/auth/me/` exposes nothing new, but a future field must be added to the accessor list in
