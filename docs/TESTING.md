@@ -121,6 +121,15 @@ Login · RBAC · student/parent/teacher access · attendance · assessment · ri
 | G3 | Test harness runs in CI-able command; permission tests exist | 2 |
 | G4 | Security baseline exit criteria met (`SECURITY.md`) | 3 |
 | G5 | Feature regression suite green for touched flows | each feature |
+| G6 | Frontend images build with their JS gate and start | per frontend change — VERIFIED 2026-11-13 (change 0042): `docker compose build frontend_men frontend_women` ran `bun install --frozen-lockfile` → `eslint` → `tsc --noEmit` → `vitest` (1 test per app) → `vite build` in the build stage, and both images answered through the gateway |
+
+**G6 detail (2026-11-13, ADR-0015 decision D6).** The JS gate lives in the image build, not in `scripts/run_tests.sh`
+(the development host has no Node toolchain), so a Python-only run does not cover the frontends: run
+`docker compose build frontend_men frontend_women` when `frontend-men/` or `frontend-women/` changes. The gateway itself has
+no test suite; its behaviour is asserted with curl in `changes/0042-frontend-containers-REPORT.md`, and the topology rules
+(no published frontend port, no shared network with PostgreSQL, no gateway route to FastAPI) are static tests in
+`fastapi_core/tests/test_exposure.py::FrontendExposureTests`.
+
 
 ## Containment checks (Phase 1, TARGET)
 Unauthenticated FastAPI calls rejected; parent cannot read other students; non-staff cannot create/delete; DB/Redis/MinIO/Ollama ports not published externally; no secret defaults used at startup.

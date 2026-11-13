@@ -183,10 +183,43 @@ auth surface. Rules, all enforced by tests in `dashboard/test_auth_api.py`:
   makes no network call. `AI_GOVERNANCE.md`/ADR-0008 still gate any real model path.
 - **Not audited (DECISION REQUIRED, D7=a):** a login writes no `AuditEvent`, because `AuditEvent.school` is non-nullable and
   a platform operator has no school. Adding it needs its own L2 proposal.
-- **Frontends are tracked but outside the test gate.** `frontend-men/`, `frontend-women/` were added to this repository
-  on 2026-11-13 (monorepo decision, ADR-0014 note; the two nested `.git` repos were removed first), so their code is now
-  reviewable here. They are still not built by `scripts/run_tests.sh` and have no CI job, and their `src/lib/api.ts` and
-  `vite.config.ts` were not executed here (no JS toolchain on the development host — **NOT VERIFIED**).
+- **Frontends are tracked, built and gated (CURRENT 2026-11-13, change 0042).** `frontend-men/`, `frontend-women/`
+  joined this repository on 2026-11-13 (monorepo decision, ADR-0014 note; the nested `.git` repos were removed first).
+  Their `src/lib/api.ts` and both `vite.config.ts` now run: lint, `tsc --noEmit`, vitest and the production build execute
+  inside the image build (ADR-0015 decision D6), and the images are started by `docker compose up`. What still does **not**
+  happen: `scripts/run_tests.sh` has no JS phase, so a Python-only test run does not exercise them — the JS gate is
+  `docker compose build frontend_men frontend_women`.
+
+## Frontend containers and the edge gateway (ADR-0015, 2026-11-13)
+
+`CURRENT`: two SSR frontends plus one nginx gateway are part of the stack (`docker-compose.yml`, `deploy/nginx/`). The
+security-relevant facts, each enforced by `fastapi_core/tests/test_exposure.py::FrontendExposureTests` or by configuration:
+
+- **One ingress, loopback-bound.** `127.0.0.1:${FRONTEND_HTTP_PORT:-8080}`. Neither frontend publishes a port, so the only
+  way to a page is the gateway; the gateway answers an unknown `Host` with 404 (`default_server`) and serves `/media/` as
+  404 (no user uploads are served by these apps).
+- **Segmentation.** `edge` = gateway + both frontends + Django; `backend` = Django + PostgreSQL + Redis + FastAPI + Celery
+  + MinIO + Ollama. A frontend therefore cannot open a database, cache or model socket, and the gateway has no route to
+  any of them; PostgreSQL/Redis/MinIO/Ollama stay unpublished.
+- **Same origin for the API (ADR-0014 decision 2).** `/api/`, `/admin/`, `/static/` on the app's own host go to
+  `django:8000`; the browser is never given a `VITE_API_URL` pointing at another origin, so `CORS_ALLOWED_ORIGINS` stays
+  empty locally. Rate limits on `/api/auth/login/` and `/api/token/` apply inside Django, unchanged.
+- **What the gateway adds.** `server_tokens off`, `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: same-origin`,
+  a 10 `r/m` limit per client IP on `/login`, `/api/token` and `/admin/login` (plus 20 `r/s` overall; Django throttles the
+  same paths independently), and `X-Forwarded-Proto`/`Host` forwarded from the client (`$http_host`, so CSRF's origin
+  comparison sees the browser's port). It never forwards a client-supplied forwarding chain (`X-Real-IP` and
+  `X-Forwarded-For` are overwritten).
+- **TLS.** This stack terminates none: the compose profile runs Django with `SECURE_SSL_REDIRECT=0` (D7=a) and the code
+  default stays `True`; production sets `1` behind the school's TLS proxy, which also forwards the two host names. Faking
+  `X-Forwarded-Proto: https` at the gateway was tried and reverted — it makes CSRF verification fail on POST.
+- **No secrets in the images.** The frontend images contain only `.output` (no `.env`, no source, no `VITE_*` secret); the
+  build stage's dependency layer is not in the runtime stage; the runtime user is `node`.
+- **Known local limitation.** `SESSION_COOKIE_SECURE`/`CSRF_COOKIE_SECURE` are fixed `True`, so over plain HTTP a browser
+  discards the session cookie; a local *login* needs TLS. Reading pages and the CSRF/`me` endpoints works.
+- **Not yet present:** an authentication wall in front of the frontends (they show constant demo data only), CSP headers
+  (deferred with the rest of the header work), and a CI job that builds the images.
+
+
 
 ## R-04 status (P9, 2026-11-02)
 The application no longer needs a PostgreSQL superuser: `school_app` (DML only) at runtime, `school_owner` for migrations, `school_admin` for maintenance (`DEPLOYMENT.md` 4a, decision 65). `CURRENT` in the repository and rehearsed in throw-away containers (`scripts/test_db_roles.sh`, CI job `dbroles`); `NOT VERIFIED` on a real server (nothing is deployed). Residual: Redis without authentication (internal network only); the bootstrap superuser exists and must have its own strong password; `school_app` can read every table of the installation (school isolation is enforced in the application, not by row-level security).

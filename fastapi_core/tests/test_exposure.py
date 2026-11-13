@@ -79,6 +79,62 @@ class ExposureTests(unittest.TestCase):
                 self.assertTrue(url.startswith('http://fastapi:8001/'), url)
 
 
+@unittest.skipUnless((REPO / 'docker-compose.yml').exists(), 'repository root not available')
+class FrontendExposureTests(unittest.TestCase):
+    """ADR-0015 (change 0042): the two SSR frontends are reachable **only** through the loopback gateway.
+
+    A published frontend port, a frontend on the database network, or a gateway route to FastAPI/database would quietly
+    undo the topology; these checks read the repository files so such a regression fails here instead of in production.
+    """
+
+    FRONTENDS = ('frontend_men', 'frontend_women')
+
+    def compose(self):
+        return (REPO / 'docker-compose.yml').read_text(encoding='utf-8')
+
+    def block(self, name):
+        block = service_block(self.compose(), name)
+        self.assertIsNotNone(block, f'{name} service not found in docker-compose.yml')
+        return '\n'.join(block)
+
+    def test_the_frontends_publish_no_port(self):
+        for name in self.FRONTENDS:
+            self.assertNotRegex(self.block(name), r'(?m)^\s+ports\s*:', f'{name} must not publish a port')
+
+    def test_the_gateway_listens_on_loopback_only(self):
+        text = self.block('gateway')
+        self.assertIn('"127.0.0.1:${FRONTEND_HTTP_PORT:-8080}:80"', text)
+        self.assertNotRegex(text, r'(?m)^\s+-\s*["\']?0\.0\.0\.0:', 'the gateway must stay on loopback')
+
+    def test_the_database_never_shares_a_network_with_a_frontend(self):
+        for name in self.FRONTENDS:
+            self.assertNotIn('- backend', self.block(name), f'{name} must not join the backend network')
+        gateway = self.block('gateway')
+        self.assertIn('- edge', gateway)
+        self.assertNotIn('- backend', gateway)
+        postgres = self.block('postgres')
+        self.assertIn('- backend', postgres)
+        self.assertNotIn('- edge', postgres, 'the database must not be reachable from the edge network')
+        django = self.block('django')
+        self.assertIn('- edge', django)
+        self.assertIn('- backend', django)
+
+    def test_the_gateway_never_routes_to_fastapi_or_the_datastores(self):
+        for path in sorted((REPO / 'deploy' / 'nginx').glob('*.conf')):
+            text = path.read_text(encoding='utf-8')
+            for forbidden in ('fastapi', '8001', 'postgres', 'redis', 'minio', 'ollama'):
+                self.assertNotIn(forbidden, text, f'{path.name} must not reference {forbidden}')
+
+    def test_the_frontend_images_run_the_node_server_not_a_workers_bundle(self):
+        for name, directory in zip(self.FRONTENDS, ('frontend-men', 'frontend-women')):
+            dockerfile = (REPO / directory / 'Dockerfile').read_text(encoding='utf-8')
+            self.assertIn('.output/server/index.mjs', dockerfile, f'{name} must start the nitro node-server output')
+            self.assertIn('bun install --frozen-lockfile', dockerfile, f'{name} must install from the lockfile')
+            self.assertNotIn('--no-frozen-lockfile', dockerfile)
+            config = (REPO / directory / 'vite.config.ts').read_text(encoding='utf-8')
+            self.assertIn('preset: "node-server"', config, f'{name} must build a node server, not a Workers bundle')
+
+
 @unittest.skipUnless(SERVICE_ROOT.exists(), 'fastapi_core/ not visible from this location (image run)')
 class SingleApplicationTests(unittest.TestCase):
     """M-4 (T7): exactly one FastAPI application may ship in the image, and it must be the authenticated one.

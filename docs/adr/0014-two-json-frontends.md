@@ -89,4 +89,9 @@ CURRENT gate. No new dependency was added to either `package.json`.
 
 ## Supersedes / superseded by
 Amends ADR-0013 (item 4, SPA DEFERRED) for presentation/pilot frontends only; does not supersede it for student data.
-Not superseded.
+Complemented (not superseded) by **ADR-0015** (2026-11-13), which turns decision 2 ("one origin per app") into the deployed
+topology: one loopback nginx gateway, two SSR Node services, `edge`/`backend` network split. ADR-0015 honours decisions 3–8
+of this document unchanged (session cookie, CSRF, fail-closed CORS, no `localStorage` token, no third-party egress) and
+records the one deliberate local-profile exception: the compose stack sets `SECURE_SSL_REDIRECT=0` because it terminates no
+TLS itself (the code default stays `True`; a server sets `1` behind its TLS proxy).
+

@@ -30,7 +30,10 @@ services:
     build: ./django_core
     container_name: django_core
     ports:
-      - "127.0.0.1:8000:8000"
+      # ADR-0015: the edge gateway on 127.0.0.1:${FRONTEND_HTTP_PORT:-8080} is the entry point.
+      # This loopback port is for debugging only; it defaults to 8010 because port 8000 is occupied by
+      # another local project on the owner's machine (decision D5, change 0042).
+      - "127.0.0.1:${DJANGO_HTTP_PORT:-8010}:8000"
     volumes:
       - ./django_core:/app
       - ./data/static:/app/staticfiles
@@ -55,6 +58,17 @@ services:
       - USE_POSTGRES=True
       - DB_USER=school_app
       - DB_PASSWORD=${DB_APP_PASSWORD:?DB_APP_PASSWORD is required}
+      # ADR-0015: the two apps are served from their own host names through the gateway, so Django must
+      # accept them. The value from .env (server profile) is kept as the base and the two loopback-era
+      # names are appended; set MEN_HOST/WOMEN_HOST to the school's names in production.
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-localhost,127.0.0.1},${MEN_HOST:-men.localhost},${WOMEN_HOST:-women.localhost}
+      # Decision D7=a: the local gateway speaks plain HTTP (no TLS in this stack), so the redirect to https
+      # would break /api/ with a 301. The code default stays True; a server deployment MUST set
+      # SECURE_SSL_REDIRECT=1 in .env behind the school's TLS proxy.
+      - SECURE_SSL_REDIRECT=${SECURE_SSL_REDIRECT:-0}
+    networks:
+      - edge        # gateway + both frontends
+      - backend     # postgres, redis, fastapi, celery
 
   # ========== Migrations (one-shot, the only service that may change the schema) ==========
   migrate:
@@ -75,6 +89,8 @@ services:
       - USE_POSTGRES=True
       - DB_USER=school_owner
       - DB_PASSWORD=${DB_OWNER_PASSWORD:?DB_OWNER_PASSWORD is required}
+    networks:
+      - backend
 
   # ========== Celery Worker (پردازش پس‌زمینه) ==========
   celery:
@@ -91,6 +107,8 @@ services:
       - DJANGO_SETTINGS_MODULE=config.settings.production
       - DB_USER=school_app
       - DB_PASSWORD=${DB_APP_PASSWORD:?DB_APP_PASSWORD is required}
+    networks:
+      - backend
 
   # ========== Celery Beat (زمان‌بندی کارها) ==========
   celery_beat:
@@ -108,6 +126,8 @@ services:
       - DJANGO_SETTINGS_MODULE=config.settings.production
       - DB_USER=school_app
       - DB_PASSWORD=${DB_APP_PASSWORD:?DB_APP_PASSWORD is required}
+    networks:
+      - backend
 
   # ========== FastAPI ==========
   fastapi:
@@ -131,6 +151,101 @@ services:
     command: uvicorn main:app --host 0.0.0.0 --port 8001 --workers 2
     depends_on:
       - postgres
+    networks:
+      - backend
+
+  # ========== Frontends (ADR-0014 apps, containerised per ADR-0015) ==========
+  # Built from their own directories: bun install from the lockfile → D6 JS gate (lint/typecheck/tests)
+  # → nitro `node-server` build → node:22-alpine runtime on port 3000. No host port: the only route in is
+  # the gateway, on the app's own origin (no CORS entry needed).
+  frontend_men:
+    build: ./frontend-men
+    container_name: frontend_men
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    networks:
+      - edge
+
+  frontend_women:
+    build: ./frontend-women
+    container_name: frontend_women
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    networks:
+      - edge
+
+  # ========== Edge gateway (ADR-0015) ==========
+  # One nginx for both apps: /api/, /admin/, /static/ → django:8000; / → the app named by the Host header.
+  # Loopback-bound (D5); the server profile puts the school's TLS proxy in front (docs/DEPLOYMENT.md §3b).
+  gateway:
+    image: nginx:1.27-alpine
+    container_name: frontend_gateway
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${FRONTEND_HTTP_PORT:-8080}:80"
+    environment:
+      - MEN_HOST=${MEN_HOST:-men.localhost}
+      - WOMEN_HOST=${WOMEN_HOST:-women.localhost}
+    volumes:
+      - ./deploy/nginx/frontends.conf:/etc/nginx/templates/frontends.conf.template:ro
+      - ./deploy/nginx/eip_proxy.conf:/etc/nginx/eip_proxy.conf:ro
+    depends_on:
+      frontend_men:
+        condition: service_healthy
+      frontend_women:
+        condition: service_healthy
+      django:
+        condition: service_started
+    networks:
+      - edge
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ========== Optional hot-reload profile (D3): no image build, source bind-mounted ==========
+  # docker compose --profile frontends-dev up -d frontend_men_dev frontend_women_dev
+  frontend_men_dev:
+    profiles: ["frontends-dev"]
+    image: oven/bun:1-alpine
+    container_name: frontend_men_dev
+    working_dir: /app
+    volumes:
+      - ./frontend-men:/app
+      - frontend_men_modules:/app/node_modules
+    environment:
+      - VITE_DEV_API_TARGET=http://django:8000
+    command: sh -c "bun install --frozen-lockfile && bun run dev --host 0.0.0.0"
+    ports:
+      - "127.0.0.1:5173:5173"
+    depends_on:
+      - django
+    networks:
+      - edge
+
+  frontend_women_dev:
+    profiles: ["frontends-dev"]
+    image: oven/bun:1-alpine
+    container_name: frontend_women_dev
+    working_dir: /app
+    volumes:
+      - ./frontend-women:/app
+      - frontend_women_modules:/app/node_modules
+    environment:
+      - VITE_DEV_API_TARGET=http://django:8000
+    command: sh -c "bun install --frozen-lockfile && bun run dev --host 0.0.0.0"
+    ports:
+      - "127.0.0.1:5174:5174"
+    depends_on:
+      - django
+    networks:
+      - edge
 
   # ========== PostgreSQL (با pgvector برای RAG آینده) ==========
   postgres:
@@ -151,6 +266,8 @@ services:
     volumes:
       - ./data/postgres:/var/lib/postgresql/data
       - ./deploy/postgres:/docker-entrypoint-initdb.d:ro
+    networks:
+      - backend     # never on `edge`: no frontend/gateway route to the database (ADR-0015)
 
   # ========== Redis (کش و بروکر Celery) ==========
   redis:
@@ -159,6 +276,8 @@ services:
     # No host port (no authentication configured): only Django/Celery reach it over the compose network.
     volumes:
       - ./data/redis:/data
+    networks:
+      - backend
 
   # ========== MinIO (ذخیره‌سازی فایل - آماده‌سازی برای فاز ۹) ==========
   minio:
@@ -171,6 +290,8 @@ services:
     env_file:
       - .env.minio   # MINIO_ROOT_USER / MINIO_ROOT_PASSWORD (gitignored, non-default); not .env
     command: server /data --console-address ":9001"
+    networks:
+      - backend
   
 
   ollama:
@@ -186,3 +307,20 @@ services:
       - OLLAMA_KEEP_ALIVE=5m  # مدل را ۵ دقیقه در حافظه نگه دار
     restart: unless-stopped
     command: serve
+    networks:
+      - backend
+
+# Two networks (ADR-0015 P6 / D4):
+#   edge    — gateway ↔ frontends ↔ django. The public-ish side; no database or cache lives here.
+#   backend — django ↔ postgres/redis/fastapi/celery/minio/ollama. Frontends are NOT members, so a
+#             compromised Next/Node process cannot open a PostgreSQL or Redis socket.
+networks:
+  edge:
+    driver: bridge
+  backend:
+    driver: bridge
+
+# Named volumes for the optional `frontends-dev` profile only (keep the host tree free of node_modules).
+volumes:
+  frontend_men_modules:
+  frontend_women_modules:
