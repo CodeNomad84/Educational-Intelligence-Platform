@@ -1,0 +1,21 @@
+# Build context for frontend-women/. Keeps `docker build` small and stops a local `.env`
+# or a stale build output from entering the image (ADR-0015 P2).
+node_modules
+dist
+dist-ssr
+.output
+.vinxi
+.nitro
+.tanstack
+.wrangler
+.dev.vars
+logs
+*.log
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+.vscode
+.idea
+.DS_Store

@@ -94,7 +94,19 @@ Superseded (historical, do not cite as current): the 2026-10-11 results of 31 Dj
 **KNOWN ISSUE (CURRENT RISK - NOT YET FIXED): `national_id` is normalised on the import path only.** The import maps Persian/Arabic-Indic digits to ASCII (commit `72379b1`); the dashboard form, the admin and the API serializer store what was typed. Matching is exact string equality and `unique=True` (`students/models.py`), so a Persian-digit id created elsewhere is not matched by an imported ASCII id, the unique constraint does not catch the duplicate, and the dashboard search (`icontains`) does not match across scripts. Future proposal (not approved): option (b), normalise in `Student.save()` or a shared helper plus a data migration (L2).
 Not covered: a real Ollama embedding model (none pulled), RAG retrieval and document-level ACL (RAG is disabled in Phase 1), full browser flows, model quality (see `DATA_AND_ARTIFACTS.md`), GPU execution, and any historical comparison of test assertions against `3404a1a` (now possible from `git log`; not performed).
 
-## Pyramid (TARGET)
+**Update 2026-11-13 (ADR-0014, JSON auth API + CORS).** New `dashboard/test_auth_api.py` (**18 tests**) and
+`CorsDeployCheckTests` in `dashboard/test_deploy_checks.py` (**7**). Cases: session login, byte-identical 401 for
+unknown/wrong/inactive, no session for a `must_change_password` account, 5-then-429 per username and 20-per-address via
+`POST /api/auth/login/`, `/me/` after a session and after a JWT, both credential paths refusing a flagged account, JSON 403
+(not 302) for `/api/` when flagged, CSRF required (client with `enforce_csrf_checks=True`; note `login()` rotates the
+token, so a test must re-read `/api/auth/csrf/`), CORS reflected for a listed origin and absent otherwise (`override_settings`
+on `CORS_ALLOWED_ORIGINS`), the exact `/me/` key set with no private field, and multi-school `?school=` (null without a
+choice, 400 for a school outside the user's set). `eip.E007` cases are pure settings tests. Run it alone with
+`DJANGO_SETTINGS_MODULE=config.settings.test_sqlite django_core/.venv/bin/python manage.py test dashboard.test_auth_api dashboard.test_deploy_checks`.
+The two frontends (`frontend-men/`, `frontend-women/`) are **not** covered by any suite here — they are tracked since
+2026-11-13 (monorepo decision, ADR-0014 note) but not in CI, and no JS toolchain exists on the development host.
+
+
 Unit → integration/API → permission/RBAC → data integrity → AI/RAG evaluation → frontend → E2E → regression. Weight toward permission and API tests first.
 
 ## Mandatory regression flows (TARGET)
@@ -109,6 +121,15 @@ Login · RBAC · student/parent/teacher access · attendance · assessment · ri
 | G3 | Test harness runs in CI-able command; permission tests exist | 2 |
 | G4 | Security baseline exit criteria met (`SECURITY.md`) | 3 |
 | G5 | Feature regression suite green for touched flows | each feature |
+| G6 | Frontend images build with their JS gate and start | per frontend change — VERIFIED 2026-11-13 (change 0042): `docker compose build frontend_men frontend_women` ran `bun install --frozen-lockfile` → `eslint` → `tsc --noEmit` → `vitest` (1 test per app) → `vite build` in the build stage, and both images answered through the gateway |
+
+**G6 detail (2026-11-13, ADR-0015 decision D6).** The JS gate lives in the image build, not in `scripts/run_tests.sh`
+(the development host has no Node toolchain), so a Python-only run does not cover the frontends: run
+`docker compose build frontend_men frontend_women` when `frontend-men/` or `frontend-women/` changes. The gateway itself has
+no test suite; its behaviour is asserted with curl in `changes/0042-frontend-containers-REPORT.md`, and the topology rules
+(no published frontend port, no shared network with PostgreSQL, no gateway route to FastAPI) are static tests in
+`fastapi_core/tests/test_exposure.py::FrontendExposureTests`.
+
 
 ## Containment checks (Phase 1, TARGET)
 Unauthenticated FastAPI calls rejected; parent cannot read other students; non-staff cannot create/delete; DB/Redis/MinIO/Ollama ports not published externally; no secret defaults used at startup.

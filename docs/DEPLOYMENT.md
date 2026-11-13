@@ -63,7 +63,50 @@ Release gate: `DJANGO_SETTINGS_MODULE=config.settings.production python manage.p
 - **Dedicated install (school's own server, OW-1):** same files; the school's domain or a subdomain of the platform's; the school names its operator (0028 P3-1).
 
 
-## 4. Prerequisites (blockers)
+## 3b. Frontends + edge gateway (CURRENT 2026-11-13, ADR-0015 / change 0042)
+
+`CURRENT`: `docker compose up -d --build` builds the two TanStack Start apps and starts one nginx gateway, so neither a
+Node toolchain on the host nor a second command is needed. Evidence (build output, `docker compose ps`, curl assertions)
+is in `changes/0042-frontend-containers-REPORT.md`.
+
+```
+browser ──http://men.localhost:8080──┐
+        └─http://women.localhost:8080┴─> gateway (nginx:1.27-alpine, 127.0.0.1:8080)
+                                             ├── /            → frontend_men:3000 | frontend_women:3000 (node-server SSR)
+                                             └── /api,/admin,/static → django:8000 (gunicorn)
+                                                                       ├── postgres  (backend network)
+                                                                       ├── redis     (backend network)
+                                                                       └── fastapi   (backend network, no port)
+```
+
+| Service | Ingress | Networks | Notes |
+|---|---|---|---|
+| `frontend_men`, `frontend_women` | none (gateway only) | `edge` | image = bun build → `node:22-alpine`, `node .output/server/index.mjs`, non-root, `PORT=3000` |
+| `gateway` | `127.0.0.1:${FRONTEND_HTTP_PORT:-8080}` | `edge` | `deploy/nginx/frontends.conf` (rendered from a template with `MEN_HOST`/`WOMEN_HOST`), `/media/` → 404, unknown `Host` → 404 |
+| `django` | `127.0.0.1:${DJANGO_HTTP_PORT:-8010}` (debug only) | `edge`, `backend` | real entry is the gateway |
+| `postgres`, `redis`, `fastapi`, `celery`, `celery_beat`, `minio`, `ollama` | none | `backend` | a frontend cannot reach these: different network |
+
+- **Django settings for the gateway.** Compose passes
+  `ALLOWED_HOSTS=${ALLOWED_HOSTS:-localhost,127.0.0.1},${MEN_HOST:-men.localhost},${WOMEN_HOST:-women.localhost}` (the
+  `.env` value stays the base; the two loopback names are appended) and `SECURE_SSL_REDIRECT=${SECURE_SSL_REDIRECT:-0}`.
+  The gateway forwards the **real** scheme and `Host` **including the port** (`$http_host`), because Django's CSRF check
+  compares the browser's `Origin` with `request.get_host()`. Presenting `X-Forwarded-Proto: https` at the gateway was
+  tried and breaks CSRF (D7=a; see ADR-0015 §7).
+- **Local limitation.** `SESSION_COOKIE_SECURE`/`CSRF_COOKIE_SECURE` are fixed `True`, so a browser over plain HTTP will
+  not store the session cookie: a local **login** needs TLS (a local proxy or an SSH tunnel). The pages themselves, and
+  `/api/auth/csrf/` (200) and `/api/auth/me/` (401 JSON), work over HTTP.
+- **Server profile.** Keep the gateway unpublished (`127.0.0.1`), point the school's TLS proxy (`eip.conf.example`,
+  adapted) at `127.0.0.1:${FRONTEND_HTTP_PORT:-8080}` for `men.<domain>`/`women.<domain>` preserving `Host`, add
+  `https://men.<domain>,https://women.<domain>` to `CSRF_TRUSTED_ORIGINS` and the two names to `ALLOWED_HOSTS`, and set
+  `SECURE_SSL_REDIRECT=1`. Certificates stay outside this stack.
+- **Hot reload.** `docker compose --profile frontends-dev up -d frontend_men_dev frontend_women_dev` runs `bun run dev`
+  on 5173/5174 with the source bind-mounted; `/api` is proxied to `http://django:8000` through `VITE_DEV_API_TARGET`.
+- **Rebuild after a change:** `docker compose build frontend_men` (one app) or `docker compose up -d --build` (all). The
+  build fails on a lint/typecheck/vitest error (D6), so a broken frontend cannot be deployed silently.
+- **First build needs disk** (~2 GB of images/build cache). If the build fails with `no space left on device`, run
+  `docker builder prune` and retry.
+
+
 
 1. **R-04 — BUILT AND REHEARSED, not applied to any real database (section 4a).** The application no longer uses a superuser: `school_app` (DML only) at runtime, `school_owner` (DDL) in the one-shot `migrate` service, `school_admin` (bootstrap superuser) for maintenance only.
 2. R-03 closed for Dev/Demo (loopback). A web server needs the proxy + HTTPS above.

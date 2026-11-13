@@ -17,6 +17,26 @@ EXTERNAL_ASSET = re.compile(r'<(?:script|link|img|iframe)\b[^>]*\b(?:src|href)\s
 EXTERNAL_CSS = re.compile(r'(?:@import\s+(?:url\()?|url\()\s*["\']?(?:https?:)?//', re.I)
 
 
+LOCAL_ORIGIN_PREFIXES = ('http://localhost:', 'http://127.0.0.1:', 'http://[::1]:')
+
+
+def cors_origin_errors():
+    """``CORS_ALLOWED_ORIGINS`` may only name https origins (ADR-0014, D2). A wildcard is always an error: with
+    ``CORS_ALLOW_CREDENTIALS`` the browser would let any site read the session's answers. A loopback http origin
+    (``http://localhost:5173``, the dev list in ``development.py``) is tolerated: it can only be the developer's own
+    machine, and it grants nothing to a remote site."""
+    origins = [str(o).strip() for o in (getattr(settings, 'CORS_ALLOWED_ORIGINS', None) or [])]
+    if getattr(settings, 'CORS_ALLOW_ALL_ORIGINS', False) or '*' in origins:
+        return [Error('CORS_ALLOW_ALL_ORIGINS / "*" is never allowed: name each origin explicitly, or none.', id='eip.E007')]
+    errors = []
+    for origin in origins:
+        if origin.startswith('https://') or origin.startswith(LOCAL_ORIGIN_PREFIXES):
+            continue
+        errors.append(Error(f'CORS_ALLOWED_ORIGINS entry {origin!r} must be an https:// origin (eip.E007).',
+                            id='eip.E007'))
+    return errors
+
+
 @register(Tags.security, deploy=True)
 def check_hosts_and_origins(app_configs, **kwargs):
     errors = []
@@ -26,6 +46,7 @@ def check_hosts_and_origins(app_configs, **kwargs):
     bad = [o for o in getattr(settings, 'CSRF_TRUSTED_ORIGINS', []) if not o.startswith('https://')]
     if bad:
         errors.append(Error('CSRF_TRUSTED_ORIGINS entries must start with https://.', id='eip.E002'))
+    errors += cors_origin_errors()
     if getattr(settings, 'SECURE_SSL_REDIRECT', False) and not getattr(settings, 'SECURE_PROXY_SSL_HEADER', None):
         errors.append(Warning('SECURE_SSL_REDIRECT without SECURE_PROXY_SSL_HEADER loops behind a TLS proxy; '
                               'set EIP_BEHIND_TLS_PROXY=1 unless Django terminates TLS itself.', id='eip.W003'))

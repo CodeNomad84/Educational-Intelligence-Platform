@@ -1,3 +1,4 @@
+import os
 import secrets
 
 from .base import *
@@ -26,3 +27,16 @@ USE_TZ = True
 # both OFF until an operator opts in.
 ENABLE_AI_FEATURES = True
 ENABLE_COUNSELOR_ROLE = True
+
+# --- Local dev only (ADR-0014, docs/changes/0040 §4.1): the two Vite frontends ---
+# The SPA reverse proxy (D2, recommended) makes the browser talk to ONE origin, so nothing here is needed for it. These
+# entries exist for a developer who calls Django cross-origin by hand; production (production.py) never inherits them,
+# where the env-only list in base.py applies and eip.E007 keeps it https-only.
+CORS_ALLOWED_ORIGINS = sorted(set(CORS_ALLOWED_ORIGINS) | {
+    'http://localhost:5173', 'http://localhost:5174',
+    'http://127.0.0.1:5173', 'http://127.0.0.1:5174',
+})
+CORS_ALLOW_CREDENTIALS = True
+# Direct cross-origin POSTs by hand ALSO need the origin trusted by Django's own CSRF check; the proxy (D2) does not,
+# because then the browser's Origin equals the host. Env-only, so no http origin leaks into the deploy check.
+CSRF_TRUSTED_ORIGINS = [o.strip() for o in os.environ.get('CSRF_TRUSTED_ORIGINS', '').split(',') if o.strip()]
