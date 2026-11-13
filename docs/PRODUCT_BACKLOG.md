@@ -4,6 +4,10 @@ Status: `PROPOSED` (owner decides priorities). Research date: 2026-10-23, web se
 vendor claims are **NOT independently verified**. "Have / Partial / Missing" is judged against the repository
 (`docs/CHANGE_GUIDE.md`, `docs/ROADMAP.md`); each row names the module so it can be checked.
 
+Post-integration roadmap: the five **Fast-Path UX & Low-Friction Data Entry / Macro-Analytics** work packages are recorded in
+[`docs/changes/0041-fast-path-ux-and-macro-data-PROPOSAL.md`](changes/0041-fast-path-ux-and-macro-data-PROPOSAL.md) — a **proposal
+only, nothing implemented**. §4 below is the pointer; the work packages are not part of the top-10 in §3 until the owner chooses.
+
 ## 1. What comparable products are valued for
 
 | Product | Most valued features (as described by the sources) | Source |
@@ -52,7 +56,24 @@ vendor claims are **NOT independently verified**. "Have / Partial / Missing" is 
 11. **Interactive exam / practice with per-option explanations and learning analytics** — design in `docs/EXAM_AND_SURVEY_DESIGN.md` §1 (3 slices). (L3: new student-level data)
 12. **In-platform family and student questionnaires** (consent, retention, restricted access; no Google Forms) — `docs/EXAM_AND_SURVEY_DESIGN.md` §2. Refines item 9; real data only after the retention/consent policy. (L3)
 
-## 4. Method and limits
+## 4. Upcoming Fast-Path Enhancements (Post Proposal 0040)
+
+Recorded, not approved: each row is a **work package of
+[`0041`](changes/0041-fast-path-ux-and-macro-data-PROPOSAL.md)**, `Status: PROPOSED`, with its own gates (§5.3 there). Level is the
+change level that a future implementation proposal must carry, not a claim that it is scheduled.
+
+| WP | Title | Level | Gate before any code | Outcome in one line |
+|---|---|---|---|---|
+| WP-1 | Negative attendance (bulk-exception flow) | L2 | owner answers D-1.1/D-1.2; **closes the §2 "attendance entry: Have" conflict** (see 0041 §2.2 — there is no write path today) | a class is marked in seconds: everyone present by default, only exceptions tapped |
+| WP-2 | Ladder-style grade grid (keyboard UX) | L2 | D-2.1/D-2.2/D-2.3 | type, Enter, type, Enter — each cell saved without a page reload |
+| WP-3 | Zero-hardware OMR answer-sheet scanner | L3 | new dependency + service-boundary ADR (D-3.1) | a phone photo of a bubble sheet becomes a confirmed score proposal |
+| WP-4 | Voice-to-incident logging (Whisper + extraction) | L3 | local-only provider, prompt/model versioning, no-write-without-confirm test (D-4.1) | a 20-second voice note becomes a draft `BehaviorNote` a teacher confirms |
+| WP-5 | Macro-analytics & regional governance (B2G) | L3 | `Region` schema + new authority role + fifth entitlement key + legal sign-off (D-5.1–D-5.5) | aggregates with k-anonymity and secondary suppression, never a child's row |
+
+Order and rationale: 0041 §5. Recommendation: WP-1 first (a correctness gap), WP-2 second, WP-3/WP-4 deferred until the pilot shows the
+volume, WP-5 treated as a decision rather than a backlog item (0041 §14.2 — a static annual report may satisfy the same ask).
+
+## 5. Method and limits
 Four standard searches (one per product); results are marketing pages, district pages and one review site. Feature lists
 may be out of date or differ by edition. No product was tried. Use this as a hypothesis list, then confirm with teachers
 and parents of the pilot school before building.
