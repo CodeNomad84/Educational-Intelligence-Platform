@@ -2,8 +2,9 @@
 
 **Level L3 — proposal `0042-frontend-containers-PROPOSAL.md`; owner approved D1–D7 on 2026-11-13 (Gemini envelope) and
 issued the Celery/Kombu dependency mandate. ADR: `docs/adr/0015-frontend-containers-and-gateway.md`.**
-Branch `work/0042-frontend-containers`, created from `phase-1/boot-security`. Local commits only — nothing pushed, merged or
-touched on `main`.
+Branch `work/0042-frontend-containers`, created from `phase-1/boot-security`. Local commits only — nothing pushed.
+**Closed 2026-11-13:** owner confirmed D7=a, the `kombu==5.4.0` pin and the result-file monitoring change, and authorized the
+merge into `main` (`git merge --no-ff`, local; **not pushed** — see §9).
 
 Truth labels below: **CURRENT** = verified by a command in this session; **NOT VERIFIED** = written but not executed;
 **TARGET** = intended, not yet exercised; **DECISION REQUIRED** = needs the owner.
@@ -147,8 +148,8 @@ Isolation and versions:
 - **NOT VERIFIED — `frontends-dev` profile.** The services are declared and `docker compose config` accepts them; they were
   not started in this session.
 - **NOT VERIFIED — a fresh-machine build.** Both images were built with a warm bun/apt/pip cache; a cold build was not timed.
-- **DECISION REQUIRED — D7 variant.** Owner approved either `SECURE_SSL_REDIRECT=False` **or** the `X-Forwarded-Proto`
-  route; (a) was implemented because (b) breaks CSRF. Needs a one-line acknowledgement (§9).
+- **RESOLVED 2026-11-13 — D7 variant.** Was `DECISION REQUIRED`; the owner approved **(a)** `SECURE_SSL_REDIRECT=0` through
+  the compose profile (code default `True`) — evidence and the approval wording are in §9.
 - **DECISION REQUIRED (unchanged from 0040) — no authentication in front of the frontends.** They render constant demo data
   and consume only `/api/auth/*`; an authenticated area still needs its own L2/L3 proposal.
 - **DEFERRED — CSP and the remaining hardening headers**, and **DEFERRED — a CI job that builds the images** (the JS gate is
@@ -165,13 +166,23 @@ Isolation and versions:
 3. The kombu pin must be reverted **together** with the compose change, otherwise `celery_worker` returns to
    `VersionMismatch` (kombu 5.7 vs redis-py 5.0.8).
 
-## 9. Acknowledgements needed from the owner (2 items, one line each)
+## 9. Owner approvals — **GRANTED 2026-11-13** (change closed)
 
-1. D7 was implemented as **(a) `SECURE_SSL_REDIRECT=0` in the compose profile** (code default stays `True`), because (b) the
-   `X-Forwarded-Proto: https` header makes CSRF verification fail through the gateway. Accept, or ask for (b) plus a local
-   TLS proxy.
-2. `kombu` is pinned to **5.4.0** (the version that pairs with `celery==5.4.0`/`redis==5.0.8`). Accept, or ask for the
-   alternative (upgrade `redis` to ≥ 6.1 and let kombu float).
+The owner (Gemini envelope, "تأییدیه رسمی رهبری پروژه") confirmed both items and authorized the merge:
+
+1. **D7 = (a) — APPROVED.** `SECURE_SSL_REDIRECT=0` applies **only** through the compose profile (local/dev); the codebase
+   default for production stays `True`. Owner's reason, verbatim in substance: it is the only way local CSRF/session tests
+   are not blocked without TLS while production stays safe.
+2. **`kombu==5.4.0` — APPROVED.** Exact pairing with `celery==5.4.0` / `redis-py==5.0.8`; guarantees worker stability.
+3. **Monitoring change — ACCEPTED.** A result-file watcher instead of dot-polling (the pg run buffers stderr, so dot counts
+   are blind).
+
+Merge authorization: "مجوز ادغام (Merge) شاخه `work/0042-frontend-containers` در شاخه اصلی و بسته شدن پرونده 0042 صادر می‌شود."
+Executed locally as `git merge --no-ff work/0042-frontend-containers` into `main` on 2026-11-13 (the merge commit is the
+`git log` record; this file deliberately carries no hash). **Nothing was pushed** — `main` moves only in this repository,
+and `git push` still needs a separate, explicit instruction. The platform is now **deployment-ready at the infrastructure
+level** for the Docker stack; the `NOT VERIFIED` / `DECISION REQUIRED` items in §7 (TLS proxy, browser login over HTTP,
+`frontends-dev`, cold build, no auth wall in front of the demo frontends) remain open and unchanged.
 
 
 

@@ -1,6 +1,8 @@
 # ADR-0015: the two frontends run as containerised Node SSR servers behind one edge gateway
 
-- Status: **ACCEPTED 2026-11-13** (owner, answers D1–D7 of `docs/changes/0042-frontend-containers-PROPOSAL.md`)
+- Status: **ACCEPTED 2026-11-13** (owner, answers D1–D7 of `docs/changes/0042-frontend-containers-PROPOSAL.md`); D7=a and
+  the `kombu==5.4.0` pin confirmed the same day, change 0042 closed and merged into `main` (local only, not pushed — see
+  `docs/changes/0042-frontend-containers-REPORT.md` §9)
 - Date: 2026-11-13
 - Decider: owner
 - Level: L3 (new services, deployment topology, new ingress, build-config change in two apps)
