@@ -71,6 +71,7 @@ Read with a plain HTTP GET of `https://www.kaggle.com/datasets/marvyaymanhalim/s
 | `.env.service` | `SERVICE_JWT_SECRET` (>= 32 random chars, different from `SECRET_KEY`) | Django, FastAPI |
 | `.env.fastapi` | `DB_USER=fastapi_user` and its password (least-privilege role) | FastAPI only |
 | `.env.minio` | non-default MinIO root credentials | MinIO only |
+| `.env.llm` | optional AI provider config: `LLM_PROVIDERS`, `LLM_SCHOOL_MAP`, `LLM_DAILY_CAP` and one `LLM_KEY_*` value (change 0043, ADR-0008). Absent = AI off. Template: `.env.llm.example` (committed, placeholders, empty key) | FastAPI only — Django, Celery, PostgreSQL, MinIO and the frontends never receive it |
 
 `.env.example` holds placeholders only. Generate values with `python3 -c "import secrets; print(secrets.token_urlsafe(48))"`.
 

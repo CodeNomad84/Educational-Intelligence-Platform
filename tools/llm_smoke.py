@@ -122,13 +122,14 @@ def _attempt(llm, provider, purpose, messages, env, transport):
         return exc.code, None
 
 
-def _expect(report, llm, provider, purpose, expected, env, messages=None):
+def _expect(report, llm, provider, purpose, expected, env, messages=None, label=None):
     transport = FakeTransport()
     code, _ = _attempt(llm, provider, purpose, messages or [{"role": "user", "content": PROMPT}], env, transport)
+    shown = label or f"purpose {purpose!r}"
     if code == expected:
-        report.ok(f"purpose {purpose!r} -> {expected}")
+        report.ok(f"{shown} -> {expected}")
     else:
-        report.fail(f"purpose {purpose!r} -> {code}, expected {expected}")
+        report.fail(f"{shown} -> {code}, expected {expected}")
     return code
 
 
@@ -200,7 +201,8 @@ def run(argv=None, env=None):
     # 5. The external-class PII tripwire refuses a synthetic phone number / national id.
     if provider.kind == llm.EXTERNAL:
         _expect(report, llm, provider, args.purpose, "pii_refused", base,
-                messages=[{"role": "user", "content": PII_PROBE}])
+                messages=[{"role": "user", "content": PII_PROBE}],
+                label="PII tripwire (synthetic phone number + national id)")
 
     # 6. Key handling: a missing key is not_configured (never a crash); mock never uses a real key.
     key = base.get(provider.api_key_env, "") if provider.api_key_env else ""

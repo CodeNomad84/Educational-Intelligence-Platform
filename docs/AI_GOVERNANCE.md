@@ -30,7 +30,7 @@ Prompts, models and embedding versions are recorded in code/config and changes a
 ## Provider adapter (P7, 2026-11-02; code `fastapi_core/llm_adapter.py`)
 One OpenAI-compatible adapter, two provider classes, both OFF by default (decisions 56-57).
 Example configuration (operator environment; names and model ids are placeholders, check the provider's current documentation):
-- ChatGPT / OpenAI: `{"chatgpt": {"class": "external", "base_url": "https://api.openai.com/v1", "model": "<model id>", "api_key_env": "OPENAI_API_KEY"}}`
+- ChatGPT / OpenAI: `{"chatgpt": {"class": "external", "base_url": "https://api.openai.com/v1", "model": "<model id>", "api_key_env": "LLM_KEY_OPENAI"}}` (the key variable must be `LLM_KEY_*`, see below)
 - Another hosted OpenAI-compatible API (DeepSeek, a reseller, a gateway): same shape with its own `base_url`, model and key variable.
 - Local (Ollama, vLLM, LM Studio): `{"ollama": {"class": "local", "base_url": "http://ollama:11434/v1", "model": "<local model>"}}`
 - Map schools: `LLM_SCHOOL_MAP={"1": "chatgpt", "2": "ollama"}`. A school not in the map has no AI.

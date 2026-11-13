@@ -10,7 +10,7 @@ Truth labels: `CURRENT` (verified in this working tree, evidence given as `file:
 
 Read with: `fastapi_core/llm_adapter.py` (the whole file, 261 lines) · `fastapi_core/main.py` §`/llm/*` ·
 `django_core/docqa/{services,models}.py` · `docs/AI_GOVERNANCE.md` §"Provider adapter" ·
-`docs/adr/README.md` (ADR-0008 = DEFERRED) · `docs/changes/0028-p3-p8-decision-pack-PROPOSAL.md` OW-6 ·
+`docs/adr/0008-llm-provider-and-egress.md` (written with this change, PROPOSED) · `docs/changes/0028-p3-p8-decision-pack-PROPOSAL.md` OW-6 ·
 `docs/DECISIONS_BY_CODE.md` decisions 56, 57, 59, 62, 63.
 
 ---
