@@ -16,8 +16,8 @@ export function TopBar() {
             <Sprout className="size-5 text-primary-foreground" aria-hidden />
           </span>
           <span className="leading-tight">
-            <span className="block text-base font-extrabold tracking-tight">قلمستان</span>
-            <span className="hidden text-xs text-muted-foreground sm:block">سامانه رشد و انتخاب مأموریت‌محور</span>
+            <span className="block text-base font-extrabold tracking-tight">آرمان‌نو - نسیم</span>
+            <span className="hidden text-xs text-muted-foreground sm:block">سکوی آموزشی-تربیتی</span>
           </span>
         </a>
 

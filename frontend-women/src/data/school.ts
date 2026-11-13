@@ -1,5 +1,5 @@
 /**
- * Demo data for the Qalamestan mentorship dashboard.
+ * Demo data for the Arman-e-No Nasim mentorship dashboard.
  * Browser-safe: shared by UI components and the server-side assistant (retrieval context).
  */
 
@@ -250,7 +250,7 @@ export const KNOWLEDGE_BASE: KnowledgeDoc[] = [
   {
     id: "kb-weekly",
     title: "خلاصه پایش هفتگی مدرسه — هفته سوم آبان",
-    source: "داشبورد مدیریتی قلمستان",
+    source: "داشبورد مدیریتی آرمان‌نو - نسیم",
     content:
       "۴۱۲ متربی فعال (۱۲+ در ماه)، ۳۸ پروژه مأموریتی در جریان (۵+ این هفته)، شاخص رشد تربیتی و درسی ۸۷٪ (۴٪+ ماهانه)، ۱۲۴۸ مشاهده و جلسه مربیگری ثبت‌شده (۸۶+ این هفته). محور کارآفرینی با میانگین ۶۸ پایین‌ترین و محور اخلاقی با ۸۴ بالاترین محور مدرسه است.",
   },

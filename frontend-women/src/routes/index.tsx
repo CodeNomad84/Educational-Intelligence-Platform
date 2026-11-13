@@ -12,10 +12,16 @@ import { TopBar } from "@/components/dashboard/TopBar";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "داشبورد رشد و مربیگری قلمستان" },
-      { name: "description", content: "پایش شایستگی‌های شش‌گانه، تابلوی رشد متربیان و دستیار هوشمند مربیگری مأموریت‌محور." },
-      { property: "og:title", content: "داشبورد رشد و مربیگری قلمستان" },
-      { property: "og:description", content: "پایش شایستگی‌ها، تابلوی رشد و دستیار هوشمند مربیگری برای معلمان، مشاوران و مدیران." },
+      { title: "داشبورد رشد و شکوفایی | آرمان‌نو - نسیم" },
+      {
+        name: "description",
+        content: "پایش شایستگی‌های شش‌گانه، تابلوی رشد متربیان و دستیار هوشمند مربیگری مأموریت‌محور در سکوی آرمان‌نو - نسیم.",
+      },
+      { property: "og:title", content: "سکوی آرمان‌نو - نسیم" },
+      {
+        property: "og:description",
+        content: "پایش شایستگی‌ها، تابلوی رشد و دستیار هوشمند مربیگری برای معلمان، مشاوران و مدیران — سکوی آرمان‌نو - نسیم.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
@@ -38,7 +44,7 @@ function Index() {
           <StudentRoster />
         </main>
         <footer className="mx-auto max-w-7xl px-6 pb-10 pt-2 text-center text-xs text-muted-foreground">
-          قلمستان · سامانه رشد و انتخاب مأموریت‌محور — داده‌های نمایشی
+          سکوی آموزشی-تربیتی آرمان‌نو - شاخه نسیم · سامانه رشد و انتخاب مأموریت‌محور — داده‌های نمایشی
         </footer>
       </div>
       <ChatDrawer />

@@ -84,11 +84,17 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "قلمستان — سامانه رشد و انتخاب مأموریت‌محور" },
-      { name: "description", content: "داشبورد هوشمند مربیگری و رشد مأموریت‌محور مدرسه قلمستان" },
+      { title: "داشبورد رشد و شکوفایی | آرمان‌نو - نسیم" },
+      {
+        name: "description",
+        content: "سکوی آرمان‌نو - نسیم — داشبورد هوشمند مربیگری و رشد مأموریت‌محور",
+      },
       { name: "theme-color", content: "#14172b" },
-      { property: "og:title", content: "قلمستان — سامانه رشد و انتخاب مأموریت‌محور" },
-      { property: "og:description", content: "داشبورد هوشمند مربیگری و رشد مأموریت‌محور مدرسه قلمستان" },
+      { property: "og:title", content: "سکوی آرمان‌نو - نسیم" },
+      {
+        property: "og:description",
+        content: "سکوی آرمان‌نو - نسیم — داشبورد هوشمند مربیگری و رشد مأموریت‌محور",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],

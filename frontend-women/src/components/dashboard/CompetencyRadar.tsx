@@ -34,7 +34,7 @@ export function CompetencyRadar() {
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 id="radar-title" className="text-lg font-extrabold">رادار شایستگی‌های قلمستان</h2>
+          <h2 id="radar-title" className="text-lg font-extrabold">رادار شایستگی‌های شش‌گانه</h2>
           <p className="text-sm text-muted-foreground">میانگین شش محور تربیتی در برابر هدف مأموریت</p>
         </div>
         <div role="tablist" aria-label="انتخاب پایه" className="flex flex-wrap gap-1 rounded-full border border-border bg-surface/60 p-1">
