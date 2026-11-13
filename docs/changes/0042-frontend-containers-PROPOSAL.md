@@ -38,7 +38,7 @@ not a named volume.
 
 | Fact | Evidence |
 |---|---|
-| Services today: `django`, `migrate`, `celery`, `celery_beat`, `fastapi`, `postgres`, `redis`, `minio`, `ollama`. **No frontend service, no nginx service.** | `docker-compose.yml:27-188` |
+| Services today: `django`, `migrate`, `celery`, `celery_beat`, `fastapi`, `postgres`, `redis`, `minio`, `ollama`. **No frontend service, no nginx service.** | `docker-compose.yml:27-187` |
 | Django is published on **loopback only**: `127.0.0.1:8000:8000`. | `docker-compose.yml:32-33` |
 | FastAPI publishes **no** port (only reachable over the compose network); a test fails if a port is published. | `docker-compose.yml:116-118`; `fastapi_core/tests/test_exposure.py` |
 | PostgreSQL / Redis / MinIO publish no host port; Ollama is `127.0.0.1:11435`. | `docker-compose.yml:147,159,167-168,179-181` |
