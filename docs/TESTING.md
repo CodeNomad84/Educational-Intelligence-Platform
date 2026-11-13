@@ -138,3 +138,13 @@ Unauthenticated FastAPI calls rejected; parent cannot read other students; non-s
 Report real output only. A change touching auth/permissions needs a permission test. Synthetic data only.
 
 **Update 2026-11-02.** The label list now also has `docqa` (the P7-5 app; it was missing from the gate until the independent review round noticed the unchanged test count). FastAPI: `fastapi_core/tests` (64 tests incl. exposure and AI-scope checks).
+
+**Update 2026-11-13 (change 0043 / ADR-0008, AI provider configuration).** New `fastapi_core/tests/test_llm_config.py`
+(20 tests): `.env.llm.example` is valid adapter configuration, holds no key and maps no school; `.gitignore` keeps
+`.env.llm` out and the template in; compose hands `.env.llm` to `fastapi` only and optionally; `tools/llm_smoke.py`
+exits 0 in mock mode, prints no key, and refuses `--live` without one. Results (`CURRENT`, this branch):
+`python -m unittest tests.test_llm_config` on the host = **20 OK**; `docker compose exec -T fastapi python -m unittest
+discover -s tests -t .` = **99 tests OK, 32 skipped** (12 pre-existing exposure skips + these 20, because the image
+mounts only `fastapi_core/` at `/app`; the CI job checks out the repository root, so there they execute);
+`python3 tools/llm_smoke.py --mock --env-file .env.llm.example` = **exit 0**; `--live` without a key = **exit 2**;
+`docker compose config --quiet` = **exit 0** with no `.env.llm` on disk.

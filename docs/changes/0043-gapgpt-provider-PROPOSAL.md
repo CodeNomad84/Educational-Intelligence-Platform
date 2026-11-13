@@ -359,5 +359,21 @@ Streaming, tool/function calling, embeddings and RAG over documents, a per-user 
 invoicing, a prompt-editing UI, a chat widget, student- or parent-facing AI, counseling data, and **any** change to
 `students/access.py`, entitlements, audit rules or school isolation.
 
-**Status: PROPOSED — awaiting D1–D6 and the explicit approval of S1 (and of ADR-0008 as PROPOSED) before any
-environment file, compose line, test or documentation line is written. Nothing in this proposal is implemented.**
+**Status: APPROVED for S1 on 2026-11-13** (owner; answers to D1–D6 below). S2, S3 and S4 remain `DEFERRED`. ADR-0008 was
+written as `docs/adr/0008-llm-provider-and-egress.md` (PROPOSED) and S1 was implemented on branch
+`work/0043-gapgpt-provider`; results, evidence and the two recorded deviations are in
+`docs/changes/0043-gapgpt-provider-REPORT.md`.
+
+## 15. Approval record (owner, 2026-11-13)
+
+| # | Answer | Effect on this proposal |
+|---|---|---|
+| **D1** | **A** — configuration plumbing only; no school mapped | S1 only; S2–S4 stay `DEFERRED`; `LLM_SCHOOL_MAP={}` in the template and a test asserts it |
+| **D2** | The four `external` purposes only; **zero** student PII or student records | Unchanged from the adapter's existing rule; stated as ADR-0008 decision 2. The retention/no-training terms must be recorded **before** any school is mapped |
+| **D3** | `.env.llm.example` (committed) + `.env.llm` (gitignored); pass to `fastapi` with a no-op default | Implemented as an **optional** `env_file` entry (`required: false`) — a missing file must not stop the service. Django receives nothing |
+| **D4** | Decision 62 stays intact; sensitive doc QA stays local-only | No change to `docqa/services.py`; `LLM_KEY_*` only in `fastapi`; the smoke tool asserts `document_qa -> purpose_refused` for an `external` provider |
+| **D5** | `tools/llm_smoke.py`, `--mock` by default, live only with a key | Implemented there (this proposal's recommendation (a) is therefore **not** followed; the owner's choice needs no container mount and works with `--env-file .env.llm`) |
+| **D6** | OpenAI-compatible endpoint, model `gpt-4o-mini`, defensive caps | Recorded with **two deviations**: the key variable is `LLM_KEY_GAPGPT`, not `GAPGPT_API_KEY` (`llm_adapter.py:36` accepts only `LLM_KEY_*`, review M1); and there is no separate `GAPGPT_BASE_URL` — base URL and model live inside the `LLM_PROVIDERS` JSON, one source of truth. Caps: `max_tokens 600`, `timeout 30`, `LLM_DAILY_CAP=100` |
+
+`NOT VERIFIED` after this change: GapGPT's real base URL, model ids, retention, residency and terms, and the latency/cost of
+a live call (no key was available and no call was made). S1 does not enable any school.

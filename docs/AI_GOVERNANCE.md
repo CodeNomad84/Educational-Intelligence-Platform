@@ -7,7 +7,8 @@ Status: CURRENT = prototype only (A-01..A-07); everything else TARGET. No autono
 - AI is not a therapist, counselor, diagnostician or decision-maker. Counseling data is not exposed to AI without an approved policy.
 - **ACL before retrieval and generation**: retrieval filters by the requesting user's permissions first; never retrieve then redact.
 - Log AI calls (who, purpose, sources, model/prompt version) without storing raw PII unnecessarily.
-- No student PII to external LLMs unless an approved provider/egress policy exists (ADR-0008 DEFERRED).
+- No student PII and no student record to external LLMs. Hosted providers are used for non-personal content only; the
+  policy itself is ADR-0008 (PROPOSED 2026-11-13) and it keeps decision 62 (local-only document QA) in force.
 
 ## Assistants (TARGET, separate)
 | | Study Assistant | School Assistant |
@@ -33,6 +34,26 @@ Example configuration (operator environment; names and model ids are placeholder
 - Another hosted OpenAI-compatible API (DeepSeek, a reseller, a gateway): same shape with its own `base_url`, model and key variable.
 - Local (Ollama, vLLM, LM Studio): `{"ollama": {"class": "local", "base_url": "http://ollama:11434/v1", "model": "<local model>"}}`
 - Map schools: `LLM_SCHOOL_MAP={"1": "chatgpt", "2": "ollama"}`. A school not in the map has no AI.
-Rules enforced in code and tests: external = non-personal purposes only plus a PII filter; local = may summarise school data the requesting user can already see; counseling data for neither; no key in logs, errors or responses; answers labelled advisory. `NOT YET IMPLEMENTED`: the Django side (UI, per-school provider setting, the licensed call caps and audit of AI calls) and any RAG over documents; `NOT VERIFIED`: behaviour against a real provider (no real key was used).
+Rules enforced in code and tests: external = non-personal purposes only plus a PII filter; local = may summarise school data the requesting user can already see; counseling data for neither; no key in logs, errors or responses; answers labelled advisory. `CURRENT` (corrected 2026-11-13, change 0043 — the earlier blanket "not implemented" was wrong): the Django side partly exists — the staff document-assistant page with a per-school switch (`docqa.AssistantSettings.ai_enabled`, OFF by default), the licensed daily/monthly caps in `schools/ai_guard.py` consumed by that path, and audit rows (`audit.DOC_ASK`, `DOC_UPLOAD`, `DOC_DELETE`, `DOC_TOGGLE`, `DOC_AI_SETTING`). Still `NOT YET IMPLEMENTED`: a per-school provider setting (the provider is chosen in the FastAPI environment, not in Django), any UI for the adapter itself, and any RAG over documents; `NOT VERIFIED`: behaviour against a real provider (no real key was used).
 
 **Limits of the outbound filter (decision 59).** The external-class filter is a best-effort tripwire, not a guarantee: it cannot catch a first name alone, digits written in words, base64, obfuscated e-mails, transliterated names, names missing from the roster Django sends, or a description that identifies a student without a name or number, and it cannot recognise counseling content. What actually protects students is (1) the purpose whitelist and (2) Django building prompts that contain no personal data. Provider keys live in `LLM_KEY_*` variables dedicated to the adapter; the route `/llm/complete/` must only be reachable by Django (service token), never from a browser.
+
+### Operator configuration (`CURRENT`, change 0043 / ADR-0008, 2026-11-13)
+
+Provider configuration is data in ONE gitignored file, `.env.llm`, injected into the `fastapi` service only
+(`docker-compose.yml`: optional `env_file`, `required: false` — a missing file means AI stays off, not a failed start).
+Committed template: `.env.llm.example` (placeholders only, key value empty).
+
+- `LLM_PROVIDERS` — JSON, one entry per provider: `class` (`external`/`local`), `base_url`, `model`, `api_key_env`,
+  `timeout`, `max_tokens`. `external` must be `https`.
+- `LLM_SCHOOL_MAP` — JSON school id → provider name. **Empty by default: no school has AI**, even with a provider listed.
+- `LLM_DAILY_CAP` — adapter-side calls per school per UTC day, in memory (defence in depth; `0` blocks all). The
+  licensed caps that a school sees are the Django ones (`School.ai_daily_cap` / `ai_monthly_cap`).
+- The key itself: a dedicated `LLM_KEY_*` variable (GapGPT → `LLM_KEY_GAPGPT`). Django never receives it, so the only
+  process that can reach a provider is the adapter.
+- Verify before mapping any school: `python3 tools/llm_smoke.py --mock` (offline, no key, sends nothing) then
+  `--live --env-file .env.llm` on the server (one fixed non-personal prompt). The tool prints fixed codes and counts,
+  never a key.
+- Mapping a school to an `external` provider is a data decision, not a config edit: record the provider's retention /
+  no-training terms first (ADR-0008 decision 8), and remember the adapter refuses `document_qa` and
+  `school_data_summary` for that class (decision 62).

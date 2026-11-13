@@ -14,10 +14,12 @@ Established decisions (Django core, FastAPI AI layer, PostgreSQL, React target, 
 | 0005 | Staff roles, scoping and counseling referral | ACCEPTED 2026-10-16 for decisions 1–9 (roles 2–4; amends 0003/0004; L3); 10–12 direction only | 2 |
 | 0006 | React island mechanics (written with the first island, ADR-0013) | DEFERRED | 8 |
 | 0007 | RAG architecture | DEFERRED | 7 |
-| 0008 | LLM provider & data egress | DEFERRED | 7 |
+| 0008 | LLM provider & data egress | PROPOSED 2026-11-13 (file created by change 0043; owner answered D1–D6, S1 approved, S2–S4 DEFERRED) | 7 |
 | 0009 | Data layering & provenance | FUTURE — DEFERRED (renumbered from 0005 on 2026-10-16; no file yet; to be proposed in Phase 4) | 4 |
 | 0010 | Platform role map (all 8 roles; `Admin` naming) | DRAFT 2026-10-16 (PROPOSED; L3) | 2–3 |
 | 0012 | School membership, platform role, per-school student identity | ACCEPTED 2026-10-19 (L3; decisions only, no stage approved; `changes/0010-multi-school-hosting-PROPOSAL.md`) | 2 |
 | 0013 | MVP frontend: server-rendered templates + Bootstrap 5 RTL, React islands, SPA deferred | ACCEPTED 2026-11-01 (owner, 0028 P8-2) | 3/8 |
 
-Only 0001–0005 and 0010 (DRAFT) files exist now. 0006–0009 are numbering reservations for future/deferred decisions; each file is created only when its phase begins (no speculative ADRs). Until then, references to them mean "future decision", not an existing record.
+Only 0006, 0007 and 0009 have no file (`0008` gained one on 2026-11-13, change 0043). They are numbering reservations
+for future/deferred decisions; each file is created only when its phase begins (no speculative ADRs). Until then,
+references to them mean "future decision", not an existing record.

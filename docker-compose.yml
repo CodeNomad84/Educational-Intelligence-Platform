@@ -144,6 +144,11 @@ services:
     env_file:
       - .env.service   # SERVICE_JWT_SECRET (gitignored)
       - .env.fastapi   # DB_USER / DB_PASSWORD of the least-privilege role `fastapi_user` (gitignored)
+      # ADR-0008 / change 0043: AI provider configuration (LLM_PROVIDERS, LLM_SCHOOL_MAP, LLM_DAILY_CAP, LLM_KEY_*).
+      # Optional on purpose: a missing or empty .env.llm means AI stays OFF (no school mapped) and the service still
+      # starts. Template: .env.llm.example. The key is never passed to django, postgres or any other service.
+      - path: .env.llm
+        required: false
     environment:
       DB_NAME: ${DB_NAME:-school_db}
       DB_HOST: ${DB_HOST:-postgres}
