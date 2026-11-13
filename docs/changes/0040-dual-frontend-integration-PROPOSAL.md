@@ -1,6 +1,6 @@
 # 0040 — Dual frontend (frontend-men / frontend-women): CORS, session login and `/api/auth/me/` (CHANGE PROPOSAL — no application code changed)
 
-Level: **L3** · Status: **BLOCKED — DECISION REQUIRED (D0–D9)** · Date: 2026-11-13
+Level: **L3** · Status: **BLOCKED — DECISION REQUIRED (D0–D13, see §18)** · Date: 2026-11-13
 Branch `work/dual-frontend-integration`, created **from `phase-1/boot-security`** per STANDING RULES.
 
 **This task changed no code, no setting, no dependency, no migration and no test, and ran no test.** It created this
@@ -450,3 +450,69 @@ touch to `main`; no push; no frontend file edited; no change to `/api/token/`, `
 - **DECISION REQUIRED**: D0-D9.
 - **DEFERRED**: login audit (D7 if (a)), `School.audience` (D5 if (b)), the AI gateway remediation (D9), and any
   production CORS configuration (D2 if (b)).
+
+---
+
+## 18. Addendum (2026-11-13, second instruction) — "clean up Mock/Supabase auth, add a central API client"
+
+The owner asked for: remove/bypass Supabase in the login pages; add `src/lib/api.ts` with
+`baseURL: import.meta.env.VITE_API_URL || '/api'` and `withCredentials: true`; set the Vite ports to 5173/5174 with a
+`/api` → `http://127.0.0.1:8000` proxy; and replace the mock login submit with a call to `/api/auth/login/` that
+redirects on success. I fact-checked every premise before writing any code. **Nothing was changed**; this section is the
+record.
+
+| # | Premise in the instruction | CURRENT evidence | Verdict |
+|---|---|---|---|
+| 1 | "Mock/Supabase auth in the login pages" | `grep -rni 'login\|signin\|mock' frontend-{men,women}/src --include=*.ts --include=*.tsx` → **no match**. `ls frontend-*/src/routes` → only `index.tsx`, `README.md`, `__root.tsx`. There is no `src/pages/`, no `Login.tsx`, no auth code at all | **No target to clean up** |
+| 2 | "Supabase client dependencies" | `package.json` (both apps): **no** `@supabase/*`, no `axios`. `grep -in supabase` over both `src/` trees → 8 hits, **all comments** (`src/start.ts:29-31` and `src/lib/lovable-error-reporting.ts:55` in each app), plus `AGENTS.md:18` ("do not add `supabase/migrations/`") | **Nothing to remove**; no dependency to bypass |
+| 3 | "`src/lib/api.ts` with `baseURL` + `withCredentials`" | both apps use `@lovable.dev/vite-tanstack-config` + TanStack Start (SSR/Worker); no HTTP client dependency exists. `baseURL`/`withCredentials` are **axios** options; with `fetch` the equivalents are `credentials: 'include'` and a relative URL | **Doable, but needs D10** (axios = a new dependency in two untracked apps) |
+| 4 | "set the port to 5173/5174 and proxy `/api`" | `vite.config.ts` calls `defineConfig` from the Lovable wrapper, whose header says it *already* handles "sandbox detection (port/host/strictPort)" and that extra config may be passed as `defineConfig({ vite: { ... } })`. A file-level `server: { port, proxy }` is therefore **not** the shape this file uses. The wrapper's source is not installed (`node_modules` absent), so its port precedence is **NOT VERIFIED** | **Doable, needs the wrapper's `vite:` key**, and the port must be checked against the wrapper's own default |
+| 5 | "call `/api/auth/login/` and redirect on success" | `grep -rn 'api/auth' django_core --include=*.py` → **no match**. §4.2/§4.3 of this proposal describe the endpoint; it is **TARGET, not built** (blocked by D0-D2) | **The call would 404** until the backend lands |
+
+Two further constraints:
+
+- **There is no JavaScript toolchain on this machine.** `command -v node`, `command -v npm`, `command -v bun` → all
+  absent; `ls frontend-*/node_modules` → *No such file or directory*. So I can write the files but **cannot** install
+  `axios`, run `vite dev`, `vite build`, `eslint` or `vitest` here. Every frontend item would have to be labelled
+  **NOT VERIFIED** until you run `bun install && bun dev` yourself. This is the strongest argument for D10=(a).
+- **Nothing here is under version control.** `git status` lists `frontend-men/` and `frontend-women/` as untracked (`??`).
+  Any edit I make is invisible to review, to `git diff`, and to any later rollback. Adding them to git is **D13**.
+- **ADR-0013 / STANDING RULES** ("No SPA/React") still apply, and D0 is unanswered, so a login route in these apps is
+  exactly the deferred case.
+
+### 18.1 The change I would make once approved (sketch, not written)
+
+```ts
+// vite.config.ts (both apps; inside the wrapper's `vite` key)
+defineConfig({
+  tanstackStart: { server: { entry: "server" } },
+  vite: { server: { port: 5173 /* 5174 for women */,
+                    proxy: { "/api": { target: "http://127.0.0.1:8000", changeOrigin: false } } } },
+});
+```
+
+```ts
+// frontend-*/src/lib/api.ts — fetch-based (zero new dependency), same public shape as axios
+const BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? "/api";
+export class ApiError extends Error { constructor(public status: number, public body: unknown) { super(`HTTP ${status}`); } }
+function csrfToken() { /* read the csrftoken cookie, send X-CSRFToken (proposal §4.5) */ }
+export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> { /* credentials: 'include' */ }
+export const apiLogin = (username: string, password: string) => apiFetch("/auth/login/", { method: "POST", … });
+export const apiMe = () => apiFetch("/auth/me/");
+```
+
+Plus `src/routes/login.tsx` (`createFileRoute("/login")`, a form that calls `apiLogin`, then
+`router.navigate({ to: "/" })` on success and renders the `401`/`403`/`429` message inline), and the generated
+`routeTree.gen.ts` is refreshed by the router plugin — **not hand-edited**.
+
+### 18.2 Additional decisions this addendum raises
+
+| D# | Question | Options | My recommendation |
+|---|---|---|---|
+| **D10** | HTTP client | (a) `fetch` wrapper, no dependency; (b) add `axios` to both `package.json` + lockfiles | **(a)** — same behaviour, no new dependency in an untracked app, `withCredentials` is `credentials: 'include'` |
+| **D11** | Login route | (a) new `src/routes/login.tsx` in each app, redirect to `/`; (b) no login UI, only `src/lib/api.ts`; (c) a modal inside the existing dashboard | **(b) first, then (a)** after the backend exists |
+| **D12** | Order of work | (a) Django endpoints first (this proposal §16), then the client; (b) client first, accept 404s; (c) both in one change | **(a)** — otherwise the client cannot be verified even manually |
+| **D13** | Version control of the two apps | (a) `git add` both `frontend-*` trees (reviewable, rollback-able); (b) leave untracked and edit them anyway | **(a)** — editing untracked code is the real risk here |
+
+**Status after this addendum: still BLOCKED — DECISION REQUIRED (D0-D13).** No frontend file, no `package.json`, no
+`vite.config.ts` and no Django file was modified; no build, lint or test was run in this task.
