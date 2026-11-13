@@ -215,8 +215,8 @@
 ## T10 — L1 pilot release readiness gate + branding (release freeze) — DONE
 - Branch: `work/T10-pilot-release-readiness` from `phase-1/boot-security` after the T9 merge (`e0b4156`).
 - Numbering note: `docs/pilot/QUEUE.md` reserves "T10" for the L3 password/2FA proposal and is owner-owned; it was
-  **not** edited. This T10 follows the owner's chat instruction; which number the 2FA proposal takes is
-  `DECISION REQUIRED` (recorded in `docs/pilot/T10-RELEASE-READINESS.md` §7 D5).
+  **not** edited. This T10 follows the owner's chat instruction; the owner resolved the clash on 2026-12-13: the 2FA
+  proposal is `T11-totp-2fa` (recorded in `docs/pilot/T10-RELEASE-READINESS.md` §7 D5).
 - Branding (L1, no behaviour change): `PLATFORM_NAME = 'سکوی آموزشی-تربیتی آرمان نو'` and
   `PLATFORM_NAME_EN = 'Arman-e-No Educational & Upbringing Platform'` in `config/settings/base.py` (env override
   `EIP_PLATFORM_NAME` / `EIP_PLATFORM_NAME_EN`), exposed by `dashboard/context_processors.role_names`; the literals are
@@ -234,8 +234,12 @@
   `Ran 1610 tests in 1228.920s / OK (skipped=11)` for the nine apps and `Ran 62 tests in 299.486s / OK` for
   `demo_intel`. First demo pass had one failure — the leak test's substring check hit the brand («آرمان» is also a
   seeded student's first name); fixed in the test only (`PLATFORM_NAME` stripped before the check), then re-run green.
-  `scripts/run_tests.sh pg` **not run** on this branch (`NOT VERIFIED`). Detail: `docs/pilot/T10-RELEASE-READINESS.md` §6.
-- Merged? **No.** Pushed? **No.** `main` untouched.
+  `DJANGO_IMAGE=eip-test-django:local scripts/run_tests.sh pg` → `Ran 1610 tests in 1963.355s / OK (skipped=1)`, last
+  line `POSTGRESQL CHECKS AND TESTS PASSED`. Detail: `docs/pilot/T10-RELEASE-READINESS.md` §6.
+- Owner decisions (2026-12-13): D4 tag `v1.0.0-pilot.1` at the merge; D5 the 2FA proposal is `T11-totp-2fa`;
+  D1 (`national_id` uniqueness) stays deferred for the pilot. D2/D3/D6 unchanged.
+- Released: merged to `main` with `--no-ff` and tagged `v1.0.0-pilot.1` on the owner's explicit instruction.
+  Nothing pushed.
 
 
 

@@ -8,7 +8,7 @@ Labels: `CURRENT` (verified here, command/file quoted) · `TARGET` · `NOT VERIF
 **Numbering note (report, not resolved silently):** `docs/pilot/QUEUE.md` reserves "T10" for an **L3
 proposal-only** task (SchoolAdmin password policy + optional 2FA) and says Cline must not edit that file. The
 owner's instruction in chat of 2026-12-11 assigns T10 to *this* release-readiness task. Both are kept; the queue
-file is untouched. Which number the 2FA proposal takes is `DECISION REQUIRED` (owner).
+file is untouched. `DECISION REQUIRED` closed on 2026-12-13: the 2FA proposal is tracked as **`T11-totp-2fa`**.
 
 ---
 
@@ -34,7 +34,7 @@ name: they are **not** stored (`CURRENT`).
 
 | Component | `CURRENT` state |
 |---|---|
-| Django apps | `students, dashboard, schools, vocabulary, missions, exams, risk, interventions, docqa` (`config/settings/base.py:10-25`); `demo_intel` is demo-settings only (`config/settings/demo.py:22`) |
+| Django apps | `students, dashboard, schools, vocabulary, missions, exams, risk, interventions, docqa` (`config/settings/base.py:17-35`); `demo_intel` is demo-settings only (`config/settings/demo.py:22`) |
 | Migrations | 53 migration files across the apps (`ls django_core/*/migrations/*.py | grep -v __init__ | wc -l` → `53`); `makemigrations --check --dry-run` is part of the gate and reports no pending change |
 | Settings modules | `development`, `production`, `demo`, `test_sqlite`, `test_postgres`, `restore_check` (`config/settings/`) |
 | FastAPI (AI layer) | `fastapi_core/` (chat/RAG/documents); every route 403 while `ENABLE_AI_FEATURES` is off (`docs/pilot/PILOT_CONFIG.md`) |
@@ -56,7 +56,8 @@ name: they are **not** stored (`CURRENT`).
 5. The gate is re-run (sqlite + pg) on the exact commit that is handed to the school; a green run on an older
    commit is not evidence for a newer one.
 6. Freeze lifts only by an explicit owner statement in chat; it is not inferred from a green test run.
-7. Tagging the release (`v0.x`) is `DECISION REQUIRED` — no tag was created here.
+7. Tagging the release: **decided by the owner on 2026-12-13 — `v1.0.0-pilot.1`**, created on `main` at the merge of
+   `work/T10-pilot-release-readiness`. No other tag is valid for this pilot.
 
 
 
@@ -78,15 +79,16 @@ Each row names the evidence. "T9-R" = `docs/pilot/T9-MULTI-SCHOOL-READINESS-REPO
 | G10 | Entitlements fail closed | `schools/entitlements.py`; a new school gets no module (T9-F1 LOW, onboarding checklist in T9-R §6) | `CURRENT` |
 | G11 | Front-end supply chain | self-hosted vendored assets, `eip.E004` deployment check refuses a CDN reference | `CURRENT` |
 | G12 | Regression gate on this commit | §6 below (sqlite + pg + the new brand tests) | `CURRENT` |
-| G13 | Backup + restore drilled | `scripts/backup.sh`, `restore_backup.sh`, `test_backup_restore.sh`, `config/settings/restore_check.py` exist; **not run in this task** | `NOT VERIFIED` (T11 runbook) |
+| G13 | Backup + restore drilled | `scripts/backup.sh`, `restore_backup.sh`, `test_backup_restore.sh`, `config/settings/restore_check.py` exist; **not run in this task** | `NOT VERIFIED` (needs a runbook task; number unassigned — `T11` is now `T11-totp-2fa`) |
 | G14 | Stronger password policy / optional 2FA | the queue's own T10 (L3, proposal only) is untouched; still UNDECIDED | `DEFERRED` |
-| G15 | National id uniqueness across two schools | S7 decision; two schools cannot both hold the same national id (a blocker, not a leak) | `DECISION REQUIRED` (T9-F3, `docs/changes/0020`) |
+| G15 | National id uniqueness across two schools | S7 decision; two schools cannot both hold the same national id (a blocker, not a leak) | **deferred for the pilot 2026-12-13 (owner, D1)** — one school only; `DECISION REQUIRED` again before school #2 (T9-F3, `docs/changes/0020`) |
 | G16 | Superuser sees every school | true until S8; keep superusers in operator hands | `DEFERRED` (T9-F5) |
 | G17 | FastAPI tests + image exposure | run separately from `run_tests.sh`; last recorded `Ran 74 tests` / `OK (skipped=7)` in the image with `--network none` (T8); not re-run here | `NOT VERIFIED` for this commit |
 | G18 | Browser rendering / a11y in a real browser | `scripts/dev/page_audit.mjs` is dev-only; the rendered a11y walk runs inside the Django tests | `NOT VERIFIED` (manual pass pending) |
 
-No gate changed status in this task: T10 only renames the product in the UI. G15 and G16 stay owner decisions
-rather than defects.
+No gate changed status *because of the code* in this task: T10 only renames the product in the UI. The owner's
+decisions of 2026-12-13 touched two rows and neither is a defect: G15 is deferred for the pilot (one school only) and
+G16 stays deferred (superusers see every school until S8) — both need a decision again before a second school.
 
 ## 5. Branding verification (evidence)
 
@@ -117,7 +119,7 @@ Everything below is a real command run on this branch; each output was redirecte
 | 3 | `manage.py test students dashboard schools vocabulary missions exams risk interventions docqa` (`config.settings.test_sqlite`) | `Ran 1610 tests in 1228.920s` / `OK (skipped=11)` | `CURRENT` |
 | 4 | `manage.py test demo_intel` (`config.settings.demo`) | first pass `FAILED (failures=1)`; after the test-only fix below `Ran 62 tests in 299.486s` / `OK` | `CURRENT` |
 | 5 | `manage.py test dashboard.test_branding` (`config.settings.test_sqlite`) | `OK`, `brand_exit=0`, 3 tests | `CURRENT` |
-| 6 | `scripts/run_tests.sh pg` (PostgreSQL leg) | not run for this commit | `NOT VERIFIED` |
+| 6 | `DJANGO_IMAGE=eip-test-django:local scripts/run_tests.sh pg` (PostgreSQL 16, disposable container) | `Ran 1610 tests in 1963.355s` / `OK (skipped=1)`; last line `POSTGRESQL CHECKS AND TESTS PASSED (PostgreSQL 16 in a disposable container; FastAPI not covered)` | `CURRENT` |
 
 **The one demo failure, and why it was not a leak.** `demo_intel.tests.SeedDemoPlatformAccountTests.`
 `test_login_lands_on_the_operator_page_and_sees_no_students` asserts that no seeded student first name appears on
@@ -133,19 +135,19 @@ not mistaken for a data leak in a future review.
 **What is *not* verified for this commit.** The redundant second `sqlite` pass was aborted on purpose (the owner asked
 to stop the polling loop); the evidence is the first full pass above, and the only change made after it is the
 test-only edit in `demo_intel/tests.py`, whose module was then re-run green on its own (`Ran 62 tests / OK`). The
-PostgreSQL leg of the gate has **not** been run on this branch (`NOT VERIFIED`); one owner command
-(`scripts/run_tests.sh pg`) closes it. Per-step exit codes are only available for the steps re-run individually
-(row 1, 2, 5); rows 3 and 4 are quoted from the verdict lines of the redirected run.
+PostgreSQL leg was then run to completion on this branch and passed (row 6). Per-step exit codes are only available
+for the steps re-run individually (row 1, 2, 5); rows 3, 4 and 6 are quoted from the verdict lines of the redirected
+run. The FastAPI suite is **not** covered by `run_tests.sh` and was not run here.
 
 ## 7. What the owner still has to decide before the first real student
 
 | # | Item | Why it blocks the pilot | Label |
 |---|---|---|---|
-| D1 | S7 `national_id` uniqueness (global vs per school) | a second school cannot import a roster whose ids collide with the first school's | `DECISION REQUIRED` (T9-F3) |
+| D1 | S7 `national_id` uniqueness (global vs per school) | a second school cannot import a roster whose ids collide with the first school's | **decided 2026-12-13 (owner): stays deferred for the pilot** (one school; T9-F3 open) |
 | D2 | Superuser visibility until S8 | every superuser sees every school; keep those accounts with the operator | `DEFERRED` (T9-F5) |
 | D3 | Stronger password policy / 2FA for SchoolAdmins | pilot accounts use national ids as usernames; the queue's L3 T10 proposes options | `DEFERRED` (proposal not written) |
-| D4 | Release tag / version string | the manifest above has no version; nothing was tagged | `DECISION REQUIRED` |
-| D5 | Which T-number the 2FA proposal takes | the queue reserves T10 for it and this task reuses the name | `DECISION REQUIRED` |
+| D4 | Release tag / version string | the manifest above has no version; nothing was tagged | **decided 2026-12-13 (owner): `v1.0.0-pilot.1`, created at the merge** |
+| D5 | Which T-number the 2FA proposal takes | the queue reserves T10 for it and this task reuses the name | **decided 2026-12-13 (owner): the 2FA proposal is tracked as `T11-totp-2fa`** |
 | D6 | Backup/restore drill on the real server | `test_backup_restore.sh` exists but was not run here | `NOT VERIFIED` |
 | D7 | Modules enabled per school | a new school reaches nothing until each module is enabled (T9-F1) | `CURRENT` documented, action per school |
 
@@ -156,6 +158,11 @@ steps in `docs/pilot/T9-MULTI-SCHOOL-READINESS-REPORT.md` §6.** The release fre
 commit; the gate is re-run on whatever commit is actually handed over. Nothing in this task changed a permission,
 a query scope or a migration — it changed the product's name and wrote down what "ready" means.
 
-`NOT VERIFIED` remains for: the PostgreSQL leg of `scripts/run_tests.sh` on this branch, the FastAPI suite on this
-commit, a real browser pass, a real PostgreSQL deployment with two schools, and the backup/restore drill.
+`NOT VERIFIED` remains for: the FastAPI suite on this commit, a real browser pass, a real PostgreSQL deployment with
+two schools, and the backup/restore drill. The full Django gate is green on this commit on **both** engines
+(sqlite `Ran 1610 / OK (skipped=11)`, pg `Ran 1610 / OK (skipped=1)`).
+
+Release: merged to `main` and tagged **`v1.0.0-pilot.1`** on 2026-12-13 by the owner's instruction. D1 (national-id
+uniqueness) stays deferred for the pilot; D5 resolved as `T11-totp-2fa`; the 2FA work itself is still
+`DEFERRED` — this release has no 2FA.
 
