@@ -68,6 +68,43 @@ class SettingChecksTests(SimpleTestCase):
         self.assertEqual(dc.database_password_errors({'ENGINE': 'django.db.backends.sqlite3'}), [])
 
 
+class CorsDeployCheckTests(SimpleTestCase):
+    """eip.E007 (ADR-0014): the CORS list may only name https origins, and never a wildcard."""
+
+    @override_settings(DEBUG=False, CORS_ALLOWED_ORIGINS=[], CORS_ALLOW_ALL_ORIGINS=False)
+    def test_empty_list_is_silent(self):
+        self.assertEqual(dc.cors_origin_errors(), [])
+
+    @override_settings(DEBUG=False, CORS_ALLOWED_ORIGINS=['https://men.example.ir', 'https://women.example.ir'])
+    def test_https_origins_are_fine(self):
+        self.assertEqual(dc.cors_origin_errors(), [])
+
+    @override_settings(CORS_ALLOWED_ORIGINS=['http://men.example.ir'])
+    def test_plain_http_origin_is_an_error(self):
+        self.assertEqual(ids(dc.cors_origin_errors()), ['eip.E007'])
+
+    @override_settings(DEBUG=False, CORS_ALLOW_ALL_ORIGINS=True, CORS_ALLOWED_ORIGINS=[])
+    def test_wildcard_flag_is_an_error(self):
+        self.assertEqual(ids(dc.cors_origin_errors()), ['eip.E007'])
+
+    @override_settings(DEBUG=False, CORS_ALLOWED_ORIGINS=['*'])
+    def test_star_entry_is_an_error(self):
+        self.assertEqual(ids(dc.cors_origin_errors()), ['eip.E007'])
+
+    @override_settings(DEBUG=True, CORS_ALLOWED_ORIGINS=['http://localhost:5173', 'http://127.0.0.1:5174'])
+    def test_dev_loopback_list_is_tolerated(self):
+        self.assertEqual(dc.cors_origin_errors(), [])
+
+    @override_settings(CORS_ALLOWED_ORIGINS=['http://localhost:5173'],
+                       ALLOWED_HOSTS=['school.example.ir'], CSRF_TRUSTED_ORIGINS=['https://school.example.ir'],
+                       SECURE_SSL_REDIRECT=True, SECURE_PROXY_SSL_HEADER=('HTTP_X_FORWARDED_PROTO', 'https'),
+                       SECURE_HSTS_SECONDS=31536000)
+    def test_the_deploy_check_reports_it(self):
+        with override_settings(CORS_ALLOWED_ORIGINS=['http://women.example.ir']):
+            self.assertIn('eip.E007', ids(dc.check_hosts_and_origins(None)))
+        self.assertEqual(ids(dc.check_hosts_and_origins(None)), [])   # loopback dev origins stay silent
+
+
 class ProductionSettingsTests(SimpleTestCase):
     """The real production settings pass `check --deploy --fail-level WARNING` with complete values and fail without them."""
 

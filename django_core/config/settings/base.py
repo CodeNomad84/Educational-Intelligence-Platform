@@ -23,6 +23,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'django_filters',
+    'corsheaders',                 # ADR-0014 / changes/0040: CORS for the two presentation frontends (empty list = no cross-origin access)
     'students',
     'dashboard',
     'schools',
@@ -36,6 +37,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'corsheaders.middleware.CorsMiddleware',   # ADR-0014: before CommonMiddleware so a preflight can be answered early
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -79,6 +81,14 @@ LOGIN_URL = 'dashboard:login'
 # Behind a reverse proxy set THROTTLE_TRUSTED_PROXIES to the proxy address(es)/networks (comma separated, e.g. "10.0.0.5,172.18.0.0/16");
 # only then, and only for a request that really comes from one of them, the real client is taken from X-Forwarded-For.
 THROTTLE_TRUSTED_PROXIES = [x.strip() for x in os.environ.get('THROTTLE_TRUSTED_PROXIES', '').split(',') if x.strip()]
+
+# CORS for the two presentation frontends (ADR-0014, docs/changes/0040). The SAME fail-closed idiom as
+# SERVICE_JWT_SECRET below: no origin is trusted until the operator names it, so a fresh deployment exposes no
+# cross-origin access at all. The recommended deployment (D2) is one origin through a reverse proxy, which needs no
+# entry here. A "*" entry is refused by the deploy check (eip.E007) because credentials + wildcard is invalid.
+CORS_ALLOWED_ORIGINS = [o.strip() for o in os.environ.get('CORS_ALLOWED_ORIGINS', '').split(',') if o.strip()]
+CORS_ALLOW_CREDENTIALS = bool(CORS_ALLOWED_ORIGINS)   # a session cookie is only sent to explicitly named origins
+CORS_ALLOW_ALL_ORIGINS = False                        # never: a wildcard with credentials is unsafe and invalid
 
 # Django -> FastAPI service trust (ADR-0002, interim). Read from the environment only;
 # there is deliberately NO default. Empty/short value => service calls fail closed.

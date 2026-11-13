@@ -155,5 +155,37 @@ Tests: `dashboard/test_principal.py`, `test_behavior.py`, `test_report_card.py`;
 ## FastAPI and `/llm/complete/` exposure (owner decision 2026-11-02)
 FastAPI (including the AI route `/llm/complete/`) is reachable ONLY over the internal Docker network (`http://fastapi:8001`, called by Django with the signed service token). **No port is published** for it in `docker-compose.yml` (the earlier loopback mapping `127.0.0.1:8001` was removed), the nginx example has no rule to it, and every route requires the token (`verify_jwt`; the AI route additionally needs the SchoolAdmin role and one school in the token). Checks that fail the build: `fastapi_core/tests/test_exposure.py` (a published port, host networking, or any reference to 8001/fastapi/`/llm` under `deploy/`), `test_every_non_public_route_requires_authentication` and `LLMRouteTests` (token removed or role relaxed). `CURRENT` for the repository files; `NOT VERIFIED` on a running server (check with `ss -ltnp` and an external port scan after deployment; owner/ops task). For local debugging use `docker compose exec fastapi ...`, not a published port.
 
+## JSON auth API and CORS (ADR-0014, 2026-11-13)
+`/api/auth/csrf/`, `/api/auth/login/`, `/api/auth/logout/`, `/api/auth/me/` (`dashboard/auth_api.py`) are the only new
+auth surface. Rules, all enforced by tests in `dashboard/test_auth_api.py`:
+
+- **One credential check.** `login/` calls `authenticate()` under `dashboard/throttle.py` — the same per-username (5) and
+  per-address (20) counters as `/login/`, `/admin/` and `/api/token/`, the same `LOCKED_MESSAGE`, and the same refusal of a
+  `must_change_password` account (no session is created). A wrong password, an unknown username and an inactive account
+  return one byte-identical 401 body (no enumeration).
+- **Session, not storage.** Success creates the ordinary Django session cookie (`login()` rotates the session key). No
+  token is returned and nothing is stored in `localStorage`.
+- **CSRF.** `GET /api/auth/csrf/` sets `csrftoken`; `login/` is `csrf_protect` (DRF's `APIView` is `csrf_exempt` inside the
+  middleware chain, so the check is restored explicitly) and `logout/` inherits DRF's `SessionAuthentication` CSRF check.
+  `SameSite=Lax` is unchanged: a same-site dev origin (`localhost:5173` → `:8000`) and a reverse-proxied single origin both
+  work; a different registrable domain would need `SameSite=None; Secure` and is **not** supported.
+- **No `BasicAuthentication`** (D4=a). `/me/` accepts `SessionAuthentication` and the existing `JWTAuthentication`; nothing
+  accepts a password on a non-login request.
+- **`must_change_password` over `/api/`.** `ForcePasswordChangeMiddleware` now returns `403 {"detail","code"}` for an
+  `/api/…` path instead of a 302 to an HTML page; `login/`, `csrf/`, `logout/` stay reachable. A fetch client can no longer
+  mistake a redirect for success.
+- **CORS is fail-closed.** `CORS_ALLOWED_ORIGINS` is read from the environment and is **empty** by default, with
+  `CORS_ALLOW_CREDENTIALS` following it and `CORS_ALLOW_ALL_ORIGINS = False`. `development.py` adds only loopback
+  origins (5173/5174). `eip.E007` fails a release for a wildcard or an external `http://` origin. The recommended
+  deployment is one origin behind a reverse proxy, which needs no entry.
+- **No third-party AI.** The `@lovable.dev/ai-gateway` call in `frontend-women/src/lib/mentor-chat.functions.ts` (roster +
+  counselling notes) is removed (D9=a); that server function now answers extractively from the built-in knowledge base and
+  makes no network call. `AI_GOVERNANCE.md`/ADR-0008 still gate any real model path.
+- **Not audited (DECISION REQUIRED, D7=a):** a login writes no `AuditEvent`, because `AuditEvent.school` is non-nullable and
+  a platform operator has no school. Adding it needs its own L2 proposal.
+- **Frontends are untracked and outside the test gate.** `frontend-men/`, `frontend-women/` are not built by
+  `scripts/run_tests.sh` and are not in CI; their `src/lib/api.ts` and `vite.config.ts` changes were not executed here
+  (no JS toolchain on the development host — **NOT VERIFIED**).
+
 ## R-04 status (P9, 2026-11-02)
 The application no longer needs a PostgreSQL superuser: `school_app` (DML only) at runtime, `school_owner` for migrations, `school_admin` for maintenance (`DEPLOYMENT.md` 4a, decision 65). `CURRENT` in the repository and rehearsed in throw-away containers (`scripts/test_db_roles.sh`, CI job `dbroles`); `NOT VERIFIED` on a real server (nothing is deployed). Residual: Redis without authentication (internal network only); the bootstrap superuser exists and must have its own strong password; `school_app` can read every table of the installation (school isolation is enforced in the application, not by row-level security).

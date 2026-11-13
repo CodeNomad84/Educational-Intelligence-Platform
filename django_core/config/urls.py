@@ -18,6 +18,9 @@ urlpatterns = [
     # ✅ مسیرهای احراز هویت JWT
     path('api/token/', ThrottledTokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    # JSON session auth for the presentation frontends (ADR-0014, docs/changes/0040): csrf/, login/, logout/, me/.
+    # Additive: /api/token/ above is unchanged and keeps working for machine clients.
+    path('api/auth/', include('dashboard.auth_api')),
     path('mission/', include('missions.urls')),
     path('exams/', include('exams.urls')),
     path('rules/', include('risk.urls')),

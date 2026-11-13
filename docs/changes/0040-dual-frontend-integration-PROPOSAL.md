@@ -1,6 +1,6 @@
 # 0040 — Dual frontend (frontend-men / frontend-women): CORS, session login and `/api/auth/me/` (CHANGE PROPOSAL — no application code changed)
 
-Level: **L3** · Status: **BLOCKED — DECISION REQUIRED (D0–D13, see §18)** · Date: 2026-11-13
+Level: **L3** · Status: **APPROVED 2026-11-13** (owner approved the vertical slice: D0=a, D1=a, D2=a, D3=a, D4=a, D5=a, D6=a, D7=a, D8=a, D9=a; §18's D10-D12 resolved as fetch / no login route yet / backend first) · Date: 2026-11-13 · Implementation: `docs/changes/0040-dual-frontend-integration-REPORT.md` · ADR: `docs/adr/0014-two-json-frontends.md`
 Branch `work/dual-frontend-integration`, created **from `phase-1/boot-security`** per STANDING RULES.
 
 **This task changed no code, no setting, no dependency, no migration and no test, and ran no test.** It created this
