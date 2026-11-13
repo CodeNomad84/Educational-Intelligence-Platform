@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}پلتفرم هوشمند مدرسه{% endblock %}</title>
+    <meta name="application-name" content="{{ PLATFORM_NAME }}">
+    <meta name="description" content="{{ PLATFORM_NAME_EN }} — از داده‌های پراکنده تا حمایت به‌موقع از هر دانش‌آموز">
+    <title>{% block title %}{{ PLATFORM_NAME }}{% endblock %}</title>
     <link href="{% static 'dashboard/vendor/bootstrap-5.3.0/bootstrap.rtl.min.css' %}" rel="stylesheet">
     <link rel="stylesheet" href="{% static 'dashboard/vendor/bootstrap-icons-1.11.3/bootstrap-icons.min.css' %}">
     <link rel="stylesheet" href="{% static 'dashboard/css/eip.css' %}">
@@ -15,7 +17,7 @@
         <div class="d-flex align-items-center justify-content-between">
             <div class="eip-brand">
                 <span class="eip-brand-mark" aria-hidden="true"><i class="bi bi-mortarboard" aria-hidden="true"></i></span>
-                <span><span class="eip-brand-name d-block">پلتفرم هوشمند مدرسه</span>{% if SCHOOL_NAME %}<span class="eip-brand-sub d-block">{{ SCHOOL_NAME }}</span>{% endif %}</span>
+                <span><span class="eip-brand-name d-block">{{ PLATFORM_NAME }}</span>{% if SCHOOL_NAME %}<span class="eip-brand-sub d-block">{{ SCHOOL_NAME }}</span>{% endif %}</span>
             </div>
             <button type="button" class="btn-close d-md-none ms-3" data-bs-dismiss="offcanvas" data-bs-target="#eipSidebar" aria-label="بستن منو"></button>
         </div>
@@ -82,7 +84,7 @@
         {% if DEMO_MODE %}<div class="eip-demo-banner" role="note"><i class="bi bi-info-circle" aria-hidden="true"></i> نسخهٔ نمایشی: همهٔ نام‌ها و داده‌ها ساختگی است.</div>{% endif %}
         <header class="eip-topbar">
             <button class="btn btn-light btn-sm d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#eipSidebar" aria-controls="eipSidebar" aria-label="باز کردن منو"><i class="bi bi-list fs-5" aria-hidden="true"></i></button>
-            <div class="eip-topbar-title">{{ SCHOOL_NAME|default:"پلتفرم هوشمند مدرسه" }}</div>
+            <div class="eip-topbar-title">{{ SCHOOL_NAME|default:PLATFORM_NAME }}</div>
             <div class="ms-auto d-flex align-items-center gap-2">
             {% if IS_SCHOOL_ADMIN or IS_GRADE_LEAD or IS_COUNSELOR %}<a class="btn btn-light btn-sm position-relative" href="{% url 'dashboard:notifications' %}" aria-label="اعلان‌ها"><i class="bi bi-bell" aria-hidden="true"></i>{% if NOTIF_COUNT %}<span class="badge text-bg-danger position-absolute top-0 start-0 translate-middle rounded-pill">{{ NOTIF_COUNT }}</span>{% endif %}</a>{% endif %}
             <div class="dropdown">

@@ -1,6 +1,10 @@
 # Educational Intelligence Platform
 
 AI-native school platform for monitoring and supporting student growth, built around **Student 360**.
+
+Product name shown in the UI: **سکوی آموزشی-تربیتی آرمان نو** — *Arman-e-No Educational & Upbringing Platform*.
+It comes from `PLATFORM_NAME` / `PLATFORM_NAME_EN` in `django_core/config/settings/base.py` (T10); no template
+carries it as a literal.
 AI is advisory; humans decide.
 
 > **Status: early prototype. Phase 1 fixes the known start-up blockers and contains the critical authorization holes, but PostgreSQL/FastAPI bring-up was last verified on 2026-10-12 and has not been re-run since (deferred verification gate). Must not hold real student data.** See `docs/SECURITY.md` and `docs/audit/STAGE0_BASELINE.md`. Copy `.env.example` to `.env` and set `SERVICE_JWT_SECRET` before running.

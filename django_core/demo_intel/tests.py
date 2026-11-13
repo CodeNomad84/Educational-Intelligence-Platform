@@ -728,7 +728,10 @@ class SeedDemoPlatformAccountTests(TestCase):
         page = self.client.get("/platform/modules/")
         self.assertEqual(page.status_code, 200)
         names = " ".join(Student.objects.values_list("first_name", flat=True))
-        self.assertFalse(any(n and n in page.content.decode() for n in names.split()[:5]))
+        # T10: the operator page shows the product name, and a seeded student is called "آرمان", which is part of
+        # "سکوی آموزشی-تربیتی آرمان نو". Drop the brand before the substring check: it is not student data.
+        html = page.content.decode().replace(settings.PLATFORM_NAME, "")
+        self.assertFalse(any(n and n in html for n in names.split()[:5]))
         self.assertEqual(self.client.get("/students/").status_code, 403)
         self.assertEqual(self.client.get("/school/").status_code, 403)
 

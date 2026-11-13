@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{% block title %}داشبورد{% endblock %} — پلتفرم هوشمند مدرسه (نمایشی)</title>
+<title>{% block title %}داشبورد{% endblock %} — {{ PLATFORM_NAME }} (نمایشی)</title>
 <link href="{% static 'demo_intel/vendor/bootstrap.rtl.min.css' %}" rel="stylesheet">
 <style>
 @font-face{font-family:Vazirmatn;src:url("{% static 'demo_intel/vendor/Vazirmatn-Regular.woff2' %}") format("woff2");font-weight:400}
@@ -34,7 +34,7 @@ table.table td,table.table th{vertical-align:middle}
 <div class="demo-banner">⚠ نسخهٔ نمایشی — تمام دانش‌آموزان و داده‌ها <strong>مصنوعی</strong> هستند. | DEMO — all data is synthetic</div>
 <div class="topbar">
  <div class="container-fluid d-flex flex-wrap align-items-center px-4">
-  <strong class="ms-4">🏫 پلتفرم هوشمند مدرسه</strong>
+  <strong class="ms-4">🏫 {{ PLATFORM_NAME }}</strong>
   <a href="{% url 'dashboard:dashboard' %}" class="{% if active == 'dashboard' %}active{% endif %}">داشبورد مدیریت</a>
   <a href="{% url 'dashboard:demo_counselor' %}" class="{% if active == 'counselor' %}active{% endif %}">داشبورد مشاور</a>
   <a href="{% url 'dashboard:demo_students' %}" class="{% if active == 'students' %}active{% endif %}">دانش‌آموزان</a>
