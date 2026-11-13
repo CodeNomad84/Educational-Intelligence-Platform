@@ -1,0 +1,25 @@
+{# DEMO SCOPE — whole file. #}
+{% extends 'demo_intel/base_demo.html' %}{% load demo_extras %}
+{% block title %}دانش‌آموزان{% endblock %}
+{% block content %}
+<h3 class="mb-3">دانش‌آموزان ({{ rows|length|fa }})</h3>
+<form class="row g-2 mb-3" method="get">
+ <div class="col-md-4"><input name="q" value="{{ q }}" class="form-control" placeholder="جست‌وجوی نام"></div>
+ <div class="col-md-3"><select name="class" class="form-select"><option value="">همهٔ کلاس‌ها</option>
+  {% for c in classes %}<option value="{{ c }}" {% if c == cls %}selected{% endif %}>{{ c|fa }}</option>{% endfor %}</select></div>
+ <div class="col-md-3"><select name="level" class="form-select"><option value="">همهٔ سطوح</option>
+  <option value="HIGH" {% if level == 'HIGH' %}selected{% endif %}>پرخطر</option>
+  <option value="MEDIUM" {% if level == 'MEDIUM' %}selected{% endif %}>نیازمند توجه</option>
+  <option value="LOW" {% if level == 'LOW' %}selected{% endif %}>کم‌خطر</option></select></div>
+ <div class="col-md-2"><button class="btn btn-primary w-100">فیلتر</button></div>
+</form>
+<div class="card"><div class="table-responsive"><table class="table table-hover mb-0">
+ <thead><tr><th>نام</th><th>کلاس</th><th>سطح</th><th>امتیاز</th><th>میانگین اخیر</th><th>غیبت اخیر</th><th></th></tr></thead>
+ <tbody>{% for row in rows %}
+  <tr><td>{{ row.student.first_name }} {{ row.student.last_name }}</td><td>{{ row.student.class_name|fa }}</td>
+   <td>{% include 'demo_intel/_level.html' with r=row.r %}</td><td>{{ row.r.score|fa }}</td>
+   <td>{{ row.r.metrics.avg_recent|one }}</td><td>{{ row.r.metrics.absence_recent|pct }}</td>
+   <td><a class="btn btn-sm btn-outline-primary" href="{% url 'dashboard:student_detail' row.student.id %}">پروفایل</a>
+   <a class="btn btn-sm btn-outline-secondary" href="{% url 'dashboard:student_360' row.student.id %}">پرونده ۳۶۰</a></td></tr>
+ {% endfor %}</tbody></table></div></div>
+{% endblock %}

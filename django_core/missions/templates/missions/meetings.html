@@ -1,0 +1,13 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}جلسات فردی اولیا{% endblock %}{% block page_title %}جلسات فردی اولیا{% endblock %}
+{% block content %}
+<a class="btn btn-link" href="{% url 'missions:report' student.pk %}">← گزارش</a>
+<h4>جلسات فردی اولیا — {{ student.last_name }} {{ student.first_name }}</h4>
+<form method="post" class="card card-body mb-3">{% csrf_token %}{{ form.non_field_errors }}
+  <div class="row g-2">{% for f in form %}<div class="col-md-3">{{ f.label_tag }}{{ f }}{{ f.errors }}</div>{% endfor %}</div>
+  <button class="btn btn-success mt-2">افزودن جلسه</button></form>
+<table class="table table-sm bg-white"><thead><tr><th>تاریخ</th><th>حضور</th><th>قرارها</th><th>کیفیت انجام</th></tr></thead><tbody>
+{% for m in meetings %}<tr><td>{{ m.held_on }}</td><td>{{ m.get_parents_present_display }}</td><td>{{ m.agreements }}</td><td>{{ m.get_quality_display }}</td></tr>
+{% empty %}<tr><td colspan="4" class="text-muted">ثبت نشده است.</td></tr>{% endfor %}</tbody></table>
+{% include 'missions/_footer.html' %}
+{% endblock %}

@@ -1,0 +1,7 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}{{ exam.title }}{% endblock %}{% block page_title %}{{ exam.title }}{% endblock %}
+{% block content %}
+<div class="alert alert-success">همهٔ {{ total }} پرسش را به پاسخ درست رساندید. نمره‌ای ثبت نمی‌شود؛ هر وقت خواستید دوباره از فهرست آزمون‌ها مرور کنید.</div>
+<a class="btn btn-primary" href="{% url 'exams:student_home' %}">← آزمون‌ها</a>
+{% include 'exams/_notice.html' %}
+{% endblock %}

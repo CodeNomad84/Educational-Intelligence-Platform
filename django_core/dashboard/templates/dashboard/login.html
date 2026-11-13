@@ -1,26 +1,5 @@
-{% extends 'dashboard/base.html' %}
+{% extends 'dashboard/base_public.html' %}
 {% block content %}
-<div class="row justify-content-center mt-5">
-    <div class="col-md-4">
-        <div class="card shadow">
-            <div class="card-header bg-primary text-white text-center">
-                <h4>ورود به سیستم</h4>
-            </div>
-            <div class="card-body">
-                <form method="post">
-                    {% csrf_token %}
-                    <div class="mb-3">
-                        <label class="form-label">نام کاربری</label>
-                        <input type="text" name="username" class="form-control" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">رمز عبور</label>
-                        <input type="password" name="password" class="form-control" required>
-                    </div>
-                    <button type="submit" class="btn btn-primary w-100">ورود</button>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
+{% include 'dashboard/_login_form.html' %}
+<p class="eip-note text-center mt-3 mb-0">رمز را فراموش کرده‌اید؟ از مدیر مدرسه بخواهید آن را بازنشانی کند.</p>
 {% endblock %}

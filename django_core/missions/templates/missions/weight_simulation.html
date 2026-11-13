@@ -1,0 +1,20 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}شبیه‌سازی نسخهٔ {{ ws.version }}{% endblock %}{% block page_title %}شبیه‌سازی نسخهٔ {{ ws.version }}{% endblock %}
+{% block content %}
+<a class="btn btn-link" href="{% url 'missions:weight_detail' ws.pk %}">← نسخهٔ {{ ws.version }}</a>
+<div class="alert alert-warning">شبیه‌سازی فقط تفاوت‌های <strong>تجمیعی</strong> را نشان می‌دهد (بدون نام دانش‌آموز، مشاهده‌گر یا شاهد) و ذخیره نمی‌شود. گروه کمتر از ۵ نفر نمایش داده نمی‌شود. نتایج اولیه و اعتبارسنجی‌نشده است.</div>
+{% if not active %}<p class="text-muted">نسخهٔ فعالی برای مقایسه نیست.</p>
+{% elif not period %}<p class="text-muted">دوره‌ای تعریف نشده است.</p>
+{% else %}
+<form method="get" class="mb-3"><select name="period" class="form-select d-inline w-auto" onchange="this.form.submit()">
+  {% for p in periods %}<option value="{{ p.pk }}" {% if p.pk == period.pk %}selected{% endif %}>{{ p.label }} ({{ p.academic_year.code }})</option>{% endfor %}</select>
+  <span class="small text-muted">مقایسهٔ نسخهٔ فعال {{ active.version }} (شناسه {{ active.pk }}) با نسخهٔ {{ ws.version }} (شناسه {{ ws.pk }})</span></form>
+{% if result.withheld %}<p class="text-muted">در این دوره فقط {{ result.n }} دانش‌آموز مشاهده دارند؛ کمتر از {{ result.min_group }} نفر، نمایش داده نمی‌شود.</p>
+{% else %}
+<p>{{ result.n }} دانش‌آموز با مشاهده. پیشنهاد سه شاخهٔ برتر برای {{ result.top3_changed }} نفر تغییر می‌کند.</p>
+<table class="table table-sm bg-white"><thead><tr><th>شاخه</th><th>میانگین فعلی</th><th>میانگین جدید</th><th>تعداد دارای تغییر امتیاز</th><th>امتیازدار (فعلی ← جدید)</th><th>تغییر وضعیت شواهد</th></tr></thead><tbody>
+{% for r in result.rows %}<tr><td>{{ r.branch }}</td><td>{% if r.mean_before is not None %}{{ r.mean_before|floatformat:2 }}{% else %}—{% endif %}</td><td>{% if r.mean_after is not None %}{{ r.mean_after|floatformat:2 }}{% else %}—{% endif %}</td>
+  <td>{% if r.changed is not None %}{{ r.changed }}{% else %}—{% endif %}</td><td>{{ r.scored_before }} ← {{ r.scored_after }}</td><td>{{ r.status_changed }}</td></tr>{% endfor %}</tbody></table>
+{% endif %}{% endif %}
+{% include 'missions/_footer.html' %}
+{% endblock %}

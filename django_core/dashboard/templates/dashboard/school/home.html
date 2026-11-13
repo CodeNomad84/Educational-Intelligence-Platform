@@ -1,0 +1,13 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}مدیریت مدرسه{% endblock %}{% block page_title %}مدیریت مدرسه{% endblock %}
+{% block content %}
+{% include 'dashboard/school/_nav.html' %}
+<div class="row g-3">
+  <div class="col-md-3"><div class="card card-stats"><div class="text-muted">سال تحصیلی جاری</div>
+    <h2 class="h4">{% if year %}{{ year.code }}{% else %}<a href="{% url 'dashboard:school_years' %}">تعریف نشده</a>{% endif %}</h2></div></div>
+  <div class="col-md-2"><div class="card card-stats"><div class="text-muted">کلاس‌ها</div><h2 class="h4">{{ counts.classes }}</h2></div></div>
+  <div class="col-md-2"><div class="card card-stats"><div class="text-muted">دانش‌آموزان</div><h2 class="h4">{{ counts.students }}</h2></div></div>
+  <div class="col-md-2"><div class="card card-stats"><div class="text-muted">معلم‌ها</div><h2 class="h4">{{ counts.teachers }}</h2></div></div>
+  <div class="col-md-3"><div class="card card-stats"><div class="text-muted">مربیان پایه</div><h2 class="h4">{{ counts.gradeleads }}</h2></div></div>
+</div>
+{% endblock %}

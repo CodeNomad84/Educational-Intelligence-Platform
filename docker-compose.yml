@@ -30,23 +30,51 @@ services:
     build: ./django_core
     container_name: django_core
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     volumes:
       - ./django_core:/app
       - ./data/static:/app/staticfiles
       - ./data/media:/app/media
-    env_file: .env
+    env_file:
+      - .env
+      - .env.service   # SERVICE_JWT_SECRET (gitignored); shared with FastAPI only
     depends_on:
-      - postgres
-      - redis
-      - fastapi
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_started
+      redis:
+        condition: service_started
+      fastapi:
+        condition: service_started
+    # R-04: the runtime connects as the least-privilege role school_app (DML only). Schema changes run in the one-shot `migrate` service.
     command: >
-      sh -c "python manage.py migrate &&
-      python manage.py collectstatic --noinput &&
-      gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 3000"
+      sh -c "gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 3000"
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.production
       - USE_POSTGRES=True
+      - DB_USER=school_app
+      - DB_PASSWORD=${DB_APP_PASSWORD:?DB_APP_PASSWORD is required}
+
+  # ========== Migrations (one-shot, the only service that may change the schema) ==========
+  migrate:
+    build: ./django_core
+    container_name: django_migrate
+    volumes:
+      - ./django_core:/app
+      - ./data/static:/app/staticfiles
+    env_file:
+      - .env
+      - .env.service
+    depends_on:
+      - postgres
+    restart: "no"
+    command: sh -c "python manage.py migrate --noinput && python manage.py collectstatic --noinput"
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings.production
+      - USE_POSTGRES=True
+      - DB_USER=school_owner
+      - DB_PASSWORD=${DB_OWNER_PASSWORD:?DB_OWNER_PASSWORD is required}
 
   # ========== Celery Worker (پردازش پس‌زمینه) ==========
   celery:
@@ -61,6 +89,8 @@ services:
     command: celery -A config worker -l info
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.production
+      - DB_USER=school_app
+      - DB_PASSWORD=${DB_APP_PASSWORD:?DB_APP_PASSWORD is required}
 
   # ========== Celery Beat (زمان‌بندی کارها) ==========
   celery_beat:
@@ -76,17 +106,28 @@ services:
     command: celery -A config beat -l info
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.production
+      - DB_USER=school_app
+      - DB_PASSWORD=${DB_APP_PASSWORD:?DB_APP_PASSWORD is required}
 
   # ========== FastAPI ==========
   fastapi:
     build: ./fastapi_core
     container_name: fastapi_core
-    ports:
-      - "8001:8001"
+    # NO published port (owner 2026-11-02): FastAPI, including /llm/complete/, is reachable only over the internal compose network
+    # ("fastapi:8001"), by Django with the signed service token. For local debugging use `docker compose exec fastapi ...`.
+    # A test (fastapi_core/tests/test_exposure.py) fails if a port is published here or nginx proxies to it.
     volumes:
       - ./fastapi_core:/app
       - ./data:/data
-    env_file: .env
+    # Deliberately NOT env_file: .env -- FastAPI must not receive Django's SECRET_KEY, the Django
+    # database owner password, or other Django-only settings.
+    env_file:
+      - .env.service   # SERVICE_JWT_SECRET (gitignored)
+      - .env.fastapi   # DB_USER / DB_PASSWORD of the least-privilege role `fastapi_user` (gitignored)
+    environment:
+      DB_NAME: ${DB_NAME:-school_db}
+      DB_HOST: ${DB_HOST:-postgres}
+      DB_PORT: ${DB_PORT:-5432}
     command: uvicorn main:app --host 0.0.0.0 --port 8001 --workers 2
     depends_on:
       - postgres
@@ -97,20 +138,25 @@ services:
     container_name: postgres_db
     environment:
       POSTGRES_DB: school_db
-      POSTGRES_USER: school_user
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-    ports:
-      - "5432:5432"
+      # R-04: the bootstrap superuser is used for maintenance only (never by the application). On the FIRST start of an empty data
+      # directory deploy/postgres/10-roles.sh creates school_owner (DDL) and school_app (DML). Existing data: docs/DEPLOYMENT.md 4a.
+      POSTGRES_USER: school_admin
+      POSTGRES_PASSWORD: ${DB_ADMIN_PASSWORD:?DB_ADMIN_PASSWORD is required}
+      DB_OWNER_PASSWORD: ${DB_OWNER_PASSWORD:?DB_OWNER_PASSWORD is required}
+      DB_APP_PASSWORD: ${DB_APP_PASSWORD:?DB_APP_PASSWORD is required}
+    # No host port: only Django/Celery/FastAPI reach it over the compose network.
+    # Admin access: docker compose exec postgres psql -U school_admin -d school_db
+    # No env_file: the server needs only the three POSTGRES_* values above (interpolated from
+    # .env by Compose), not Django's SECRET_KEY or the service-token secret.
     volumes:
       - ./data/postgres:/var/lib/postgresql/data
-    env_file: .env
+      - ./deploy/postgres:/docker-entrypoint-initdb.d:ro
 
   # ========== Redis (کش و بروکر Celery) ==========
   redis:
     image: redis:7-alpine
     container_name: redis_cache
-    ports:
-      - "6379:6379"
+    # No host port (no authentication configured): only Django/Celery reach it over the compose network.
     volumes:
       - ./data/redis:/data
 
@@ -118,12 +164,12 @@ services:
   minio:
     image: minio/minio
     container_name: minio_storage
-    ports:
-      - "9000:9000"
-      - "9001:9001"
+    # No host port: not used by the application yet (Phase 9). To use the console, bind it to
+    # 127.0.0.1 only, e.g. "127.0.0.1:9001:9001".
     volumes:
       - ./data/minio:/data
-    env_file: .env
+    env_file:
+      - .env.minio   # MINIO_ROOT_USER / MINIO_ROOT_PASSWORD (gitignored, non-default); not .env
     command: server /data --console-address ":9001"
   
 
@@ -131,7 +177,8 @@ services:
     image: ollama/ollama:latest
     container_name: ollama_server
     ports:
-      - "11434:11434"
+      # Host port 11434 is taken by the system-wide ollama service; containers use "ollama:11434" internally.
+      - "127.0.0.1:11435:11434"
     volumes:
       - ./data/ollama:/root/.ollama  # ماندگاری مدل‌ها
     environment:

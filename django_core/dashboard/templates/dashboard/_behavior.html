@@ -1,0 +1,26 @@
+{% load eip_ui %}
+<div class="card mt-4">
+    <div class="card-header eip-card-head"><span>یادداشت‌های رفتاری</span><span class="eip-card-hint">{% if IS_PARENT and not IS_SCHOOL_ADMIN and not IS_GRADE_LEAD %}فقط یادداشت‌های مثبت{% else %}ثبت‌شده توسط کادر مدرسه؛ برچسب دانش‌آموز نیست{% endif %}</span></div>
+    {% if behavior_notes %}
+    <ul class="list-group list-group-flush">
+        {% for n in behavior_notes %}<li class="list-group-item d-flex flex-wrap gap-2 align-items-start">
+            {% if n.kind == 'positive' %}<span class="eip-badge is-success"><i class="bi bi-hand-thumbs-up" aria-hidden="true"></i> {{ n.get_kind_display }}</span>{% else %}<span class="eip-badge is-warning"><i class="bi bi-exclamation-circle" aria-hidden="true"></i> {{ n.get_kind_display }}</span>{% endif %}
+            <span class="eip-badge">{{ n.get_category_display }}</span>
+            <span class="flex-grow-1">{{ n.note }}</span>
+            <span class="eip-note">{{ n.occurred_on|jdate }}</span>
+        </li>{% endfor %}
+    </ul>
+    {% else %}{% empty_state 'یادداشتی ثبت نشده است' '' 'journal' %}{% endif %}
+    {% if behavior_form %}
+    <div class="card-footer">
+        <form method="post" action="{% url 'dashboard:behavior_new' student.pk %}" class="row g-2 align-items-end">{% csrf_token %}
+            <input type="hidden" name="back" value="{{ request.path }}">
+            <div class="col-6 col-md-2"><label class="form-label small" for="id_kind">{{ behavior_form.kind.label }}</label>{{ behavior_form.kind }}</div>
+            <div class="col-6 col-md-2"><label class="form-label small" for="id_category">{{ behavior_form.category.label }}</label>{{ behavior_form.category }}</div>
+            <div class="col-12 col-md-5"><label class="form-label small" for="id_note">{{ behavior_form.note.label }}</label>{{ behavior_form.note }}</div>
+            <div class="col-6 col-md-2"><label class="form-label small" for="id_occurred_on">{{ behavior_form.occurred_on.label }}</label>{{ behavior_form.occurred_on }}</div>
+            <div class="col-6 col-md-1"><button class="btn btn-primary w-100">ثبت</button></div>
+        </form>
+    </div>
+    {% endif %}
+</div>

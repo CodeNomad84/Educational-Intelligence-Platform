@@ -1,0 +1,22 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}پرسش{% endblock %}{% block page_title %}پرسش{% endblock %}
+{% block content %}
+<a class="btn btn-link" href="{% url 'exams:teacher_home' %}">← بانک پرسش</a>
+{% if read_only %}<div class="alert alert-secondary">فقط مشاهده: فقط سازندهٔ پرسش آن را ویرایش می‌کند و بعد از اولین تلاش دانش‌آموزان ویرایش بسته می‌شود (پرسش را بازنشسته و نسخهٔ تازه بسازید).</div>{% endif %}
+{% for e in errors %}<div class="alert alert-danger">{{ e }}</div>{% endfor %}
+<form method="post" class="card card-body">{% csrf_token %}
+  <div class="row g-2 mb-2">
+    <div class="col-md-4"><label>درس</label><select name="scope" class="form-select" {% if read_only %}disabled{% endif %}>{% for key, label in scopes %}<option value="{{ key }}" {% if key == state.scope %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+    <div class="col-md-8"><label>مبحث (از مبحث‌های همین درس)</label><select name="topic" class="form-select" {% if read_only %}disabled{% endif %}>
+      {% for key, ts in topics_by_scope.items %}{% for t in ts %}<option value="{{ t.pk }}" {% if t.pk == state.topic %}selected{% endif %}>{{ t.label_fa }} — {{ t.code }}</option>{% endfor %}{% endfor %}</select></div>
+  </div>
+  <label>متن پرسش</label><textarea name="stem" rows="3" class="form-control mb-3" maxlength="2000" {% if read_only %}disabled{% endif %}>{{ state.stem }}</textarea>
+  <p class="small text-muted">برای هر گزینه، چه درست چه غلط، یک توضیح بنویسید: دانش‌آموز بعد از انتخاب همان گزینه آن را می‌بیند. دو تا پنج گزینه؛ دقیقاً یکی درست.</p>
+  {% for s in slots %}<div class="row g-2 mb-2 align-items-start">
+    <div class="col-md-1 text-center pt-2"><input type="radio" name="correct" value="{{ s.i }}" {% if state.correct == s.i|stringformat:'s' %}checked{% endif %} {% if read_only %}disabled{% endif %} title="پاسخ درست"> {{ s.i }}</div>
+    <div class="col-md-4"><input name="o{{ s.i }}_text" class="form-control" placeholder="متن گزینه" maxlength="300" value="{{ s.text }}" {% if read_only %}disabled{% endif %}></div>
+    <div class="col-md-7"><textarea name="o{{ s.i }}_expl" rows="2" class="form-control" placeholder="توضیح این گزینه" maxlength="1000" {% if read_only %}disabled{% endif %}>{{ s.explanation }}</textarea></div></div>{% endfor %}
+  {% if not read_only %}<button class="btn btn-success mt-2">ذخیره (پیش‌نویس)</button>{% endif %}
+</form>
+{% include 'exams/_notice.html' %}
+{% endblock %}

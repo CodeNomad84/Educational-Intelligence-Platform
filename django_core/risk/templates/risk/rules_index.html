@@ -1,0 +1,38 @@
+{% extends 'dashboard/base.html' %}
+{% load eip_ui %}
+{% block title %}قواعد هشدار{% endblock %}{% block page_title %}قواعد هشدار{% endblock %}
+{% block content %}
+{% include 'dashboard/school/_nav.html' %}
+<h2>قواعد هشدار (قاعده‌محور و قابل‌توضیح)</h2>
+<div class="alert alert-warning">{{ unvalidated }} قاعده فقط می‌گوید «کدام شرط برقرار بود»؛ نمرهٔ ریسک یا سطح‌بندی وجود ندارد و هر هشدار باید توسط یک انسان بررسی شود.</div>
+<div class="card card-body mb-3"><h2 class="h6">تنظیمات مدرسه</h2>
+<form method="post" action="{% url 'rules:settings' %}" class="row g-2 small">{% csrf_token %}
+  <div class="col-md-3"><label for="id_grade_scale_max">سقف مقیاس نمره (برای قاعدهٔ میانگین؛ خالی = تنظیم‌نشده، فعال‌سازی ممکن نیست)</label>
+    <input class="form-control form-control-sm" id="id_grade_scale_max" name="grade_scale_max" value="{{ settings.grade_scale_max|default_if_none:'' }}" inputmode="numeric"></div>
+  <div class="col-md-3"><label for="id_breaker_percent">قطع‌کن: حداکثر درصد دانش‌آموزانی که یک قاعده می‌تواند هم‌زمان هشدار بگیرد</label>
+    <input class="form-control form-control-sm" id="id_breaker_percent" name="breaker_percent" value="{{ settings.breaker_percent }}" inputmode="numeric"></div>
+  <div class="col-md-3 pt-4"><label><input type="checkbox" name="second" {% if settings.require_second_approver %}checked{% endif %}> تأییدکنندهٔ دوم (غیر از سازنده)</label></div>
+  <div class="col-md-3 pt-3"><button class="btn btn-sm btn-primary">ذخیره</button></div>
+</form></div>
+<div class="mb-3"><a class="btn btn-sm btn-success" href="{% url 'rules:create' %}">قاعدهٔ جدید</a>
+  <a class="btn btn-sm btn-primary" href="{% url 'rules:catalog' %}">کاتالوگ پیش‌فرض</a> <a class="btn btn-sm btn-outline-primary" href="{% url 'rules:import' %}">درون‌ریزی از Excel</a>
+  {% for code in starters %}<a class="btn btn-sm btn-outline-secondary" href="{% url 'rules:create' %}?from={{ code }}">از پیشنهاد اولیه: {{ code }}</a>{% endfor %}</div>
+<table class="table table-sm bg-white">
+  <thead><tr><th scope="col">کد</th><th scope="col">نسخه</th><th scope="col">عنوان</th><th scope="col">نوع</th><th scope="col">شدت</th><th scope="col">وضعیت</th><th scope="col"><span class="visually-hidden">اقدام‌ها</span></th></tr></thead>
+  <tbody>{% for r in rules %}<tr><td>{{ r.code }}</td><td>{{ r.version }}</td><td>{{ r.title }}</td><td>{{ r.risk_type }}</td><td>{{ r.severity }}</td>
+    <td><span class="badge bg-secondary">{{ r.get_status_display }}</span></td><td><a href="{% url 'rules:detail' r.pk %}">باز کردن</a></td></tr>
+  {% empty %}<tr><td colspan="7" class="text-muted">هنوز قاعده‌ای تعریف نشده است.</td></tr>{% endfor %}</tbody>
+</table>
+<h2 class="h5 mt-4">اجرای قواعد</h2>
+<p class="small text-muted">قواعد فعال را روی دانش‌آموزان همین مدرسه اجرا می‌کند. اجرای خودکار زمان‌بندی‌شده وجود ندارد (دستور <code>run_rules</code> در RUNBOOK).</p>
+{% if has_active %}<form method="post" action="{% url 'rules:run' %}" class="mb-3">{% csrf_token %}<button class="btn btn-sm btn-warning">اجرای قواعد فعال همین حالا</button></form>{% endif %}
+<table class="table table-sm bg-white small"><thead><tr><th scope="col">زمان</th><th scope="col">قاعده</th><th scope="col">وضعیت</th><th scope="col">ارزیابی‌شده</th><th scope="col">برقرار</th><th scope="col">هشدار جدید</th><th scope="col">مهلت/تکراری</th><th scope="col">داده ناکافی</th></tr></thead>
+<tbody>{% for r in runs %}<tr class="{% if r.status != 'ok' %}table-danger{% endif %}"><td>{{ r.started_at|jdate }} {{ r.started_at|date:'H:i' }}</td><td>{{ r.rule.code }} v{{ r.rule.version }}</td><td>{{ r.get_status_display }}{% if r.status == 'breaker_tripped' %}<div>آستانه‌ها را بازبینی کنید: {{ r.hits }} از {{ r.evaluated }} دانش‌آموز برقرار بود.</div>{% endif %}</td>
+<td>{{ r.evaluated }}</td><td>{{ r.hits }}</td><td>{{ r.alerts_raised }}</td><td>{{ r.skipped_cooldown }}</td><td>{{ r.skipped_insufficient }}</td></tr>
+{% empty %}<tr><td colspan="8" class="text-muted">هنوز اجرایی انجام نشده است.</td></tr>{% endfor %}</tbody></table>
+<h2 class="h5 mt-4">کیفیت قواعد (فقط شمارش؛ مقادیر کمتر از ۵ پنهان است)</h2>
+<table class="table table-sm bg-white small"><thead><tr><th scope="col">قاعده</th><th scope="col">هشدار</th><th scope="col">پذیرفته‌شده</th><th scope="col">ردشده (به تفکیک دلیل)</th></tr></thead>
+<tbody>{% for q in quality %}<tr><td>{{ q.code }}</td>{% if q.withheld %}<td colspan="3" class="text-muted">تعداد کمتر از ۵؛ نمایش داده نمی‌شود</td>{% else %}
+<td>{{ q.raised }}</td><td>{% if q.accepted is None %}—{% else %}{{ q.accepted }}{% endif %}</td><td>{% for reason, n in q.dismissed.items %}{{ reason }}: {% if n is None %}—{% else %}{{ n }}{% endif %}{% if not forloop.last %}، {% endif %}{% endfor %}</td>{% endif %}</tr>
+{% empty %}<tr><td colspan="4" class="text-muted">هنوز هشداری از قواعد ثبت نشده است.</td></tr>{% endfor %}</tbody></table>
+{% endblock %}

@@ -1,0 +1,19 @@
+{% extends 'dashboard/base.html' %}
+{% load eip_ui %}
+{% block title %}برنامه‌های مداخله{% endblock %}{% block page_title %}برنامه‌های مداخله{% endblock %}
+{% block content %}
+<p class="text-muted small">این فهرست فقط ردیابی اقدام‌هاست. متن برنامه‌های «عاطفی» فقط برای مسئول برنامه و مشاورِ دارای ارجاع باز نمایش داده می‌شود.</p>
+{% if due %}<div class="alert alert-warning"><strong>زمان ارزیابی مجدد:</strong>
+  {% for p in due %}<a href="{% url 'dashboard:plan_detail' p.pk %}">{{ p.student.first_name }} {{ p.student.last_name }} ({{ p.reevaluate_on|jdate }})</a>{% if not forloop.last %}، {% endif %}{% endfor %}</div>{% endif %}
+<div class="mb-3">{% for code, label in statuses %}<a class="btn btn-sm {% if code == status %}btn-primary{% else %}btn-outline-primary{% endif %}" href="?status={{ code }}">{{ label }}</a> {% endfor %}</div>
+<table class="table table-sm bg-white">
+  <thead><tr><th scope="col">دانش‌آموز</th><th scope="col">نوع</th><th scope="col">وضعیت</th><th scope="col">مسئول</th><th scope="col">سررسید</th><th scope="col">نتیجه</th><th scope="col"><span class="visually-hidden">اقدام‌ها</span></th></tr></thead>
+  <tbody>
+  {% for p in plans %}
+    <tr><td>{{ p.student.first_name }} {{ p.student.last_name }}</td><td>{{ p.get_intervention_type_display }}</td><td>{{ p.get_status_display }}</td>
+      <td>{{ p.owner.username }}</td><td>{{ p.due_date|jdate }}</td><td>{{ p.get_outcome_display }}</td>
+      <td><a class="btn btn-sm btn-primary" href="{% url 'dashboard:plan_detail' p.pk %}">مشاهده</a></td></tr>
+  {% empty %}<tr><td colspan="7" class="text-muted">برنامه‌ای وجود ندارد.</td></tr>{% endfor %}
+  </tbody>
+</table>
+{% endblock %}

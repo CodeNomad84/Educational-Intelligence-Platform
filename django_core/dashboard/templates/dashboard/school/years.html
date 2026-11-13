@@ -1,0 +1,21 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}سال تحصیلی{% endblock %}{% block page_title %}سال تحصیلی{% endblock %}
+{% block content %}
+{% include 'dashboard/school/_nav.html' %}
+<table class="table table-sm bg-white">
+  <thead><tr><th scope="col">کد</th><th scope="col">عنوان</th><th scope="col">شروع</th><th scope="col">پایان</th><th scope="col">وضعیت</th><th scope="col"><span class="visually-hidden">اقدام‌ها</span></th></tr></thead>
+  <tbody>
+  {% for y in years %}
+    <tr><td>{{ y.code }}</td><td>{{ y.label }}</td><td>{{ y.start_date }}</td><td>{{ y.end_date }}</td>
+      <td>{% if y.is_current %}<span class="badge bg-success">جاری</span>{% endif %}</td>
+      <td>{% if not y.is_current %}
+        <form method="post" action="{% url 'dashboard:school_year_current' y.pk %}">{% csrf_token %}
+          <button class="btn btn-sm btn-outline-primary">تنظیم به‌عنوان سال جاری</button></form>{% endif %}</td></tr>
+  {% empty %}<tr><td colspan="6" class="text-muted">هنوز سالی تعریف نشده است.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+<div class="card"><div class="card-header">سال تحصیلی جدید</div><div class="card-body">
+  <form method="post">{% csrf_token %}{{ form.as_p }}<button class="btn btn-success">ثبت</button></form>
+</div></div>
+{% endblock %}

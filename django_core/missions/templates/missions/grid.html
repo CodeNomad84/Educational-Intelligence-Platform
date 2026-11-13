@@ -1,0 +1,36 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}{{ activity.title }} — ثبت مشاهدات{% endblock %}{% block page_title %}{{ activity.title }} — ثبت مشاهدات{% endblock %}
+{% block content %}
+<a class="btn btn-link" href="{% url 'missions:activities' %}">← فعالیت‌ها</a>
+<div class="alert alert-warning">اولیه و اعتبارسنجی‌نشده؛ تصمیم نیست. فقط رفتار دیده‌شده را نمره بدهید. اگر فرصت مشاهده نبود، «مشاهده نشد» را انتخاب کنید (با نمرهٔ ۱ فرق دارد). فقط مشاهدات خودتان در این صفحه دیده و ویرایش می‌شود.</div>
+<details class="mb-3" open><summary class="fw-bold">راهنمای نمره‌گذاری</summary>
+  <ul class="small mb-0 mt-2">
+    <li><strong>نمرهٔ ۱ تا ۵</strong> فقط وقتی است که رفتار را دیده‌اید؛ ملاک هر نمره با نگه‌داشتن اشاره‌گر روی عنوان شاخص دیده می‌شود.</li>
+    <li><strong>«مشاهده نشد»</strong> یعنی در این فعالیت فرصت یا شاهد کافی نبود. این با نمرهٔ ۱ (عملکرد ضعیف دیده‌شده) فرق دارد و در هیچ محاسبه‌ای وارد نمی‌شود.</li>
+    <li>خانهٔ خالی یعنی هنوز چیزی ثبت نشده است.</li>
+    <li>برای هر شاخص دست‌کم <strong>{{ min_obs }} مشاهدهٔ معتبر در {{ min_acts }} فعالیت متفاوت</strong> لازم است؛ تا آن زمان نتیجهٔ شاخص «موقت» می‌ماند و «نیازمند تکمیل مشاهده» نشان داده می‌شود.</li>
+    <li>برای هر دانش‌آموزِ نمره‌دار، یک شاهد کوتاه از رفتار واقعی بنویسید.</li>
+  </ul></details>
+{% if read_only %}<div class="alert alert-secondary">این دوره بسته است؛ ثبت یا ویرایش ممکن نیست.</div>{% endif %}
+<form method="post">{% csrf_token %}
+<div class="table-responsive"><table class="table table-sm bg-white align-middle">
+  <thead><tr><th>دانش‌آموز</th>
+    {% for ind in indicators %}<th class="text-center small" title="{% for l in ind.levels.all %}{{ l.score }}: {{ l.text }}&#10;{% endfor %}">{{ ind.code }}. {{ ind.name_fa }}</th>{% endfor %}
+    <th style="min-width:220px">شاهد کوتاه (برای نمره‌ها)</th><th>شرایط</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+    <tr {% if r.error %}class="table-danger"{% endif %}>
+      <td class="text-nowrap">{{ r.student.last_name }} {{ r.student.first_name }}{% if r.error %}<div class="text-danger small">{{ r.error }}</div>{% endif %}</td>
+      {% for c in r.cells %}<td><select name="c_{{ r.student.pk }}_{{ c.indicator.code }}" class="form-select form-select-sm" {% if read_only %}disabled{% endif %}>
+        {% for v, l in cell_choices %}<option value="{{ v }}" {% if v == c.value %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></td>{% endfor %}
+      <td><input name="e_{{ r.student.pk }}" maxlength="{{ max_evidence }}" class="form-control form-control-sm" value="{{ r.evidence }}" {% if read_only %}disabled{% endif %}></td>
+      <td><select name="k_{{ r.student.pk }}" class="form-select form-select-sm" {% if read_only %}disabled{% endif %}><option value="">—</option>
+        {% for pk, t in conditions %}<option value="{{ pk }}" {% if pk == r.condition %}selected{% endif %}>{{ t.label_fa }}</option>{% endfor %}</select></td>
+    </tr>
+  {% empty %}<tr><td colspan="15" class="text-muted">دانش‌آموزی برای ثبت در این فعالیت در دسترس شما نیست.</td></tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% if rows and not read_only %}<button class="btn btn-success">ثبت مشاهدات</button>{% endif %}
+</form>
+{% endblock %}

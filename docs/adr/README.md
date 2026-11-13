@@ -1,0 +1,23 @@
+# Architecture Decision Records
+
+Purpose: record decisions that are hard to reverse. Template: `TEMPLATE.md`. One ADR per decision; ADRs are never deleted — supersede them.
+Status values: PROPOSED · ACCEPTED · SUPERSEDED · DEFERRED · DECISION REQUIRED. Only the owner marks ACCEPTED.
+Established decisions (Django core, FastAPI AI layer, PostgreSQL, React target, AI advisory) live in `../ARCHITECTURE.md`, not as ADRs.
+
+| ADR | Title | Status | Phase |
+|---|---|---|---|
+| 0001 | Service boundary & database ownership | PROPOSED (partly implemented in Phase 1) | 1 |
+| 0002 | Service-to-service authentication | PROPOSED (interim implemented in Phase 1) | 1 |
+| 0003 | Authorization model | ACCEPTED 2026-10-13 (Phase 2 scope; other roles unchanged) | 2 |
+| 0011 | Temporal data model (academic years, enrollments) | ACCEPTED 2026-10-16 for scope 2.2a-1..3 (2.2a-4 parity-gated; Recommendation/retention deferred) | 2 |
+| 0004 | School scoping / tenant key | ACCEPTED 2026-10-13 (integer PKs, `schools` app); decisions 3 and 8 amended by 0012 on 2026-10-19 (not yet implemented) | 2–4 |
+| 0005 | Staff roles, scoping and counseling referral | ACCEPTED 2026-10-16 for decisions 1–9 (roles 2–4; amends 0003/0004; L3); 10–12 direction only | 2 |
+| 0006 | React island mechanics (written with the first island, ADR-0013) | DEFERRED | 8 |
+| 0007 | RAG architecture | DEFERRED | 7 |
+| 0008 | LLM provider & data egress | DEFERRED | 7 |
+| 0009 | Data layering & provenance | FUTURE — DEFERRED (renumbered from 0005 on 2026-10-16; no file yet; to be proposed in Phase 4) | 4 |
+| 0010 | Platform role map (all 8 roles; `Admin` naming) | DRAFT 2026-10-16 (PROPOSED; L3) | 2–3 |
+| 0012 | School membership, platform role, per-school student identity | ACCEPTED 2026-10-19 (L3; decisions only, no stage approved; `changes/0010-multi-school-hosting-PROPOSAL.md`) | 2 |
+| 0013 | MVP frontend: server-rendered templates + Bootstrap 5 RTL, React islands, SPA deferred | ACCEPTED 2026-11-01 (owner, 0028 P8-2) | 3/8 |
+
+Only 0001–0005 and 0010 (DRAFT) files exist now. 0006–0009 are numbering reservations for future/deferred decisions; each file is created only when its phase begins (no speculative ADRs). Until then, references to them mean "future decision", not an existing record.

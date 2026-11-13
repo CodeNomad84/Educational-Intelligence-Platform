@@ -1,0 +1,15 @@
+{% extends 'dashboard/base.html' %}
+{% load eip_ui %}
+{% block title %}شبیه‌سازی قاعده{% endblock %}{% block page_title %}شبیه‌سازی قاعده{% endblock %}
+{% block content %}
+{% include 'dashboard/school/_nav.html' %}
+<a class="btn btn-link" href="{% url 'rules:detail' rule.pk %}">← {{ rule.code }} نسخهٔ {{ rule.version }}</a>
+<div class="alert alert-warning">{{ unvalidated }}</div>
+<p class="small text-muted">نتیجه فقط شمارش تجمعی است: هیچ هشداری ثبت نشد، هیچ نامی نمایش داده نمی‌شود، و شمارش‌های کمتر از ۵ پنهان است (—).</p>
+<table class="table table-sm bg-white text-center">
+  <thead><tr><th scope="col">هفتهٔ منتهی به</th><th scope="col">ارزیابی‌شده</th><th scope="col">داده ناکافی</th><th scope="col">برقرار بود (کل)</th><th scope="col">به تفکیک پایه</th></tr></thead>
+  <tbody>{% for w in result %}<tr><td>{{ w.as_of|jdate }}</td><td>{{ w.evaluated }}</td><td>{{ w.insufficient }}</td>
+    <td>{% if w.fired is None %}—{% else %}{{ w.fired }}{% endif %}</td>
+    <td class="small">{% for g, n in w.by_grade.items %}پایه {{ g }}: {% if n is None %}—{% else %}{{ n }}{% endif %}{% if not forloop.last %}، {% endif %}{% endfor %}</td></tr>{% endfor %}</tbody>
+</table>
+{% endblock %}

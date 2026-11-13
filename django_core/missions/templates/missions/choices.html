@@ -1,0 +1,13 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}انتخاب در فعالیت‌ها{% endblock %}{% block page_title %}انتخاب در فعالیت‌ها{% endblock %}
+{% block content %}
+<a class="btn btn-link" href="{% url 'missions:report' student.pk %}?period={{ period.pk }}">← گزارش</a>
+<h4>انتخاب در فعالیت‌ها — {{ student.last_name }} {{ student.first_name }} ({{ period.label }})</h4>
+<form method="post">{% csrf_token %}<input type="hidden" name="period" value="{{ period.pk }}">
+<table class="table table-sm bg-white"><thead><tr><th>عنوان فعالیت</th><th>انتخاب نوجوان</th><th>منطق انتخاب نوجوان</th></tr></thead><tbody>
+{% for r in rows %}<tr><td>{{ r.label }}</td>
+  <td><input class="form-control" name="ch_{{ r.code }}" value="{{ r.choice }}" maxlength="150"></td>
+  <td><input class="form-control" name="rs_{{ r.code }}" value="{{ r.reason }}" maxlength="300">{% if r.error %}<div class="text-danger small">{{ r.error }}</div>{% endif %}</td></tr>{% endfor %}
+</tbody></table><button class="btn btn-success">ثبت</button></form>
+{% include 'missions/_footer.html' %}
+{% endblock %}

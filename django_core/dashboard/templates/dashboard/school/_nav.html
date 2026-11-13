@@ -1,0 +1,23 @@
+<div class="mb-3 d-flex flex-wrap gap-2 align-items-center">
+  <strong>{{ school.name }}</strong>
+  {% if my_schools|length > 1 %}
+  <form method="get" class="d-inline-flex gap-1">
+    <select name="school" class="form-select form-select-sm" onchange="this.form.submit()">
+      {% for s in my_schools %}<option value="{{ s.pk }}" {% if s.pk == school.pk %}selected{% endif %}>{{ s.name }}</option>{% endfor %}
+    </select>
+  </form>
+  {% endif %}
+  <span class="vr"></span>
+  <a class="btn btn-sm btn-outline-secondary" href="{% url 'dashboard:school_home' %}">نمای کلی</a>
+  <a class="btn btn-sm btn-outline-secondary" href="{% url 'dashboard:school_years' %}">سال تحصیلی</a>
+  <a class="btn btn-sm btn-outline-secondary" href="{% url 'dashboard:school_classes' %}">کلاس‌ها</a>
+  <a class="btn btn-sm btn-outline-secondary" href="{% url 'dashboard:school_staff' 'teachers' %}">معلم‌ها</a>
+  <a class="btn btn-sm btn-outline-secondary" href="{% url 'dashboard:school_staff' 'gradeleads' %}">مربیان پایه</a>
+  <a class="btn btn-sm btn-outline-secondary" href="{% url 'dashboard:school_staff' 'counselors' %}">مشاوران</a>
+  <a class="btn btn-sm btn-outline-secondary" href="{% url 'dashboard:school_accounts' %}">حساب‌های گروهی (اکسل)</a>
+  <a class="btn btn-sm btn-outline-secondary" href="{% url 'dashboard:school_staff_roles' %}">نقش‌های کارکنان</a>
+  <a class="btn btn-sm btn-outline-secondary" href="{% url 'dashboard:school_resets' %}">بازنشانی رمز</a>
+  <a class="btn btn-sm btn-outline-secondary" href="{% url 'dashboard:school_strategies' %}">راهبردهای مداخله</a>
+  <a class="btn btn-sm btn-outline-secondary" href="{% url 'dashboard:school_audit' %}">گزارش دسترسی‌ها</a>
+  <a class="btn btn-sm btn-outline-secondary" href="{% url 'rules:index' %}">قواعد هشدار</a>
+</div>

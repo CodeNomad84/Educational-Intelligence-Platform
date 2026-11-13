@@ -1,0 +1,19 @@
+{% extends 'dashboard/base.html' %}
+{% load eip_ui %}
+{% block title %}اسناد دستیار مدرسه{% endblock %}{% block page_title %}اسناد دستیار مدرسه{% endblock %}
+{% block content %}
+<div class="alert alert-info small">فقط اسناد <strong>غیرشخصی</strong> بارگذاری کنید (آیین‌نامه‌ها، تقویم، روال‌ها). سند با شناسه، تلفن، ایمیل یا نام دانش‌آموزان همین مدرسه پذیرفته نمی‌شود. فقط متن استخراج‌شده نگه‌داری می‌شود، نه فایل اصلی.</div>
+<div class="row g-3">
+ <div class="col-lg-7"><div class="card"><div class="table-responsive"><table class="table table-sm mb-0 eip-fit"><thead><tr><th>سند</th><th>اندازه</th><th></th></tr></thead><tbody>
+ {% for d in docs %}<tr class="{% if not d.is_active %}text-muted{% endif %}"><td>{{ d.title }}<div class="small text-muted">{{ d.created_at|jdate }} · {{ d.source_name }}</div></td><td>{{ d.char_count }}</td>
+ <td class="text-nowrap"><form method="post" action="{% url 'docqa:document_action' d.pk %}" class="d-inline">{% csrf_token %}<button name="action" value="toggle" class="btn btn-link btn-sm p-0">{% if d.is_active %}غیرفعال{% else %}فعال{% endif %}</button> · <button name="action" value="delete" class="btn btn-link btn-sm p-0 text-danger" onclick="return confirm('حذف سند؟')">حذف</button></form></td></tr>
+ {% empty %}<tr><td colspan="3" class="text-muted">سندی نیست.</td></tr>{% endfor %}</tbody></table></div></div></div>
+ <div class="col-lg-5">
+  <div class="card mb-3"><div class="card-header">بارگذاری سند</div><div class="card-body"><form method="post" enctype="multipart/form-data">{% csrf_token %}
+   <input name="title" class="form-control mb-2" placeholder="عنوان" maxlength="120" required><input type="file" name="file" accept=".txt,.md,.docx" class="form-control mb-2" required>
+   <label class="small d-block mb-2"><input type="checkbox" name="attest" required> تأیید می‌کنم این سند دادهٔ شخصی دانش‌آموزان را ندارد.</label><button class="btn btn-primary">بارگذاری</button></form></div></div>
+  <div class="card"><div class="card-header">پاسخ هوشمند</div><div class="card-body"><form method="post" action="{% url 'docqa:ai_setting' %}">{% csrf_token %}
+   <label><input type="checkbox" name="ai_enabled" {% if ai_on %}checked{% endif %}> فعال (فقط با مدل <strong>محلی</strong>؛ پیش‌فرض خاموش)</label>
+   <p class="small text-muted mb-2 mt-2">وقتی روشن است و مدل محلی برای مدرسه تنظیم شده باشد، پاسخ از روی بخش‌های سند ساخته می‌شود و سقف روزانه/ماهانهٔ مدرسه اعمال می‌شود. در غیر این صورت فقط جست‌وجو در اسناد است. فقط سؤال و بخش‌های سند به مدل می‌رسد؛ متن سؤال‌ها در گزارش دسترسی ثبت نمی‌شود.</p><button class="btn btn-sm btn-outline-primary">ذخیره</button></form></div></div>
+ </div></div>
+{% endblock %}

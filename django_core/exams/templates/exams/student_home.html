@@ -1,0 +1,10 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}آزمون‌های من{% endblock %}{% block page_title %}آزمون‌های من{% endblock %}
+{% block content %}
+<div class="alert alert-info">اینجا تمرین است: هر پرسش را تا پاسخ درست ادامه می‌دهید و برای هر گزینه توضیحش را می‌بینید. نمره‌ای ثبت نمی‌شود.</div>
+<table class="table table-sm bg-white"><thead><tr><th>آزمون</th><th>درس</th><th>پیشرفت</th><th></th></tr></thead><tbody>
+{% for r in rows %}<tr><td>{{ r.exam.title }}</td><td>{{ r.exam.get_subject_display }}</td><td>{{ r.solved }} از {{ r.total }}</td>
+  <td><a class="btn btn-sm btn-primary" href="{% url 'exams:play' r.exam.pk %}">{% if r.solved == r.total and r.total %}مرور{% elif r.solved %}ادامه{% else %}شروع{% endif %}</a></td></tr>
+{% empty %}<tr><td colspan="4" class="text-muted">آزمونی برای شما باز نیست.</td></tr>{% endfor %}</tbody></table>
+{% include 'exams/_notice.html' %}
+{% endblock %}

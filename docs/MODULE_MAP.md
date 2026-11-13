@@ -1,0 +1,33 @@
+# MODULE MAP
+
+Verified-at: `3404a1a` + Phase 1 branch `phase-1/boot-security`; the commit `3404a1a` is resolvable in this repository's history (verified 2026-10-13); Phase 1 closed at `4c096de`. Paths re-checked against the working tree on 2026-10-12. Status labels: CURRENT / NOT YET IMPLEMENTED. Code wins over this file.
+
+## Django core — `django_core/`
+| Module | Path | Purpose / contents | Tests |
+|---|---|---|---|
+| Service auth (Phase 1) | `config/service_auth.py` | mints the Django→FastAPI service token | `dashboard/tests.py` (ServiceTokenTests) |
+| Access policy | `students/access.py` (roles, `visible_students` with `full_tier`, `visible_grades`, `visible_attendances`, `search_students`), `students/import_store.py` (S3: school-scoped database access of the live import), `students/student_school.py` (multi-school S2b: the one rule that decides the school of a new/edited student; S6-1: an existing student without a school is never given one outside `backfill_student_school`; no visibility rule), `dashboard/decorators.py` (`role_required`) | single source of role + object-scope rules | `students/tests.py`, `dashboard/tests.py` |
+| Settings/config | `config/` (`settings/{base,development,production}.py`, `urls.py`, `celery.py`, `wsgi.py`, `asgi.py`, plus `settings/demo.py` for DEMO SCOPE) | Project config. The former flat `config/settings.py` (shadowed, B-04) was removed in `48e8e1f` | none |
+| School structure | `schools/` — `models.py` (School, SchoolClass incl. nullable `grade`, TeacherAssignment, GradeLeadAssignment, **AcademicYear**, **SchoolMembership** (multi-school S1/S2, 2026-10-19: stored only, read by no visibility rule; tooling `batch_log.py`, `membership_audit.py`, `multischool_checks.py`, commands `backfill_school_memberships`, `check_school_memberships`, `students/.../backfill_student_school`)), `academic_years.py` (year normaliser, date lookup), `vocabulary.py` (subject/grade vocabularies shared with `students`), `admin.py`, `management/commands/{setup_staff_roles,check_assignment_subjects,check_academic_years,normalize_year_texts}.py`, `migrations/0001–0003` | School key and assignments (none read by access code before C5a) | `schools/tests.py`, `schools/test_c4b.py`, `schools/test_setup_staff_roles.py` |
+| Students | `students/` — `models.py` (Student, Grade, Attendance, **Enrollment, ImportBatch**; Grade Lead / Subject Teacher access is decided by the current `Enrollment` since 2.2a-4c; ADR-0011), `enrollment_sync.py` (current-year enrollment kept in step; called explicitly), `access.py` (single choke point; since 4c enrollment-based scope via `_current_enrollment`), `access_legacy.py` (pre-switch rule kept verbatim, parity reference and revert only; `access_enrollment.py` was folded into `access.py` and no longer exists), `history_import.py` + `management/commands/{check_enrollment_backfill,backfill_enrollments,seed_temporal_synthetic,seed_temporal_realistic,import_history,check_access_switch_ready,compare_access_parity,rollover_academic_year}.py`, `views.py` (DRF `StudentViewSet`, import, features, predict), `serializers.py`, `permissions.py`, `tasks.py`, `migrations/0001–0006` | Operational student data & API at `/api/students/` | `tests.py` empty |
+| Dashboard | `dashboard/` — `views.py`, `urls.py`, `forms.py`, `models.py` (Homework, TeacherParentCommunication; no migrations, undefined imports — B-02), `templates/dashboard/*.html` | Server-rendered UI (login, student list/detail/form, chat, library) | `tests.py` empty |
+
+## AI layer — `fastapi_core/`
+| Module | Path | Purpose |
+|---|---|---|
+| API | `main.py` | chat, documents CRUD/search, upload, predict; role-protected (Phase 1) |
+| RAG | `rag_service.py` | embeddings/generation via Ollama; read-only table check, no DDL (Phase 1) |
+| Auth | `auth.py` | service-token verification, `require_roles`, `disabled_in_phase1` (chat/ingestion/search), `validate_service_secret` (startup); tests in `fastapi_core/tests/` |
+| Data pipeline / models | `data_pipeline.py`, `train_model.py`, `train_nn_model.py`, `models/`, `student_model.joblib` | prototype risk model (synthetic label — A-01) |
+| Config | `config.py` | empty |
+
+## Infrastructure
+`docker-compose.yml` (8 services; env files `.env`, `.env.service`, `.env.fastapi`, `.env.minio` — see `DATA_AND_ARTIFACTS.md`; DB role runbook `FASTAPI_DB_ROLE.md`), `django_core/Dockerfile`, `fastapi_core/Dockerfile`.
+| Rules and derived analytics (change 0025, base module) | `risk/signals.py` (metrics), `risk/rules.py` (validation, evaluation, simulation, runner), `risk/lifecycle.py`, `risk/views.py` + `urls.py` + templates `risk/`, `risk/quality.py`, `risk/trends.py`, commands `run_rules` / `seed_rules`, `students/access.py` `system_scope_*`, `schools/audit.py` (`SYSTEM` actor, `rule_*`) | Deterministic rules over attendance and grades raise ordinary alerts; no score, no levels; SchoolAdmin only; not sellable | `risk/test_signals.py`, `test_rule_models.py`, `test_rules_core.py`, `test_rules_lifecycle.py`, `test_rules_views.py`, `test_rules_runner.py`, `test_rules_run_views.py`, `test_rules_seed_trends.py`, `test_rules_race_postgres.py`, `demo_intel/test_core_parity.py` |
+| Intervention loop (change 0022, base module) | `risk/` (`models.py` RiskEvent, Alert; `services.py` `raise_alert`, `raise_alert_as`, `review_alert`, `reopen_alert`), `interventions/` (`models.py` InterventionPlan, InterventionFollowUp; `services.py`; `reeval.py` derived re-evaluation and recurrence), `students/access.py` (`raisable_students`, `plan_students`, `visible_alerts`, `reviewable_alerts`, `visible_plans`, `visible_plan_texts`, `visible_followups`, `may_*`, `valid_plan_owner`), `dashboard/loop_views.py` (alerts), `dashboard/plan_views.py` (plans), templates `dashboard/loop/`, Student 360 tile, `seed_demo._loop` | Alert > human review > plan > follow-ups > outcome > re-evaluation; not sellable; the two apps are not in the Django admin | `risk/test_services.py`, `risk/test_choke_point.py`, `interventions/test_services.py`, `dashboard/test_loop_{alerts,plans,summary}.py`, `demo_intel/tests.py` |
+
+## NOT YET IMPLEMENTED
+Rule engine (the loop's `raise_alert` is its future entry point) · Observations/Behavior · Parents/Classes entities · Audit log · Ingestion pipeline · React frontend · tests/CI.
+
+## Per-module template (use when a module is added)
+Purpose · Responsibility · Main files · Models · Services · APIs · Frontend · Dependencies · Inputs · Outputs · Tests · Related docs.

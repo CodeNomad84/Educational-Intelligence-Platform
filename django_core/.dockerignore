@@ -7,3 +7,6 @@ pycache/
 .env
 
 db.sqlite3
+
+.venv/
+.venv-win/

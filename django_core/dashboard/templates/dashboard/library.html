@@ -1,25 +1,25 @@
 <!-- dashboard/templates/dashboard/library.html -->
 
 {% extends 'dashboard/base.html' %}
-{% block title %}کتابخانه اسناد{% endblock %}
+{% block title %}کتابخانه اسناد{% endblock %}{% block page_title %}کتابخانه اسناد{% endblock %}
 {% block content %}
 <div class="row">
     <!-- بخش آپلود (بدون تغییر) -->
     <div class="col-md-6">
         <div class="card">
             <div class="card-header bg-primary text-white">
-                <h5>📤 آپلود سند جدید</h5>
+                <h2 class="h5">📤 آپلود سند جدید</h2>
             </div>
             <div class="card-body">
                 <form method="post" enctype="multipart/form-data" action="{% url 'dashboard:upload_document' %}">
                     {% csrf_token %}
                     <div class="mb-3">
-                        <label class="form-label">فایل خود را انتخاب کنید (PDF, Word)</label>
-                        <input type="file" name="document_file" class="form-control" accept=".pdf,.docx,.doc" required>
+                        <label class="form-label" for="id_document_file">فایل خود را انتخاب کنید (PDF, Word)</label>
+                        <input type="file" name="document_file" id="id_document_file" class="form-control" accept=".pdf,.docx,.doc" required>
                         <div class="form-text">حداکثر حجم: ۱۰ مگابایت</div>
                     </div>
                     <button type="submit" class="btn btn-success">
-                        <i class="bi bi-upload"></i> آپلود
+                        <i class="bi bi-upload" aria-hidden="true"></i> آپلود
                     </button>
                 </form>
             </div>
@@ -30,7 +30,7 @@
     <div class="col-md-6">
         <div class="card">
             <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">📚 اسناد موجود</h5>
+                <h2 class="h5 mb-0">📚 اسناد موجود</h2>
                 <span class="badge bg-light text-dark">{{ documents|length }}</span>
             </div>
             <div class="card-body">
@@ -51,7 +51,7 @@
                                     {% csrf_token %}
                                     <input type="hidden" name="parent_id" value="{{ doc.parent_id }}">
                                     <button type="submit" class="btn btn-sm btn-outline-danger" title="حذف فایل">
-                                        <i class="bi bi-trash3"></i>
+                                        <i class="bi bi-trash3" aria-hidden="true"></i>
                                     </button>
                                 </form>
                             </div>
@@ -60,7 +60,7 @@
                     </ul>
                 {% else %}
                     <div class="alert alert-info">
-                        <i class="bi bi-info-circle"></i> هنوز سندی آپلود نشده است.
+                        <i class="bi bi-info-circle" aria-hidden="true"></i> هنوز سندی آپلود نشده است.
                     </div>
                 {% endif %}
             </div>

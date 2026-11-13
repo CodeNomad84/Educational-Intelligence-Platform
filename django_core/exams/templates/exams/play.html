@@ -1,0 +1,22 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}{{ exam.title }}{% endblock %}{% block page_title %}{{ exam.title }}{% endblock %}
+{% block content %}
+<a class="btn btn-link" href="{% url 'exams:student_home' %}">← آزمون‌ها</a>
+<p class="text-muted">پرسش {{ index }} از {{ total }}</p>
+<div class="card mb-3"><div class="card-body"><h5>{{ question.stem|linebreaksbr }}</h5></div></div>
+<form method="post">{% csrf_token %}
+  {% for o in options %}
+  <div class="mb-2">
+    {% if o.state == 'wrong' %}
+      <div class="alert alert-danger mb-0"><strong>{{ o.text }}</strong><div class="small mt-1">{{ o.explanation|linebreaksbr }}</div></div>
+    {% elif o.state == 'correct' %}
+      <div class="alert alert-success mb-0"><strong>{{ o.text }}</strong><div class="small mt-1">چرا درست است: {{ o.explanation|linebreaksbr }}</div></div>
+    {% else %}
+      <button name="option" value="{{ o.pk }}" class="btn btn-outline-secondary w-100 text-start" {% if solved_now %}disabled{% endif %}>{{ o.text }}</button>
+    {% endif %}
+  </div>{% endfor %}
+</form>
+{% if solved_now %}<a class="btn btn-success mt-2" href="{% url 'exams:play' exam.pk %}">ادامه</a>
+{% elif feedback == 'wrong' %}<p class="text-danger mt-2">این گزینه درست نبود؛ توضیحش را بخوانید و دوباره تلاش کنید.</p>{% endif %}
+{% include 'exams/_notice.html' %}
+{% endblock %}

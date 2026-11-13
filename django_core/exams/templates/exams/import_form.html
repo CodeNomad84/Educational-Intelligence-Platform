@@ -1,0 +1,13 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}ورود پرسش‌ها از فایل CSV{% endblock %}{% block page_title %}ورود پرسش‌ها از فایل CSV{% endblock %}
+{% block content %}
+<a class="btn btn-link" href="{% url 'exams:teacher_home' %}">← بانک پرسش</a>
+<div class="alert alert-info">ابتدا فقط <strong>پیش‌نمایش</strong> می‌بینید و چیزی ذخیره نمی‌شود. پرسش‌های واردشده <strong>پیش‌نویس</strong> هستند و باید تأیید شوند. حداکثر {{ max_rows }} ردیف؛ فایل UTF-8.</div>
+<p class="small">ستون‌ها: <code dir="ltr">{{ header|join:', ' }}</code> — <a href="{% url 'exams:import_template' %}">بارگیری فایل نمونه</a>. هر گزینه هم متن و هم توضیح لازم دارد؛ ستون <code>correct</code> شمارهٔ گزینهٔ درست است.</p>
+<form method="post" enctype="multipart/form-data" class="card card-body">{% csrf_token %}
+  <div class="row g-2"><div class="col-md-4"><select name="scope" class="form-select">{% for key, label in scopes %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select></div>
+  <div class="col-md-6"><input type="file" name="file" accept=".csv,text/csv" class="form-control"></div>
+  <div class="col-md-2"><button class="btn btn-primary">پیش‌نمایش</button></div></div>
+</form>
+{% include 'exams/_notice.html' %}
+{% endblock %}

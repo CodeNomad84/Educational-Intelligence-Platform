@@ -1,0 +1,33 @@
+{# DEMO SCOPE — whole file. #}
+{% extends 'demo_intel/base_demo.html' %}{% load demo_extras %}
+{% block title %}داشبورد مشاور{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
+ <h3 class="mb-0">داشبورد مشاور — موارد نیازمند توجه</h3>
+ <div class="proto">🔬 {{ PROTOTYPE_LABEL_FA }}</div>
+</div>
+<div class="row g-3">
+{% for c in cases %}
+ <div class="col-lg-6"><div class="card h-100">
+  <div class="card-header d-flex justify-content-between align-items-center">
+   <span>{{ c.student.first_name }} {{ c.student.last_name }} <small class="text-muted">· کلاس {{ c.student.class_name|fa }}</small></span>
+   {% include 'demo_intel/_level.html' with r=c.r %}
+  </div>
+  <div class="card-body">
+   <div class="bar mb-3" title="امتیاز {{ c.r.score }}"><span style="width:{{ c.r.score }}%;background:{% if c.r.level == 'HIGH' %}var(--high){% elif c.r.level == 'MEDIUM' %}#e0a030{% else %}var(--low){% endif %}"></span></div>
+   <h6>دلایل</h6>
+   {% for x in c.r.reasons %}{% if x.kind == 'risk' %}<div class="reason">{{ x.text|fa }} <span class="pts">({{ x.points|fa }} امتیاز)</span></div>{% endif %}{% endfor %}
+   <h6 class="mt-3">اقدامات پیشنهادی</h6>
+   <ul>{% for rec in c.r.recommendations %}<li>{{ rec|fa }}</li>{% endfor %}</ul>
+   <div class="small text-muted">
+    {% if c.interventions %}مداخله‌های ثبت‌شده:
+     {% for i in c.interventions %}{{ i.get_kind_display }} ({{ i.get_status_display }}){% if not forloop.last %}، {% endif %}{% endfor %}
+    {% else %}مداخله‌ای ثبت نشده است.{% endif %}
+    {% if c.last_counseling %}<br>آخرین جلسهٔ مشاوره: {{ c.last_counseling|date:"Y-m-d"|fa }}{% endif %}
+   </div>
+   <a class="btn btn-sm btn-outline-primary mt-3" href="{% url 'dashboard:student_detail' c.student.id %}">مشاهدهٔ پروفایل هوشمند</a>
+  </div></div></div>
+{% empty %}<div class="alert alert-success">موردی نیازمند بازبینی نیست.</div>{% endfor %}
+</div>
+<p class="small text-muted mt-3">پیشنهادها حاصل قواعد مشخص‌اند و تصمیم نهایی با مشاور و کادر مدرسه است.</p>
+{% endblock %}

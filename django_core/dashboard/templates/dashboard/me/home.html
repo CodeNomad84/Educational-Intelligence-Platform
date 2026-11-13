@@ -1,0 +1,17 @@
+{% extends 'dashboard/base.html' %}
+{% load eip_ui %}
+{% block title %}صفحهٔ من{% endblock %}{% block page_title %}صفحهٔ من{% endblock %}
+{% block content %}
+<h2 class="h5">{{ student.first_name }} {{ student.last_name }} — {{ student.get_grade_display }}</h2>
+{% for m in VISIBLE_MODULES %}{% if m.key == 'tutor_ai' %}<a class="btn btn-outline-primary mb-3" href="{{ m.url }}">دستیار مطالعه (نمایشی){% if not m.enabled %} <i class="bi bi-lock" aria-hidden="true"></i>{% endif %}</a>{% endif %}{% endfor %}
+<h2 class="h5">نمرات من</h2>
+{% for year, subjects, year_average in grade_years %}
+<div class="card mb-3"><div class="card-header">{{ year }} — میانگین کل: <strong>{{ year_average }}</strong></div><div class="card-body p-0">
+  <table class="table table-sm mb-0"><thead><tr><th scope="col">درس</th><th scope="col">تعداد نمره</th><th scope="col">میانگین</th></tr></thead><tbody>
+  {% for name, count, avg in subjects %}<tr><td>{{ name }}</td><td>{{ count }}</td><td>{{ avg }}</td></tr>{% endfor %}
+  </tbody></table></div></div>
+{% empty %}<p class="text-muted">نمره‌ای ثبت نشده است.</p>{% endfor %}
+<h2 class="h5 mt-4">بازخورد معلمان</h2>
+{% for r in recommendations %}<div class="border rounded p-2 mb-2 bg-white"><small class="text-muted">{{ r.created_at|jdate }}{% if r.subject %} — {{ r.get_subject_display }}{% endif %}</small><div>{{ r.text|linebreaksbr }}</div></div>
+{% empty %}<p class="text-muted">بازخوردی ثبت نشده است.</p>{% endfor %}
+{% endblock %}

@@ -1,0 +1,68 @@
+{% extends 'dashboard/base.html' %}
+{% load eip_ui %}
+{% block title %}گزارش مأموریت‌محور{% endblock %}{% block page_title %}گزارش مأموریت‌محور{% endblock %}
+{% block content %}
+<a class="btn btn-link" href="{% url 'missions:students' %}">← دانش‌آموزان</a>
+<h4>{{ student.last_name }} {{ student.first_name }}</h4>
+<div class="alert alert-warning">این گزارش «زمینه‌های پیشنهادی برای بازبینی» است: <strong>اولیه، اعتبارسنجی‌نشده و تصمیم نیست</strong>. هیچ رتبه یا برچسب دائمی ذخیره نمی‌شود.</div>
+{% if error %}<div class="alert alert-secondary">{{ error }}</div>{% else %}
+<form method="get" class="mb-3"><select name="period" class="form-select d-inline w-auto" onchange="this.form.submit()">
+  {% for p in periods %}<option value="{{ p.pk }}" {% if p.pk == period.pk %}selected{% endif %}>{{ p.label }} ({{ p.academic_year.code }})</option>{% endfor %}
+</select> <span class="text-muted small">نسخهٔ پارامترها: {{ params_version }}</span></form>
+
+<h5>توانمندی‌های برجسته</h5>
+{% for i in strong %}<div class="card mb-2"><div class="card-body py-2"><strong>{{ i.name }}</strong> — {{ i.score|floatformat:2 }}{% if i.provisional %} <span class="badge bg-secondary">موقت</span>{% endif %}
+  <ul class="mb-0 small">{% for e in i.evidence %}<li>{{ e.text }} <span class="text-muted">({{ e.activity }}{% if e.condition %}؛ {{ e.condition.label_fa }}{% endif %}{% if e.observer %}؛ {{ e.observer }}{% endif %})</span></li>{% endfor %}</ul></div></div>
+{% empty %}<p class="text-muted">هنوز شاخص برجسته‌ای مشخص نشده است.</p>{% endfor %}
+
+<h5 class="mt-4">زمینه‌های نیازمند رشد</h5>
+{% for i in growth %}<div class="mb-1"><strong>{{ i.name }}</strong> — {{ i.score|floatformat:2 }}{% if i.provisional %} <span class="badge bg-secondary">موقت</span>{% endif %}
+  <span class="small text-muted">نمرهٔ پایین می‌تواند از تجربهٔ کمتر یا محدودبودن موقعیت‌ها باشد.</span></div>
+{% empty %}<p class="text-muted">—</p>{% endfor %}
+
+<h5 class="mt-4">تفاوت موقعیت‌ها{% if kind == 'lead' %} و مشاهده‌گران{% endif %}</h5>
+{% for s in situations %}<div class="mb-2"><strong>{{ s.name }}</strong>
+  <ul class="small mb-0">{% for t, m in s.activities %}<li>فعالیت «{{ t }}»: {{ m|floatformat:2 }}</li>{% endfor %}
+  {% for o, m in s.observers %}<li>مشاهده‌گر {{ o }}: {{ m|floatformat:2 }}</li>{% endfor %}</ul></div>
+{% empty %}<p class="text-muted">تفاوت قابل‌توجهی دیده نشد.</p>{% endfor %}
+
+<h5 class="mt-4">امتیاز هشت شاخه (به ترتیب ثابت، نه رتبه‌بندی)</h5>
+<table class="table table-sm bg-white"><thead><tr><th>میدان</th><th>شاخه</th><th>امتیاز (۱ تا ۵)</th><th>وضعیت شواهد</th><th>تغییر نسبت به دورهٔ قبل</th><th>توضیح</th></tr></thead><tbody>
+{% for b in branches %}<tr><td>{{ b.field }}</td><td>{{ b.name }}</td>
+  <td>{% if b.scored %}{{ b.score|floatformat:2 }}{% if b.score_x20 %} ({{ b.score_x20|floatformat:0 }} از ۱۰۰){% endif %}{% else %}بدون امتیاز{% endif %}</td>
+  <td>{{ b.status }}</td><td>{% if b.change is not None %}{{ b.change|floatformat:2 }}{% else %}—{% endif %}</td>
+  <td class="small">{% if b.missing %}برای محاسبه، این شاخص‌ها هنوز مشاهده نشده‌اند: {{ b.missing|join:'، ' }}.{% endif %}
+    {% if b.provisional %} موقت (مشاهدهٔ بیشتر لازم): {{ b.provisional|join:'، ' }}.{% endif %}
+    {% if b.differing %} نیازمند بررسی تفاوت: {{ b.differing|join:'، ' }}.{% endif %}</td></tr>{% endfor %}
+</tbody></table>
+
+<h5 class="mt-4">دغدغه‌های مشاهده‌شده <span class="small text-muted">(جدا از نمرهٔ توانمندی؛ در محاسبه وارد نمی‌شود)</span></h5>
+<table class="table table-sm bg-white"><thead><tr><th>زمینه</th><th>انتخاب نوجوان</th><th>منطق انتخاب</th></tr></thead><tbody>
+{% for c in choices %}<tr><td>{{ c.get_category_display }}</td><td>{{ c.choice }}</td><td>{{ c.reason }}</td></tr>
+{% empty %}<tr><td colspan="3" class="text-muted">ثبت نشده است.</td></tr>{% endfor %}</tbody></table>
+{% if kind == 'lead' %}<a href="{% url 'missions:choices' student.pk %}?period={{ period.pk }}" class="btn btn-sm btn-outline-secondary">ثبت / ویرایش انتخاب‌ها</a>{% endif %}
+
+<h5 class="mt-4">جلسات فردی اولیا</h5>
+<table class="table table-sm bg-white"><thead><tr><th>تاریخ</th><th>حضور</th><th>قرارها</th><th>کیفیت انجام</th></tr></thead><tbody>
+{% for m in meetings %}<tr><td>{{ m.held_on }}</td><td>{{ m.get_parents_present_display }}</td><td>{{ m.agreements }}</td><td>{{ m.get_quality_display }}</td></tr>
+{% empty %}<tr><td colspan="4" class="text-muted">ثبت نشده است.</td></tr>{% endfor %}</tbody></table>
+{% if kind == 'lead' %}<a href="{% url 'missions:meetings' student.pk %}" class="btn btn-sm btn-outline-secondary">ثبت جلسهٔ جدید</a>{% endif %}
+
+<h5 class="mt-4">مسیرهای پیشنهادی برای بازبینی</h5>
+{% for p in paths %}<div class="card mb-2"><div class="card-body py-2"><strong>{{ p.branch.name_fa }}</strong>
+  <div class="small">تجربهٔ عملی: {{ p.experience }}<br>هدف رشد: {{ p.growth_goal }}<br>تاریخ بازبینی: {{ p.review_date }} <span class="text-muted">(نسخهٔ پارامترها {{ p.params_version }})</span></div></div></div>
+{% empty %}<p class="text-muted">هنوز مسیری پیشنهاد نشده است.</p>{% endfor %}
+{% if kind == 'lead' %}
+<form method="post" action="{% url 'missions:plan' student.pk %}" class="card card-body mt-2">{% csrf_token %}
+  <input type="hidden" name="period" value="{{ period.pk }}">
+  <p class="small text-muted">دو یا سه مسیر قابل‌بررسی پیشنهاد کنید (جایگزین مسیرهای فعلی همین دوره می‌شود).</p>
+  {% for n in '123' %}<div class="row g-2 mb-2">
+    <div class="col-md-2"><select name="p{{ n }}_branch" class="form-select"><option value="">— شاخه —</option>{% for b in branch_choices %}<option value="{{ b.pk }}">{{ b.name_fa }}</option>{% endfor %}</select></div>
+    <div class="col-md-4"><input name="p{{ n }}_experience" class="form-control" maxlength="300" placeholder="تجربهٔ عملی"></div>
+    <div class="col-md-4"><input name="p{{ n }}_goal" class="form-control" maxlength="300" placeholder="هدف رشد"></div>
+    <div class="col-md-2"><input type="date" name="p{{ n }}_review" class="form-control" min="{{ today|date:'Y-m-d' }}"></div></div>{% endfor %}
+  <button class="btn btn-success">ثبت مسیرهای پیشنهادی</button>
+</form>{% endif %}
+{% endif %}
+{% include 'missions/_footer.html' %}
+{% endblock %}

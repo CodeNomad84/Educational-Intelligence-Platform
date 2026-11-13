@@ -1,0 +1,28 @@
+{% extends 'dashboard/base.html' %}
+{% load eip_ui %}
+{% block title %}کارنامهٔ {{ term.1 }}{% endblock %}{% block page_title %}کارنامهٔ {{ term.1 }}{% endblock %}
+{% block subtitle %}<p class="eip-subtitle">{{ student.first_name }} {{ student.last_name }} · {{ student.get_grade_display }}{% if student.school_class %} · {{ student.school_class.title }}{% endif %}{% if year %} · سال تحصیلی {{ year.code }}{% endif %}</p>{% endblock %}
+{% block page_actions %}
+{% for t in terms %}<a class="btn btn-sm {% if t.0 == term.0 %}btn-primary{% else %}btn-outline-primary{% endif %}" href="?term={{ t.0 }}">{{ t.1 }}</a>{% endfor %}
+<button class="btn btn-sm btn-light" onclick="window.print()"><i class="bi bi-printer" aria-hidden="true"></i> چاپ</button>
+{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-body">
+        <div class="d-flex flex-wrap justify-content-between gap-2 mb-3">
+            <div><strong>{{ student.school.name }}</strong><div class="eip-note">بازه: {{ term.2|jdate }} تا {{ term.3|jdate }}</div></div>
+            <div class="text-end"><div class="eip-note">میانگین کل</div><div class="fs-3 fw-bold">{% if overall is not None %}{{ overall }}{% else %}—{% endif %}</div></div>
+        </div>
+        {% if subjects %}
+        <div class="table-responsive"><table class="table">
+            <thead><tr><th scope="col">درس</th><th scope="col">تعداد نمره</th><th scope="col">کمترین</th><th scope="col">بیشترین</th><th scope="col">میانگین</th></tr></thead>
+            <tbody>{% for s in subjects %}<tr><td>{{ s.label }}</td><td>{{ s.n }}</td><td>{{ s.lo }}</td><td>{{ s.hi }}</td><td><strong>{{ s.avg }}</strong></td></tr>{% endfor %}</tbody>
+        </table></div>
+        {% else %}{% empty_state 'در این نوبت نمره‌ای ثبت نشده است' '' 'journal-x' %}{% endif %}
+        <h2 class="h6 mt-4">حضور در این نوبت</h2>
+        {% if days_total %}<dl class="eip-kv"><dt>روزهای ثبت‌شده</dt><dd>{{ days_total }}</dd><dt>حاضر</dt><dd>{{ days.present|default:0 }}</dd><dt>غایب</dt><dd>{{ days.absent|default:0 }}</dd><dt>تأخیر</dt><dd>{{ days.late|default:0 }}</dd><dt>بیماری</dt><dd>{{ days.sick|default:0 }}</dd></dl>
+        {% else %}<p class="eip-note">حضوری در این نوبت ثبت نشده است.</p>{% endif %}
+        <p class="eip-note mt-4 mb-0">این کارنامه از نمره‌ها و حضورِ ثبت‌شده در سامانه ساخته شده و جایگزین کارنامهٔ رسمی نیست. تاریخ تهیه: {{ today|jdate:'long' }}</p>
+    </div>
+</div>
+{% endblock %}

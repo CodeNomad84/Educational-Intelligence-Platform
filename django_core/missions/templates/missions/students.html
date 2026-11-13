@@ -1,0 +1,11 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}گزارش مأموریت‌محور{% endblock %}{% block page_title %}گزارش مأموریت‌محور{% endblock %}
+{% block content %}
+<div class="alert alert-warning">نتایج <strong>اولیه و اعتبارسنجی‌نشده</strong> است؛ تصمیم یا برچسب نیست. فهرست بر اساس نام است، نه نمره.</div>
+<table class="table table-sm bg-white"><thead><tr><th>دانش‌آموز</th><th></th></tr></thead><tbody>
+{% for s in students %}<tr><td>{{ s.last_name }} {{ s.first_name }}</td>
+  <td><a class="btn btn-sm btn-outline-primary" href="{% url 'missions:report' s.pk %}">گزارش</a></td></tr>
+{% empty %}<tr><td colspan="2" class="text-muted">دانش‌آموزی در دسترس شما نیست.</td></tr>{% endfor %}
+</tbody></table>
+{% include 'missions/_footer.html' %}
+{% endblock %}

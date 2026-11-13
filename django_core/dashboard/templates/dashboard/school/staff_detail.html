@@ -1,0 +1,27 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}{{ noun }}: {{ person.first_name }} {{ person.last_name }}{% endblock %}{% block page_title %}{{ noun }}: {{ person.first_name }} {{ person.last_name }}{% endblock %}
+{% block content %}
+{% include 'dashboard/school/_nav.html' %}
+<p>نام کاربری: <strong>{{ person.username }}</strong> —
+  {% if person.is_active %}فعال{% else %}<span class="text-danger">غیرفعال</span>{% endif %}
+  <form method="post" action="{% url 'dashboard:school_staff_active' kind person.pk %}" class="d-inline">{% csrf_token %}
+    <button class="btn btn-sm btn-outline-warning">{% if person.is_active %}غیرفعال‌سازی{% else %}فعال‌سازی{% endif %}</button></form></p>
+{% if kind != 'counselors' %}
+<table class="table table-sm bg-white">
+  <thead><tr>{% if kind == 'teachers' %}<th scope="col">کلاس</th><th scope="col">درس</th>{% else %}<th scope="col">پایه</th><th scope="col">سال تحصیلی</th>{% endif %}<th scope="col"><span class="visually-hidden">اقدام‌ها</span></th></tr></thead>
+  <tbody>
+  {% for a in assignments %}
+    <tr>{% if kind == 'teachers' %}<td>{{ a.school_class }}</td><td>{{ a.get_subject_display }}</td>
+        {% else %}<td>{{ a.get_grade_display }}</td><td>{{ a.academic_year }}</td>{% endif %}
+      <td><form method="post" action="{% url 'dashboard:school_assignment_delete' kind person.pk a.pk %}">{% csrf_token %}
+        <button class="btn btn-sm btn-outline-danger">حذف</button></form></td></tr>
+  {% empty %}<tr><td colspan="3" class="text-muted">تخصیصی ثبت نشده است.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+<div class="card"><div class="card-header">تخصیص جدید</div><div class="card-body">
+  <form method="post">{% csrf_token %}{{ form.as_p }}<button class="btn btn-success">افزودن</button></form>
+</div></div>
+{% else %}<p class="text-muted">دسترسی مشاور فقط از طریق ارجاع‌های مدیر مدرسه و مربی پایه ایجاد می‌شود.</p>{% endif %}
+<a class="btn btn-link mt-2" href="{% url 'dashboard:school_staff' kind %}">بازگشت</a>
+{% endblock %}

@@ -1,0 +1,29 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}مشاهدهٔ توانمندی‌ها{% endblock %}{% block page_title %}مشاهدهٔ توانمندی‌ها{% endblock %}
+{% block content %}
+<div class="alert alert-warning">نتایج این بخش <strong>اولیه و اعتبارسنجی‌نشده</strong> است و فقط برای پیشنهاد تجربهٔ بعدی به کار می‌رود؛ <strong>تصمیم یا برچسب دائمی نیست</strong>.</div>
+<div class="card mb-4"><div class="card-header">فعالیت جدید</div><div class="card-body">
+  {% if has_scope %}
+  <form method="post">{% csrf_token %}{{ form.non_field_errors }}
+    <div class="row g-3">
+      <div class="col-md-4">{{ form.title.label_tag }}{{ form.title }}{{ form.title.errors }}</div>
+      <div class="col-md-2">{{ form.held_on.label_tag }}{{ form.held_on }}{{ form.held_on.errors }}</div>
+      <div class="col-md-2">{{ form.scope.label_tag }}{{ form.scope }}{{ form.scope.errors }}</div>
+      <div class="col-md-2">{{ form.period.label_tag }}{{ form.period }}{{ form.period.errors }}</div>
+      <div class="col-md-2">{{ form.activity_type.label_tag }}{{ form.activity_type }}{{ form.activity_type.errors }}</div>
+    </div>
+    <button class="btn btn-success mt-3">ایجاد و ثبت مشاهده</button>
+  </form>
+  {% else %}<p class="text-muted mb-0">دانش‌آموزی برای ثبت مشاهده در دسترس شما نیست.</p>{% endif %}
+</div></div>
+<table class="table table-sm bg-white">
+  <thead><tr><th>فعالیت</th><th>پایه</th><th>دوره</th><th>نوع</th><th>تاریخ</th><th></th></tr></thead>
+  <tbody>
+  {% for a in activities %}
+    <tr><td>{{ a.title }}</td><td>{{ a.grade }}</td><td>{{ a.period }}</td><td>{{ a.activity_type.label_fa }}</td><td>{{ a.held_on }}</td>
+      <td><a class="btn btn-sm btn-outline-primary" href="{% url 'missions:grid' a.pk %}">ثبت / ویرایش مشاهدات من</a></td></tr>
+  {% empty %}<tr><td colspan="6" class="text-muted">فعالیتی ثبت نشده است.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

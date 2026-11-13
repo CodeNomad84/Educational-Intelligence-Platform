@@ -1,0 +1,20 @@
+{% extends 'dashboard/base.html' %}
+{% load eip_ui %}
+{% block title %}پرونده ارجاعی: {{ student.first_name }} {{ student.last_name }}{% endblock %}{% block page_title %}پرونده ارجاعی: {{ student.first_name }} {{ student.last_name }}{% endblock %}
+{% block content %}
+<a class="btn btn-link" href="{% url 'dashboard:counselor_home' %}">← پرونده‌های ارجاعی</a>
+<div class="alert alert-warning"><strong>دلیل ارجاع:</strong> {{ referral.reason }}
+  <small class="text-muted d-block">{{ referral.created_at|jdate }}</small></div>
+<div class="card mb-3"><div class="card-header">تلفن والدین (فقط در پروندهٔ ارجاعی)</div><div class="card-body">
+  <p class="mb-1"><strong>پدر:</strong> <span dir="ltr">{{ student.father_phone|default:"—" }}</span></p>
+  <p class="mb-0"><strong>مادر:</strong> <span dir="ltr">{{ student.mother_phone|default:"—" }}</span></p>
+</div></div>
+{% include 'dashboard/_student_summary.html' %}
+<h2 class="h5 mt-4">یادداشت‌های مشاور (فقط شما، مسئول پایه و مدیر مدرسه)</h2>
+{% for n in notes %}<div class="border rounded p-2 mb-2 bg-white"><small class="text-muted">{{ n.created_at|jdate }}</small><div>{{ n.text|linebreaksbr }}</div></div>
+{% empty %}<p class="text-muted">یادداشتی ثبت نشده است.</p>{% endfor %}
+<div class="card mb-3"><div class="card-body"><form method="post">{% csrf_token %}{{ form.as_p }}<button class="btn btn-success">ثبت یادداشت</button></form></div></div>
+<form method="post" action="{% url 'dashboard:counselor_close' referral.pk %}" onsubmit="return confirm('با بستن پرونده دسترسی شما به این دانش‌آموز پایان می‌یابد. ادامه؟')">{% csrf_token %}
+  <button class="btn btn-outline-secondary">بستن پرونده</button></form>
+{% endblock %}
+{% block scripts %}{% include 'dashboard/_nid_script.html' %}{% endblock %}

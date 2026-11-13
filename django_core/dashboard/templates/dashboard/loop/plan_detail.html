@@ -1,0 +1,36 @@
+{% extends 'dashboard/base.html' %}
+{% load eip_ui %}
+{% block title %}برنامهٔ مداخله: {{ student.first_name }} {{ student.last_name }}{% endblock %}{% block page_title %}برنامهٔ مداخله: {{ student.first_name }} {{ student.last_name }}{% endblock %}
+{% block content %}
+<a class="btn btn-link" href="{% url 'dashboard:plan_list' %}">← فهرست</a>
+<table class="table table-sm bg-white" style="max-width:48rem">
+  <tr><th scope="row">نوع</th><td>{{ plan.get_intervention_type_display }}</td></tr>
+  <tr><th scope="row">وضعیت</th><td>{{ plan.get_status_display }}</td></tr>
+  <tr><th scope="row">مسئول</th><td>{{ plan.owner.username }}</td></tr>
+  <tr><th scope="row">شروع / سررسید</th><td>{{ plan.start_date|jdate }} / {{ plan.due_date|jdate }}</td></tr>
+  {% if plan.status == 'completed' %}<tr><th scope="row">نتیجه</th><td>{{ plan.get_outcome_display }}</td></tr>
+  <tr><th scope="row">ارزیابی مجدد در</th><td>{{ plan.reevaluate_on|jdate }}</td></tr>{% endif %}
+  {% if text %}
+  <tr><th scope="row">هدف</th><td>{{ plan.goal }}</td></tr><tr><th scope="row">برنامه اقدام</th><td>{{ plan.action_plan|linebreaksbr }}</td></tr>
+  {% if plan.outcome_note %}<tr><th scope="row">یادداشت نتیجه</th><td>{{ plan.outcome_note }}</td></tr>{% endif %}
+  {% endif %}
+</table>
+{% if not text %}<div class="alert alert-secondary">متن این برنامه برای شما نمایش داده نمی‌شود (فقط مسئول برنامه و مشاورِ دارای ارجاع باز). {{ followup_count }} پیگیری{% if last_followup %}، آخرین: {{ last_followup.followup_date|jdate }}{% endif %}.</div>{% endif %}
+{% if text %}
+<h2 class="h5">پیگیری‌ها</h2>
+<ul class="list-group mb-3" style="max-width:48rem">{% for f in followups %}<li class="list-group-item"><strong>{{ f.followup_date|jdate }}</strong> — {{ f.get_assessment_display }}<br>{{ f.progress_note }}</li>{% empty %}<li class="list-group-item text-muted">پیگیری ثبت نشده است.</li>{% endfor %}</ul>
+{% endif %}
+{% if can_edit and plan.status == 'planned' %}<form method="post" action="{% url 'dashboard:plan_start' plan.pk %}" class="d-inline">{% csrf_token %}<button class="btn btn-success">شروع اجرا</button></form>{% endif %}
+{% if can_edit and plan.status == 'active' %}
+<form method="post" action="{% url 'dashboard:plan_followup' plan.pk %}" class="bg-white p-3 border rounded mb-3" style="max-width:40rem">{% csrf_token %}
+  {% for field in followup_form %}<div class="mb-2"><label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}</div>{% endfor %}<button class="btn btn-primary">ثبت پیگیری</button></form>
+<form method="post" action="{% url 'dashboard:plan_complete' plan.pk %}" class="bg-white p-3 border rounded mb-3" style="max-width:40rem">{% csrf_token %}
+  <label class="form-label" for="id_outcome">نتیجه</label><select name="outcome" id="id_outcome" class="form-select mb-2">{% for code, label in outcomes %}<option value="{{ code }}">{{ label }}</option>{% endfor %}</select>
+  <input name="note" maxlength="500" aria-label="یادداشت نتیجه" class="form-control mb-2" placeholder="یادداشت نتیجه"><button class="btn btn-warning">بستن با نتیجه</button></form>
+{% endif %}
+{% if can_manage and plan.status == 'planned' or can_manage and plan.status == 'active' %}
+<form method="post" action="{% url 'dashboard:plan_cancel' plan.pk %}" class="d-inline">{% csrf_token %}<button class="btn btn-outline-danger">لغو</button></form>
+{% if owners %}<form method="post" action="{% url 'dashboard:plan_reassign' plan.pk %}" class="d-inline">{% csrf_token %}
+  <select name="owner" aria-label="مسئول برنامه" class="form-select d-inline w-auto">{% for u in owners %}<option value="{{ u.pk }}">{{ u.get_full_name|default:u.username }}</option>{% endfor %}</select><button class="btn btn-outline-secondary">تغییر مسئول</button></form>{% endif %}
+{% endif %}
+{% endblock %}

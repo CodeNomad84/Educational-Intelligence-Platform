@@ -5,3 +5,12 @@ pycache/
 *.pyc
 
 .env
+
+.venv/
+.venv-win/
+
+# T7 M-4: local HuggingFace variants are a second, unauthenticated FastAPI application (unscoped RAG backend, no
+# service token). They are untracked experiments, kept on the developer's disk only - never in the image. Removing
+# these two lines fails fastapi_core/tests/test_exposure.py::SingleApplicationTests.
+main_HuggingFace.py
+rag_service_HuggingFace_Models.py

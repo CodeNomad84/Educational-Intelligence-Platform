@@ -1,0 +1,8 @@
+# Minimal dependencies to run fastapi_core/tests (CI job "fastapi"). The suite fakes torch, numpy, joblib, the model class and the
+# RAG module, so none of the heavy packages in requirements.txt are installed. Versions are the ones of the verified Docker image.
+fastapi==0.162.0
+starlette==1.7.0
+pydantic==2.14.2
+PyJWT==2.15.1
+python-multipart==0.0.32
+httpx==0.28.1

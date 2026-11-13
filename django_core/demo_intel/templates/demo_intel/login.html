@@ -1,0 +1,10 @@
+{# DEMO SCOPE — whole file. Demo login on the shared public layout (self-hosted assets, demo banner). #}
+{% extends 'dashboard/base_public.html' %}
+{% block head_title %}ورود — {{ PLATFORM_NAME }} (نمایشی){% endblock %}
+{% block banner %}<div class="eip-demo-banner justify-content-center" role="note">⚠ نسخهٔ نمایشی — تمام دانش‌آموزان و داده‌ها <strong>مصنوعی</strong> هستند. | DEMO — all data is synthetic</div>{% endblock %}
+{% block tagline %}هوش تحلیلی دانش‌آموز — از داده‌های پراکنده تا اقدام به‌موقع{% endblock %}
+{% block content %}
+{% include 'dashboard/_login_form.html' %}
+<div class="eip-note mt-3 text-center">حساب‌های نمایشی: <span dir="ltr">demo_admin</span> · <span dir="ltr">demo_gradelead</span> · <span dir="ltr">demo_teacher</span> · <span dir="ltr">demo_counselor</span> · <span dir="ltr">demo_parent</span> · <span dir="ltr">demo_student</span></div>
+<div class="alert alert-info mt-3 mb-0 text-center small">{{ PROTOTYPE_LABEL_FA }}<br><span dir="ltr">{{ PROTOTYPE_LABEL_EN }}</span></div>
+{% endblock %}

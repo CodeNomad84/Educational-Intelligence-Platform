@@ -1,0 +1,17 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}وضعیت مشاهدات{% endblock %}{% block page_title %}وضعیت مشاهدات{% endblock %}
+{% block content %}
+<a class="btn btn-link" href="{% url 'missions:students' %}">← دانش‌آموزان</a>
+<h4>{{ student.last_name }} {{ student.first_name }} — وضعیت مشاهدات من</h4>
+{% if error %}<div class="alert alert-secondary">{{ error }}</div>{% else %}
+<p class="text-muted">فقط مشاهدات خودتان در دورهٔ «{{ period.label }}» و فقط وضعیت آن‌ها نمایش داده می‌شود (نه نمره). برای تکمیل، شاخص‌هایی را ثبت کنید که «نیازمند تکمیل مشاهده» هستند.</p>
+<table class="table table-sm bg-white"><thead><tr><th>شاخص</th><th>مشاهده‌های معتبر من</th><th>فعالیت‌ها</th><th>وضعیت</th></tr></thead><tbody>
+{% for i in indicators %}<tr><td>{{ i.code }}. {{ i.name }}</td><td>{{ i.evidences }}</td><td>{{ i.activities }}</td><td>{{ i.status }}</td></tr>{% endfor %}
+</tbody></table>
+<h5 class="mt-4">شاخه‌ها: چه چیزی هنوز باید مشاهده شود؟</h5>
+<table class="table table-sm bg-white"><thead><tr><th>شاخه</th><th>وضعیت</th><th>شاخص‌هایی که هنوز مشاهده نشده‌اند</th></tr></thead><tbody>
+{% for b in branches %}<tr><td>{{ b.name }}</td><td>{{ b.status }}</td><td class="small">{% if b.missing %}{{ b.missing|join:'، ' }}{% else %}—{% endif %}</td></tr>{% endfor %}
+</tbody></table>
+{% endif %}
+{% include 'missions/_footer.html' %}
+{% endblock %}

@@ -1,0 +1,13 @@
+{% extends 'dashboard/base.html' %}
+{% load eip_ui %}
+{% block title %}اعلان‌ها{% endblock %}{% block page_title %}اعلان‌ها{% endblock %}
+{% block page_actions %}<form method="post" action="{% url 'dashboard:notifications_read' %}">{% csrf_token %}<button class="btn btn-sm btn-outline-secondary">علامت‌گذاری همه به‌عنوان خوانده‌شده</button></form>{% endblock %}
+{% block content %}
+<p class="text-muted small">اعلان‌ها فقط یادآوری‌اند و نام یا جزئیات دانش‌آموز ندارند؛ برای دیدن جزئیات به صفحهٔ مربوط بروید.</p>
+{% for i in items %}
+<div class="card mb-2 {% if not i.row.read_at %}border-primary{% endif %}"><div class="card-body d-flex justify-content-between align-items-center gap-2">
+  <div>{{ i.text }}<div class="small text-muted">{{ i.row.created_at|jdate }}</div></div>
+  {% if i.plan %}<a class="btn btn-sm btn-light" href="{% url 'dashboard:plan_detail' i.plan %}">مشاهده</a>{% else %}<a class="btn btn-sm btn-light" href="{% url 'dashboard:alert_list' %}">مشاهده</a>{% endif %}
+</div></div>
+{% empty %}{% empty_state 'اعلانی ندارید' 'وقتی هشدار جدیدی برای بررسی یا سررسید برنامه‌ای باشد، اینجا می‌آید.' 'bell' %}{% endfor %}
+{% endblock %}

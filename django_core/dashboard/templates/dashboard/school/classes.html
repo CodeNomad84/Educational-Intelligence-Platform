@@ -1,0 +1,17 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}کلاس‌ها{% endblock %}{% block page_title %}کلاس‌ها{% endblock %}
+{% block content %}
+{% include 'dashboard/school/_nav.html' %}
+<a class="btn btn-success mb-3" href="{% url 'dashboard:school_class_new' %}">+ کلاس جدید</a>
+<table class="table table-sm bg-white">
+  <thead><tr><th scope="col">عنوان</th><th scope="col">پایه</th><th scope="col">سال تحصیلی</th><th scope="col">فعال</th><th scope="col"><span class="visually-hidden">اقدام‌ها</span></th></tr></thead>
+  <tbody>
+  {% for c in classes %}
+    <tr><td>{{ c.title }}</td><td>{{ c.get_grade_display }}</td><td>{{ c.academic_year }}</td>
+      <td>{% if c.is_active %}✔{% else %}—{% endif %}</td>
+      <td><a href="{% url 'dashboard:school_class_edit' c.pk %}">ویرایش</a></td></tr>
+  {% empty %}<tr><td colspan="5" class="text-muted">کلاسی ثبت نشده است.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

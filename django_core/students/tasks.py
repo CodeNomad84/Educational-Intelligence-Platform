@@ -1,5 +1,6 @@
 # students/tasks.py
 from celery import shared_task
+from django.conf import settings
 from django.core.mail import send_mail
 from .models import Student
 
@@ -9,7 +10,7 @@ def send_welcome_email(student_id):
         student = Student.objects.get(id=student_id)
         send_mail(
             'خوش آمدید',
-            f'{student.first_name} عزیز، به پلتفرم مدرسه خوش آمدید!',
+            f'{student.first_name} عزیز، به {settings.PLATFORM_NAME} خوش آمدید!',
             'noreply@school.com',
             [student.phone_number + '@sms_provider.com'],  # نمونه
             fail_silently=True,

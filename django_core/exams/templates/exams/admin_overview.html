@@ -1,0 +1,13 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}آمار آزمون‌ها{% endblock %}{% block page_title %}آمار آزمون‌ها{% endblock %}
+{% block content %}
+<div class="alert alert-info">{{ note }} فقط آمار تجمیعی، بدون نام؛ گروه کمتر از {{ group_floor }} نفر نمایش داده نمی‌شود.</div>
+{% for b in blocks %}<h5>{{ b.school.name }}</h5>
+  {% for e in b.exams %}<div class="card mb-2"><div class="card-body py-2"><strong>{{ e.exam.title }}</strong> <span class="text-muted small">({{ e.subject }})</span>
+    {% if e.shown %}<div class="small">شروع‌کرده: {{ e.started }} · پایان‌داده: {{ e.finished }}</div>
+      <ul class="small mb-0">{% for t, n, rate in e.topics %}<li>{{ t.label_fa }} ({{ n }} دانش‌آموز): {% if rate is not None %}{% widthratio rate 1 100 %}٪ درست در تلاش اول{% else %}کمتر از {{ group_floor }} نفر؛ نمایش داده نمی‌شود{% endif %}</li>{% endfor %}</ul>
+    {% else %}<div class="small text-muted">کمتر از {{ group_floor }} دانش‌آموز؛ نمایش داده نمی‌شود.</div>{% endif %}</div></div>
+  {% empty %}<p class="text-muted">آزمونی نیست.</p>{% endfor %}
+{% empty %}<p class="text-muted">مدرسه‌ای با ماژول فعال نیست.</p>{% endfor %}
+{% include 'exams/_notice.html' %}
+{% endblock %}

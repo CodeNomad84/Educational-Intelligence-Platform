@@ -1,0 +1,109 @@
+# DEMO SCOPE — whole file. Views for the demo dashboards. Only reachable when settings.DEMO_MODE is true.
+# Authorization: every view is Admin-role only (same policy as the existing school-wide dashboard, S-04).
+from django.shortcuts import render
+from django.utils import timezone
+
+from dashboard.decorators import role_required
+from schools import ai_guard
+from schools.entitlements import module_enabled, user_school_ids
+from students.access import ADMIN, visible_students
+from students.models import Student
+
+from . import assistant as assistant_mod
+from .analytics import school_overview, sort_by_attention, student_trends
+from .engine import analyze_students
+from .models import CounselingNote, InterventionRecord, StudentObservation
+
+
+def _all(user):
+    """Today, the students the USER may read (scoped through the access layer), and their analysis."""
+    today = timezone.localdate()
+    students = list(visible_students(user))
+    return today, students, analyze_students(students, today)
+
+
+@role_required(ADMIN)
+def school_dashboard_page(request):
+    """The demo engine's school view on its own route (the principal dashboard, P5-1, took /dashboard/)."""
+    return school_dashboard(request)
+
+
+def school_dashboard(request):
+    """Caller has verified the Admin role (``school_dashboard_page``)."""
+    today, students, results = _all(request.user)
+    overview = school_overview(students, results, today)
+    top = [{"student": s, "r": results[s.id]} for s in overview["attention"][:8]]
+    return render(request, "demo_intel/school_dashboard.html", {"o": overview, "top": top, "active": "dashboard"})
+
+
+@role_required(ADMIN)
+def counselor_view(request):
+    today, students, results = _all(request.user)
+    cases = []
+    for s in sort_by_attention(students, results):
+        r = results[s.id]
+        if r["level"] == "LOW":
+            continue
+        cases.append({
+            "student": s, "r": r,
+            "interventions": list(InterventionRecord.objects.filter(student=s)[:3]),
+            "last_counseling": CounselingNote.objects.filter(student=s).values_list("date", flat=True).first(),
+        })
+    return render(request, "demo_intel/counselor.html", {"cases": cases, "active": "counselor"})
+
+
+@role_required(ADMIN)
+def demo_student_list(request):
+    today, students, results = _all(request.user)
+    level = request.GET.get("level", "")
+    cls = request.GET.get("class", "")
+    q = request.GET.get("q", "").strip()
+    rows = []
+    for s in sort_by_attention(students, results):
+        r = results[s.id]
+        if level and r["level"] != level:
+            continue
+        if cls and s.class_name != cls:
+            continue
+        if q and q not in f"{s.first_name} {s.last_name}":
+            continue
+        rows.append({"student": s, "r": r})
+    classes = sorted({s.class_name for s in students})
+    return render(request, "demo_intel/student_list.html",
+                  {"rows": rows, "classes": classes, "level": level, "cls": cls, "q": q, "active": "students"})
+
+
+def student_profile(request, student):
+    """Called from dashboard.views.student_detail_view (DEMO SCOPE hook); caller has verified the Admin role."""
+    today = timezone.localdate()
+    result = analyze_students([student], today)[student.id]
+    ctx = {
+        "student": student, "r": result, "trends": student_trends(student, today), "active": "students",
+        "grades": student.grades.all()[:18],
+        "attendance_counts": {
+            "absent": student.attendances.filter(status="absent").count(),
+            "late": student.attendances.filter(status="late").count(),
+            "total": student.attendances.count(),
+        },
+        "observations": StudentObservation.objects.filter(student=student)[:8],
+        "interventions": InterventionRecord.objects.filter(student=student),
+        "counseling": CounselingNote.objects.filter(student=student)[:4],
+    }
+    return render(request, "demo_intel/student_profile.html", ctx)
+
+
+@role_required(ADMIN, module="advisor_ai")
+def assistant_view(request):
+    query = request.POST.get("query", "").strip() if request.method == "POST" else request.GET.get("q", "").strip()
+    result, cap_message, status = None, "", 200
+    if query:
+        # the user's schools where advisor_ai is on; the first one carries the call cap (checked before answering)
+        school_id = min((sid for sid in user_school_ids(request.user) if module_enabled(sid, "advisor_ai")), default=None)
+        try:
+            ai_guard.consume(school_id, "advisor_ai")
+            result = assistant_mod.answer(query, students=visible_students(request.user))
+        except ai_guard.AICapReached as cap:
+            cap_message, status = cap.message_fa, 429
+    return render(request, "demo_intel/assistant.html", {
+        "result": result, "query": query, "suggestions": assistant_mod.SUGGESTIONS, "active": "assistant",
+        "cap_message": cap_message}, status=status)

@@ -1,0 +1,9 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}ثبت نگرانی دربارهٔ {{ student.first_name }} {{ student.last_name }}{% endblock %}{% block page_title %}ثبت نگرانی دربارهٔ {{ student.first_name }} {{ student.last_name }}{% endblock %}
+{% block content %}
+<p class="text-muted small">فقط مشاهدهٔ خود را بنویسید؛ این ثبت یک برچسب برای دانش‌آموز نیست و فقط توسط افراد مجاز بررسی می‌شود.</p>
+<form method="post" class="bg-white p-3 border rounded" style="max-width:36rem">{% csrf_token %}
+  {% for field in form %}<div class="mb-3"><label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% include 'dashboard/_form_errors.html' %}</div>{% endfor %}
+  <button class="btn btn-primary">ثبت</button> <a class="btn btn-link" href="{% url 'dashboard:alert_list' %}">بازگشت</a>
+</form>
+{% endblock %}

@@ -1,9 +1,9 @@
 # django_core/requirements.txt
-Django==5.2.15
-requests==2.32.3
-djangorestframework==3.15.2
+Django==5.2.18
+requests==2.34.2
+djangorestframework==3.18.3
 django-filter==24.3
-djangorestframework-simplejwt==5.4.0
+djangorestframework-simplejwt==5.5.1
 pandas==2.2.2
 openpyxl==3.1.5
 xlrd==2.0.1
@@ -12,4 +12,5 @@ celery==5.4.0
 redis==5.0.8
 django-celery-results==2.5.1
 gunicorn==23.0.0
-django_redis
+django-redis==7.0.0
+PyJWT==2.15.1

@@ -1,0 +1,181 @@
+# PROJECT CHECKLIST — start to finish
+
+Written for the owner, 2026-10-25, from the repository at `8435a0e`. Docs only; it changes no behavior and is **derived**: code, migrations and tests win over it (see `ROADMAP.md` and `RUNBOOK.md` for detail).
+Legend: `[x]` done and verified in the repo (commit or file cited) · `[~]` partial (what is missing is stated) · `[ ]` not started · `[!]` blocked or needs an owner decision. A line marked "unverified" was not checked against code or tests for this list.
+Test status (latest real run 2026-11-07, `/tmp/tests_run.log`): Django 1565 tests on SQLite (11 skipped) plus `demo_intel` 62, all OK; PostgreSQL and FastAPI NOT covered by that run (`docs/TESTING.md`). ROADMAP.md now points here for status.
+
+## 1. Foundation
+- [x] Phase 1 boot and critical security containment closed (`docs/PHASE1_FINAL_STATUS.md`, `4c096de` per `ROADMAP.md`).
+- [x] Authorization model and school scoping decided in ADRs 0003, 0004, 0005, 0010, 0011, 0012 (`docs/adr/`).
+- [x] Roles Teacher, Grade Lead, Counselor, Student, Parent, SchoolAdmin enforced through one access layer (`students/access.py`; commits `cdfeef5`, `ca0ea93`, `bbc0190`).
+- [x] Superuser is the platform account with no school data (`416c64e`).
+- [x] Cross-school write hole closed (`e530877`).
+- [x] Multi-school S1 `SchoolMembership` and platform-admin group (report `docs/changes/0011-multi-school-S1-membership-REPORT.md`; model in `schools/models.py`).
+- [x] Multi-school S2 tooling and S2b school assignment on every student-creation path (reports `0012`, `0013`; `a29b44b`..`45f541f`).
+- [x] Multi-school S6 `Student.school` NOT NULL (`4b40532`, report `0015`).
+- [x] Multi-school S3 SchoolAdmin read scope by membership, with leak checks (`e22f140`, `492e8f2`, report `0017`).
+- [x] Multi-school S4 writes, imports and commands: every write path refused across schools (`students/test_cross_school_writes.py`), real PostgreSQL import-race test (`students/test_import_race_postgres.py`), maintenance commands classified and scoped (`schools/test_command_scope.py`); see `docs/changes/0019-s4-completion-REPORT.md`.
+- [x] Multi-school S5 FastAPI document library scoped by school (`2c5dc7a`).
+- [x] Multi-school S7 decided 2026-10-26: **S7 = C (keep global `national_id` uniqueness) until a second real school or first transfer case is planned; then A with a username rule** (`docs/changes/0020-s7-national-id-PROPOSAL.md`). Nothing to build now.
+- [ ] Multi-school S8 platform split, S9 Django admin restricted to platform operators, S10 second-school go-live gate: **DEFERRED until after P3** (owner, 2026-10-26; only needed once a second school exists; admin is still ungated, see `0021`).
+- [x] Audit log: who viewed or changed what, no content stored (`ac7be60`, `schools/audit.py`).
+- [~] Backup and restore: production scripts since 2026-11-01 (C-K): `scripts/backup.sh` (pg_dump + media, GPG public-key encryption, 14/8/12 rotation, add-only off-site copy), `scripts/restore_backup.sh` (empty database only, checksums), rehearsal `scripts/test_backup_restore.sh` (CI job `backup`); demo rehearsal `scripts/backup_restore_check.sh` (`501f2d1`). Still open: running it on the real server with a real off-site target and the owner's key (O3).
+- [x] Test tooling: `scripts/run_tests.sh sqlite|pg|all`, disposable PostgreSQL container, isolation traps (`fde42b0`, `cb2b44f`; fast test-only hasher `0c0430e`).
+- [~] CI (T-01): `.github/workflows/ci.yml` runs Django check, migrations check, SQLite and PostgreSQL tests and `demo_intel`, green on GitHub since 2026-10-25; the FastAPI suite is a separate job (`fastapi_core/requirements-test.txt`).
+
+## 2. Core school features
+- [x] Slice 1 SchoolAdmin manages years, classes, teachers, grade leads in the dashboard (`e9b3ee4`).
+- [x] Slice 2 Subject Teacher enters grades and recommendations (`cdfeef5`).
+- [x] Slice 3 Student 360 page for SchoolAdmin, Grade Lead and Parent (`e5e4cfe`).
+- [x] Slice 4a Counselor role and referrals (`ca0ea93`); owner corrections A1-A4 (`52e82eb`).
+- [~] Referral workflow states and parental consent (declined, awaiting consent, parent declined) from roadmap 2.6: not in code (`grep awaiting_parent_consent` finds nothing); satisfaction feedback 2.7 not started.
+- [x] Slice 4b Student role with a demo-stub study assistant (`bbc0190`).
+- [x] Bulk accounts from Excel with dry run, confirm and a one-time login sheet (`983c07a`); dead `/upload/` stub replaced (`b48a0e4`).
+- [x] Forced first-login password change and profile password change (`983c07a`).
+- [x] Password reset by SchoolAdmin and by Grade Lead (school setting, default off) (`a52b81b`); a lost login sheet is reissued from the same list (test 2026-10-25, linked from the accounts page).
+- [x] Login throttle per username and address on `/login/` and `/api/token/` (`201c94d`).
+- [x] One home entry per role in the sidebar with a duplicate-link test (`4651c9a`, `dashboard/test_menu.py`).
+- [x] Persian quick-start page for the SchoolAdmin (`acf2bd8`).
+- [x] Demo seed with all modules licensed and synthetic mission and exam data (`4651c9a`, `8435a0e`).
+- [~] Grade entry (own class and subject) is done for teachers, but roadmap item 2.2b "grade needs academic year and class" is recorded as open (`SECURITY.md` C5a-R1).
+- [x] (built 2026-10-28, change 0025; see the rules entry below) Deterministic risk rules and alerts in the real core DB (roadmap 2.3/2.4; `risk/` has `RiskEvent`/`Alert` models only; the demo has its own rules).
+- [x] Intervention loop built 2026-10-26 (change 0022; commits `9063a1c`, `e8e367e`, `63c0715` and the Student 360/re-evaluation commit): manual alerts, human review (accept/dismiss with a coded reason), intervention plans, follow-ups, outcome, re-evaluation list and Student 360 tile; base module, no AI; emotional-plan text only for the owner and an open-referral Counselor. Built since: the rule engine that calls `risk.services.raise_alert` (change 0025, 2026-10-28), P6-1/P6-2/P6-3 (three bullets below). `NOT YET IMPLEMENTED`: a parent or student view of alerts and plans; the numeric per-plan effectiveness score (doc 12 §16.3, deferred).
+- [x] P6-1 intervention strategy library — 2026-11-02, decision 42, commit `ecddc70`, report 0030 (demo-track exit); expanded by 0031 (decisions 53-55): school-editable `interventions.Strategy` (migration 0002), ~30 generic Persian entries from `seed_strategies`, picker on the plan form, permission tests.
+- [x] P6-2 in-app notifications — 2026-11-02, decisions 50-52, commits `c816582`/`de8ea66`/`c58565f` (no separate numbered report; `DECISIONS_BY_CODE.md` 50-52): `risk.Notification` (migrations 0005/0006), rows only for users whose existing scope already contains the object, bell + `/notifications/`; `concern_count` rule signal in the same batch. Parent notifications remain NOT BUILT.
+- [x] P6-3 effectiveness per strategy — 2026-11-02, decision 49, commit `10e7f31` (no separate numbered report): the strategies page shows each strategy's completed-plan outcomes from the viewer's own `visible_plans`, withheld below `MIN_GROUP` (5); counts only, no new access path.
+- [!] Retention period for alerts, plans, follow-ups and risk events waits for the legal policy; risk events 3 years per doc 12, not enforced; nothing is deleted automatically.
+- [ ] Open item: `Referral` and `CounselorNote` still use `CASCADE` on the student, the new loop tables use `PROTECT` (students are deactivated, never deleted); decide whether to align (changes applied models, Tier C).
+- [ ] Open item: the local `.git/info/exclude` hides `django_core/{risk,interventions,behavior,governance,accounts,core}`; `risk/` and `interventions/` were force-added (new files there need `git add -f`).
+- [x] Open item (info, from 0023 F4) closed 2026-11-01 (C-L): student, referral, alert and plan lists and the student API write `list_view` (counts per school); the Student 360 tile is covered by the page's `view_student_360` event (`dashboard/test_audit_lists.py`).
+- [ ] Open item (info, from 0023 F5): no rate limit on raising alerts.
+- [ ] Open item (info, from 0023 F6): the loop's test fixture `risk/loop_testing.py` lives inside the app package and imports `dashboard.test_counselor`; move it to a test-only location when convenient.
+- [x] Alert text rule (0023 F3): message and review note of `emotional`/`family` alerts readable only by the raiser and an open-referral Counselor; SchoolAdmin and Grade Lead see metadata and can still review.
+- [x] Demo PlatformAdmin `demo_platform` in the demo seed (staff, zero permissions, demo database only); a PlatformAdmin lands on `/platform/modules/` (2026-10-26).
+- [x] `create_school` command with an audit event (C-B, 2026-11-01): `schools/management/commands/create_school.py` (row + `school_create` audit + vocabulary seed, one transaction); the Django-admin add path is audited too (`schools/test_create_school.py`). Decision 2026-10-26: onboarding option A (manual checklist, `docs/manuals/platform-admin.md`) now; PlatformAdmin gets NO extra powers; school creation stays with the superuser.
+- [ ] S9 Django admin closure: the superuser sees every user account, including student and parent accounts whose usernames are national ids. **Must be closed before real data.**
+- [x] Owner decision 2026-10-28: after a referral is closed the SchoolAdmin sees counselor-note METADATA only (no text); the Grade Lead is unchanged; the Counselor sees nothing (tested). Owner decision 2026-10-26: the Grade Lead MAY read counselor notes of students in the own grade (read only, enrollment-based grade scope, tied to a referral; pinned by `dashboard/test_lead_counselor_notes.py`). Audit gap closed 2026-10-27 (`counselor_note_view`, counts only, written only when text is displayed; mutation-checked). Owner decision 2026-10-27: access stays as is, the asymmetry with metadata-only alerts/plans stays documented. Open question for the owner: should SchoolAdmin keep text access after a referral is closed (Grade Lead and SchoolAdmin do today)? Earlier open question for the owner: align this with the metadata-only rule for emotional/family alerts and emotional plan text?
+- [ ] Future idea (not now): the counselor marks each note "counselor only" or "shared with the grade lead".
+- [x] (approved 2026-10-27, implemented 2026-10-28) Proposal `docs/changes/0025-rules-and-alerts-PROPOSAL.md` (deterministic rules and derived analytics feeding the alerts): awaiting owner decision.
+- [ ] P3 exit plan `docs/changes/0026-p3-exit-plan-NOTE.md`: owner/legal/ops tasks (O1-O9) can start now; code tasks (C-*) in order.
+- [ ] Parent notifications, parent-teacher messaging, printable report card, behavior log UI (backlog items 3-6).
+- [!] Parent individual-record access (Parent sees `parent_user`; recorded as C5a-R3/C6 in `SECURITY.md`).
+
+## 3. Commercial layer
+- [x] Per-school module entitlement for `advisor_ai`, `tutor_ai`, `exams`, `mission`; Student 360 and counseling stay base (`ef7a0d1`, `schools/entitlements.py`).
+- [x] Trial versus licensed rows, expiry banner, locked-but-visible menu with a static info page, per-school AI call caps (`06e9dcb`).
+- [x] Platform operator grants modules by command or Django admin, audit-logged (`set_school_module`, `schools/admin.py`).
+- [x] Operator page `/platform/modules/` (`dashboard/operator_page.py`): superuser or PlatformAdmin only, per-school module state, end date, days left, AI usage vs caps, expiring filter, audit-logged, no student data; base/platform, not a sellable module.
+- [ ] Billing, plans, prices, invoices, license keys, renewal and usage reports: deliberately not built.
+- [!] Pricing and trial-length policy (owner decision, not yet made).
+- [~] FastAPI carries no module claim, so module gating is Django-side only (`entitlements.py` docstring).
+
+## 4. Modules
+### Mission / Qalamestan
+- [x] Slice 1 models, versioned default weights, fast observation grid (`f681093`).
+- [x] Slice 2 rule engine plus evaluation hook for a later ML comparison (`8001002`).
+- [x] Slice 3 per-student report, 2-3 suggested paths with `params_version`, activity-choice and parent-meeting forms, admin aggregate with groups under 5 hidden (`3390f08`).
+- [x] Read-only weights page for SchoolAdmin and grid help text (`dd4c03c`).
+- [x] Slice 2b weights lifecycle UI for the SchoolAdmin: draft > simulated > pending approval > active, aggregate simulation, clone, immutable active/retired, `params_version` kept (`missions/lifecycle.py`, `views_weights.py`).
+- [x] Mission weights approval decided 2026-10-25: single approver for now; creator, approver and approval time are shown on the weight-set page and the approval is audit-logged. Optional per-school "require second approver" switch (default OFF) to revisit before the first real multi-admin school.
+- [ ] Real-teacher pilot of the rubric and weights; the weights are an unvalidated first proposal.
+- [!] Whether subject teachers may enter the two forms (owner said Grade Lead only; revisit after the pilot).
+### Exams
+- [x] Slice 1 question bank with an explanation per option, flat topics, exams for classes, practice player, module gate (`8435a0e`).
+- [~] Slice 2 built 2026-10-25 (CSV import with dry run, exam editing, teacher/Grade Lead/SchoolAdmin results with group floors); still missing: repeated-error rule, weekly trend, per-student baseline-relative time.
+- [ ] Slice 3 study recommendations, Student 360 tile, retention cleanup command.
+- [ ] Slice 4 AI question suggestions behind a separate exams AI cap and the external-LLM switch.
+- [!] Exam retention period, SchoolAdmin and parent access to individual analytics, question ownership when a teacher leaves (`docs/EXAM_DESIGN_V2.md` §7).
+### Questionnaires
+- [ ] In-platform family and student questionnaires (`docs/EXAM_AND_SURVEY_DESIGN.md` §2; design only).
+- [!] Consent text, retention rules and anonymity group size need an approved policy first.
+### Vocabulary
+- [x] School-scoped, dated, never-edited-in-place vocabulary terms with `seed_vocabulary` (`0c1b246`).
+- [!] A tree (`parent` link) is a later Tier C decision; flat dotted codes are used now.
+
+## 5. AI
+- [x] Governance rules written (`docs/AI_GOVERNANCE.md`) and the Socratic tutor designed (`docs/ASSISTANT_DESIGN.md`, design only).
+- [x] Demo-stub study assistant and demo School Assistant run without any LLM (`bbc0190`, `demo_intel/`).
+- [ ] LLM integration for the tutor: pseudonymisation, safety escalation to adults, transparency to the student (all in the design, none built).
+- [!] External-LLM switch: whether any external provider is allowed at all, which provider and which country.
+- [x] P7 provider-agnostic LLM adapter — 2026-11-02, report 0032, decisions 56-59 (`fastapi_core/llm_adapter.py`): one OpenAI-compatible client, external/local classes, both OFF by default, dedicated `LLM_KEY_*` keys, PII tripwire + purpose whitelist; external class never called with a real key (tests mock). NOT VERIFIED against a real provider.
+- [x] P7-5 staff document assistant (`docqa`) — 2026-11-02, report 0034, decisions 61-64: SchoolAdmin uploads non-personal documents (attestation + screening + limits), ACL-first keyword retrieval, cited answers from a LOCAL class only, per-school switch OFF by default, licensed caps + metadata-only audit; demo works with no model. NOT BUILT: student-facing tutor, RAG over student data, embeddings, the external class on the Django side (wait for legal/consent).
+- [ ] Adaptive learning feedback from exam analytics (after exams Slice 2).
+- [ ] Prompt-injection and unauthorized-retrieval tests for the AI layer (`SECURITY.md` review topics).
+
+## 6. Hardening before real data
+- [x] `/admin/` login throttled with the same limits and counters as `/login/` (`dashboard/throttle.py` `throttled_admin_login`, tests in `dashboard/test_login_throttle.py`).
+- [~] Throttle behind a proxy: client address source is configurable (`THROTTLE_TRUSTED_PROXIES`, default OFF, tests for both modes); HTTPS settings and a generic reverse-proxy example shipped 2026-11-01 (C-H: `config/settings/production.py`, `deploy/nginx/eip.conf.example`, `check --deploy` gate in `dashboard/deploy_checks.py`); real certificate and hosting values wait for the server (OW-1, OW-3).
+- [ ] Password strength beyond length 8, 2FA for SchoolAdmin, email/SMS self-service reset (RUNBOOK).
+- [~] Migration-order fragility between `schools.0010` and `students.0009`: guarded by `schools/test_fresh_migrate.py` (fresh-DB module rows and plan order; `docs/changes/0018-migration-order-guard.md`); an explicit dependency is unsafe for databases behind on migrations, so the order is protected, not enforced.
+- [x] Concurrent import race on PostgreSQL has a real two-connection test that runs in `pg` mode and the CI postgres job (`EIP_REQUIRE_PG=1`).
+- [~] R-a batch-file provenance: signed batch files exist (`067571b`), no per-row provenance (RUNBOOK).
+- [ ] FastAPI module claim in the service token (RUNBOOK).
+- [x] Django admin closed to platform operators and platform tables (C-A, 2026-11-01; `schools/test_admin_closure.py`).
+- [~] Audit log completeness: list pages and the student API done 2026-11-01 (C-L); exports do not exist; Django admin actions only in Django's admin history (closed with C-A, Tier C).
+- [ ] Test-container overlay misses files replaced mid-run (RUNBOOK; avoid reseeding the demo while tests run).
+- [x] FastAPI suite re-run 2026-10-25: 28 tests OK in the fastapi image (`docs/TESTING.md`); still not part of CI.
+- [~] Dependency audit done 2026-11-01 (C-D, `docs/changes/0029-dependency-audit-REPORT.md`): Django 5.2.18, DRF 3.18.3, SimpleJWT 5.5.1, requests 2.34.2; FastAPI web stack 0.162/starlette 1.7/PyJWT 2.15.1; `.pth` loaded `weights_only`. Open: FastAPI ML/RAG stack (torch, transformers, langchain, chromadb) until P7; `scaler.joblib` pickle; S-11 untracking stays with the owner.
+- [ ] Full `/security-review` of the whole branch, not only of single changes.
+- [!] Legal, consent and retention policy for children's data (owner and legal; gates questionnaires, surveys, referral consent, real data).
+- [ ] Real-data readiness gate (P3 exit criteria in `SECURITY.md`): authorization matrix tested, scoping everywhere, secrets rotated, upload validation, hardened production settings, dependency audit, permission tests green in CI.
+- [!] Rotation of any secret that was ever committed (hard rule in `CLAUDE.md`; status unverified).
+
+## 7. Deployment and operations
+- [ ] Production deployment from `docs/DEPLOYMENT.md` (Docker compose exists; production never run; unverified).
+- [~] Production + multi-school readiness PREPARED 2026-11-02, report 0035, decisions 65-67 (nothing deployed; no real key or data): R-04 least-privilege DB roles + rehearsal (CI job `dbroles`), two deployment profiles, `scripts/preflight.py`, second-school gate test, `MULTI_SCHOOL_READINESS.md`, `DEPLOYMENT.md` §11. `NOT VERIFIED`: real server, real certificates/secrets, off-site backup target + restore, external port scan, running `r04-convert-existing.sql` on existing data.
+- [~] Scheduled, encrypted, off-site backups: scripts and rehearsal done (C-K, `RUNBOOK.md` §3); schedule, off-site target and a restore on the real infrastructure wait for the server (O2/O3).
+- [ ] Monitoring, logging and alerting.
+- [ ] Onboarding runbook for a first pilot school: create school, admin, year, classes, staff, bulk accounts (steps 2 and 6 of `RUNBOOK.md` exist; pilot not done).
+- [ ] Pilot feedback loop with teachers (mission observations and exam use) feeding weights and rubric changes.
+- [!] Hosting location and who operates the platform day to day.
+
+## 8. Later
+- [ ] Rules versus ML evaluation on held-out anonymised data (hook exists: `missions/evaluation.py`).
+- [!] Framework tree (principle > component > indicator) for vocabulary (Tier C schema decision).
+- [ ] Family questionnaires in production use (see §4).
+- [ ] React frontend (target in `ARCHITECTURE.md`; not started).
+- [!] Google sign-in for staff, LTI or other integrations: only if the owner wants them (decision 8 in `EXAM_AND_SURVEY_DESIGN.md`).
+- [ ] Multi-language support, only if non-Persian-speaking families appear.
+
+## Next 5 recommended steps
+1. Exams Slice 2: CSV import first, then analytics (your order).
+2. The operator page (read-only module and AI usage view; approved in principle).
+3. Mission slice 2b: weights lifecycle UI so the weights can be tuned after a teacher pilot.
+4. Hardening: the migration-order fix as its own commit once CI has run green on GitHub.
+5. Run a closed pilot with synthetic data and 2-3 real teachers on mission observations, before any real student data.
+
+## Decisions waiting for the owner
+1. Migration-order fix: make `schools.0010` / `students.0009` order explicit (touches applied migrations).
+2. Exams: retention period, SchoolAdmin and parent access to individual analytics, question ownership, separate exams AI cap values, whether AI suggestions are allowed at all.
+3. External LLM: allowed or not, provider and country.
+4. Legal, consent and retention policy for questionnaires, referral consent and real data.
+5. Subject teachers on the mission forms; and when the weights may leave "unvalidated".
+6. Pricing, plans and trial length (before any billing work).
+7. Hosting and operator model for production.
+8. Vocabulary tree (Tier C) versus flat codes.
+
+## User manuals (source for the final manuals)
+- [x] Skeleton and backfill 2026-10-26: `docs/manuals/` has one file per role (platform admin, school admin, grade lead, teacher, counselor, parent, student) and a README with the convention and the markers TO VERIFY / PENDING POLICY / NOT BUILT. Written in plain English first; Persian translation at the end of the project.
+- [ ] Every item marked TO VERIFY in the manuals is checked in the running product before publishing.
+- [ ] Manual material marked PENDING POLICY (consent, retention, external LLM, parent access) is finished only after the owner decides.
+
+## Template for a new slice's checklist entry
+```
+- [ ] <slice name> (proposal NNNN): code + tests green on SQLite and PostgreSQL + mutation checks for access rules + security review + docs (maps, SECURITY matrix if access changed) + **manual lines for each affected role (docs/manuals/<role>.md)** + CI green
+```
+
+- [x] Rules and derived analytics (proposal 0025): signals, tables, lifecycle, simulation, pages, runner, command, breaker, system audit actor, quality aggregates, seed command, trend tile, manuals (school admin, grade lead, counselor, teacher), RUNBOOK cron. Tests green on SQLite and PostgreSQL, mutation checks done. Security review of the slice: see the Phase 2 exit report. Retention of hits/runs: PENDING POLICY.
+
+- [ ] Possible later hardening (P3 plan): a second school-level actor (another admin, or the platform) for Counselor account creation, Counselor password reset, Counselor role grant and referral to a freshly created Counselor. Residual risk accepted by the owner 2026-10-28 (independent review finding 1), compensated by audit.
+
+## Resume note (Phase 2 autonomous mode, CLAUDE.md §6a-bis)
+- **Done 2026-10-27/28:** `a95e299` counselor_note_view audit event; `29c05ee` rules 0025 commit 1 (signals, tables, parity tests). Not pushed yet (push at the end of the rules slice after `scripts/run_tests.sh all`).
+- **Next step:** 0025 commit 2: clause validation against `risk/signals.METRICS` (refuse emotional/family; `low_average` needs `RuleSettings.grade_scale_max`), lifecycle (draft > simulated > pending_approval > active > paused > archived, `params_hash`, single approver, optional second approver), simulation (aggregate counts, groups under 5 withheld, writes nothing but RuleRun), SchoolAdmin pages with the "unvalidated" note. Then c3 runner (`system_scope_students`, circuit breaker, atomic per-student, `rule_run` audit with `system` actor), c4 seed/trend tile/manuals/docs, c5 security review.
+- **Blocked on owner:** principals' questionnaire spec (message not in context, resend needed); SchoolAdmin text access to closed-referral notes.
+- **STOPPED at the Phase 2 exit** (`docs/changes/0027-phase-2-exit-REPORT.md`). Review findings 1-4 and closed-referral notes: decided and applied 2026-10-28 (report §6a). Next step for a fresh session: the principals' questionnaire (owner's spec message), then STOP; the owner starts Phase 3 explicitly after removing CLAUDE.md §6a-bis.
+
+## Resume note (Phase 3 autonomous mode, CLAUDE.md §6a-bis, started 2026-11-01)
+- Owner decisions OW-1..OW-7 (Iran hosting shared/dedicated, mandatory backups, `.ir` HTTPS, provider-agnostic server-side controls, no real data, demo goal, two AI provider classes, push except `main`) and the decision pack: `docs/changes/0028-p3-p8-decision-pack-PROPOSAL.md`.
+- Order: C-B `create_school` > C-D dependency audit > C-H production hardening + self-hosted assets > C-K backups > C-L audit completeness > STOP before C-A (Tier C).
+- **Completed since this note (CURRENT at `a48c6a1`, work up to 2026-11-02):** C-A admin closure, P5-1..P5-4, P5-3 behavior rule signal (decision 50), P6-1/P6-2/P6-3 (decisions 42, 50-52, 49), P8 completion (decision 60), P7 adapter (report 0032, decisions 56-59), P7-5 document assistant (report 0034, decisions 61-64), P9 PREPARED (report 0035, decisions 65-67).
+- **Next step (2026-11-07):** STOP for owner review — the autonomous run approved through Phase 9 is finished at P9 PREPARED. Remaining code work is owner-gated or blocked: S7 per-school national id (`DECISION REQUIRED`, `changes/0020`); S8 remainder + S9/S10 second-school go-live; P4 mixed-scale normalisation; exams Slice 3/4; student tutor, parent view and any external-provider use wait on the legal/consent/provider decisions.

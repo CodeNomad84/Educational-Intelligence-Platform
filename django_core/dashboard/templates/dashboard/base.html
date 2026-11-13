@@ -1,56 +1,134 @@
-<!DOCTYPE html>
+{% load static eip_ui %}<!DOCTYPE html>
 <html dir="rtl" lang="fa">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>پلتفرم هوشمند مدرسه</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <style>
-        body { background-color: #f8f9fa; }
-        .sidebar { min-height: 100vh; background-color: #343a40; color: white; }
-        .sidebar a { color: #ddd; text-decoration: none; display: block; padding: 10px; }
-        .sidebar a:hover { background-color: #495057; color: white; }
-        .main-content { padding: 20px; }
-        .card-stats { border-radius: 10px; padding: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-    </style>
+    <meta name="application-name" content="{{ PLATFORM_NAME }}">
+    <meta name="description" content="{{ PLATFORM_NAME_EN }} — از داده‌های پراکنده تا حمایت به‌موقع از هر دانش‌آموز">
+    <title>{% block title %}{{ PLATFORM_NAME }}{% endblock %}</title>
+    <link href="{% static 'dashboard/vendor/bootstrap-5.3.0/bootstrap.rtl.min.css' %}" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'dashboard/vendor/bootstrap-icons-1.11.3/bootstrap-icons.min.css' %}">
+    <link rel="stylesheet" href="{% static 'dashboard/css/eip.css' %}">
 </head>
 <body>
-    <div class="container-fluid">
-        <div class="row">
-            <!-- Sidebar -->
-            <nav class="col-md-2 d-none d-md-block sidebar">
-                <h4 class="mt-3 text-center">🏫 مدرسه</h4>
-                <hr class="bg-light">
-                <a href="{% url 'dashboard:dashboard' %}"><i class="bi bi-speedometer2"></i> داشبورد</a>
-                <a href="{% url 'dashboard:student_list' %}"><i class="bi bi-people"></i> دانش‌آموزان</a>
-                <a href="{% url 'dashboard:chat' %}"><i class="bi bi-chat-dots"></i> چت با هوش مصنوعی</a>
-                <a href="{% url 'dashboard:library' %}"><i class="bi bi-book"></i> کتابخانه</a>
-                {% if user.is_superuser or user.groups.all.0.name == 'Admin' %}
-                <a href="{% url 'dashboard:upload_students' %}"><i class="bi bi-upload"></i> آپلود فایل</a>
-                {% endif %}
-                <hr class="bg-light">
-                <a href="{% url 'dashboard:logout' %}" class="text-danger"><i class="bi bi-box-arrow-right"></i> خروج</a>
-            </nav>
-
-            <!-- Main Content -->
-            <main class="col-md-10 ms-sm-auto main-content">
-                <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h2>{% block title %}پنل مدیریت{% endblock %}</h2>
-                    <span class="badge bg-secondary">{{ user.username }}</span>
-                </div>
-                {% if messages %}
-                    {% for message in messages %}
-                        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-                            {{ message }}
-                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                        </div>
-                    {% endfor %}
-                {% endif %}
-                {% block content %}{% endblock %}
-            </main>
+<a class="eip-skip" href="#eip-main">پرش به محتوای اصلی</a>
+<div class="eip-shell">
+    <aside class="eip-sidebar offcanvas-md offcanvas-start" tabindex="-1" id="eipSidebar" aria-label="منو">
+        <div class="d-flex align-items-center justify-content-between">
+            <div class="eip-brand">
+                <span class="eip-brand-mark" aria-hidden="true"><i class="bi bi-mortarboard" aria-hidden="true"></i></span>
+                <span><span class="eip-brand-name d-block">{{ PLATFORM_NAME }}</span>{% if SCHOOL_NAME %}<span class="eip-brand-sub d-block">{{ SCHOOL_NAME }}</span>{% endif %}</span>
+            </div>
+            <button type="button" class="btn-close d-md-none ms-3" data-bs-dismiss="offcanvas" data-bs-target="#eipSidebar" aria-label="بستن منو"></button>
         </div>
+        {# The sidebar <nav> holds every menu link (dashboard/test_menu.py reads it). Role conditions are unchanged; the real gates are server-side. #}
+        <nav class="eip-nav sidebar" aria-label="منوی اصلی">
+            <div class="eip-nav-section">اصلی</div>
+            {# one home entry per role: /dashboard/ redirects every role but SchoolAdmin to its own home, so only SchoolAdmin gets it #}
+            {% if IS_SCHOOL_ADMIN %}{% nav_link 'dashboard:dashboard' 'speedometer2' 'داشبورد مدرسه' %}{% endif %}
+            {% if IS_GRADE_LEAD %}{% nav_link 'dashboard:grade_dashboard' 'bar-chart' 'داشبورد پایه' %}{% endif %}
+            {% if IS_TEACHER %}{% nav_link 'dashboard:teacher_home' 'journal-check' 'کلاس‌های من' also='dashboard:teacher_grades dashboard:teacher_student' %}{% endif %}
+            {% if IS_STUDENT %}{% nav_link 'dashboard:me_home' 'person' 'صفحهٔ من' %}{% endif %}
+            {% if IS_COUNSELOR %}{% nav_link 'dashboard:counselor_home' 'heart-pulse' 'پرونده‌های ارجاعی' also='dashboard:counselor_case' %}{% endif %}
+            {% if IS_GRADE_LEAD %}{% nav_link 'dashboard:student_list' 'people' 'دانش‌آموزان پایه' prefix=True %}{% elif IS_PARENT %}{% nav_link 'dashboard:student_list' 'people' 'فرزندان من' prefix=True %}{% elif IS_SCHOOL_ADMIN or IS_TEACHER %}{% nav_link 'dashboard:student_list' 'people' 'دانش‌آموزان' prefix=True %}{% endif %}
+
+            {% if IS_SCHOOL_ADMIN or IS_GRADE_LEAD or IS_COUNSELOR %}
+            <div class="eip-nav-section">حمایت از دانش‌آموز</div>
+            {% nav_link 'dashboard:alert_list' 'bell' 'هشدارها' also='dashboard:alert_review' %}
+            {% nav_link 'dashboard:plan_list' 'clipboard2-pulse' 'برنامه‌های مداخله' prefix=True %}
+            {% elif IS_TEACHER %}
+            <div class="eip-nav-section">حمایت از دانش‌آموز</div>
+            {% nav_link 'dashboard:alert_list' 'bell' 'نگرانی‌های ثبت‌شده' %}
+            {% endif %}
+
+            {% if IS_SCHOOL_ADMIN or IS_STUDENT %}<div class="eip-nav-section">ماژول‌ها</div>
+            {% elif IS_TEACHER or IS_GRADE_LEAD or IS_COUNSELOR %}{% if 'mission' in ENABLED_MODULES or 'exams' in ENABLED_MODULES and IS_TEACHER or 'exams' in ENABLED_MODULES and IS_GRADE_LEAD %}<div class="eip-nav-section">ماژول‌ها</div>{% endif %}{% endif %}
+            {% if 'mission' in ENABLED_MODULES %}
+            {% if IS_TEACHER or IS_GRADE_LEAD %}{% nav_link 'missions:activities' 'compass' 'مشاهدهٔ توانمندی‌ها' %}{% endif %}
+            {% if IS_TEACHER or IS_GRADE_LEAD or IS_COUNSELOR %}{% nav_link 'missions:students' 'person-lines-fill' 'گزارش مأموریت‌محور' %}{% endif %}
+            {% if IS_SCHOOL_ADMIN %}{% nav_link 'missions:aggregate' 'pie-chart' 'آمار مأموریت‌محور' %}{% nav_link 'missions:weights' 'sliders' 'وزن‌های مأموریت‌محور' %}{% endif %}
+            {% endif %}
+            {% if 'exams' in ENABLED_MODULES %}
+            {% if IS_TEACHER %}{% nav_link 'exams:teacher_home' 'patch-question' 'آزمون‌ها (بانک پرسش)' %}{% endif %}
+            {% if IS_GRADE_LEAD %}{% nav_link 'exams:lead_overview' 'patch-check' 'آزمون‌های پایه' %}{% endif %}
+            {% if IS_SCHOOL_ADMIN %}{% nav_link 'exams:admin_overview' 'bar-chart-steps' 'آمار آزمون‌ها' %}{% endif %}
+            {% if IS_STUDENT %}{% nav_link 'exams:student_home' 'patch-check' 'آزمون‌های من' %}{% endif %}
+            {% endif %}
+            {% if IS_STUDENT %}{% for m in VISIBLE_MODULES %}{% if m.key == 'tutor_ai' %}<a href="{{ m.url }}" class="eip-nav-link"><i class="bi bi-lightbulb" aria-hidden="true"></i><span>دستیار مطالعه (نمایشی)</span>{% if not m.enabled %}<i class="bi bi-lock eip-lock" aria-label="قفل" aria-hidden="true"></i>{% endif %}</a>{% endif %}{% endfor %}{% endif %}
+            {% if IS_SCHOOL_ADMIN %}{% for m in VISIBLE_MODULES %}<a href="{{ m.url }}" class="eip-nav-link{% if request.path == m.url %} active{% endif %}"><i class="bi bi-puzzle" aria-hidden="true"></i><span>{{ m.label }}</span>{% if not m.enabled %}<i class="bi bi-lock eip-lock" aria-label="قفل" aria-hidden="true"></i>{% endif %}</a>{% endfor %}{% endif %}
+
+            {% if IS_SCHOOL_ADMIN or IS_GRADE_LEAD %}<div class="eip-nav-section">مدیریت</div>{% endif %}
+            {% if IS_SCHOOL_ADMIN %}
+            {% nav_link 'dashboard:school_home' 'building' 'مدیریت مدرسه' also='dashboard:school_years dashboard:school_classes dashboard:school_class_new dashboard:school_class_edit dashboard:school_staff dashboard:school_staff_detail dashboard:school_audit dashboard:school_resets dashboard:school_staff_roles dashboard:school_strategies dashboard:school_strategy_edit rules:index' %}
+            {% nav_link 'dashboard:school_accounts' 'upload' 'ثبت گروهی از اکسل' also='dashboard:school_accounts_preview' %}
+            {% nav_link 'dashboard:quickstart' 'signpost-split' 'راهنمای شروع سریع' %}
+            {% endif %}
+            {% if IS_GRADE_LEAD and GRADE_RESETS_ENABLED %}{% nav_link 'dashboard:grade_resets' 'key' 'بازنشانی رمز' %}{% endif %}
+
+            {# DEMO SCOPE begin — chat/library are disabled in Phase 1 (403); hidden in the demo #}
+            {% if not DEMO_MODE %}
+            <div class="eip-nav-section">دستیار و منابع</div>
+            <span class="eip-nav-link is-disabled" aria-disabled="true"><i class="bi bi-chat-dots" aria-hidden="true"></i><span>چت با هوش مصنوعی</span><small class="eip-soon">به‌زودی</small></span>
+            <span class="eip-nav-link is-disabled" aria-disabled="true"><i class="bi bi-book" aria-hidden="true"></i><span>کتابخانه</span><small class="eip-soon">به‌زودی</small></span>
+            {% endif %}
+            {# DEMO SCOPE end #}
+
+            <div class="eip-nav-section">حساب</div>
+            {% if IS_PLATFORM_OPERATOR %}{% nav_link 'dashboard:operator_overview' 'diagram-3' 'نمای کلی پلتفرم' %}{% endif %}
+            {% nav_link 'dashboard:profile' 'person-gear' 'حساب من' also='dashboard:password_change' %}
+            {% nav_link 'dashboard:logout' 'box-arrow-right' 'خروج' css='is-danger' %}
+        </nav>
+    </aside>
+
+    <div class="eip-main">
+        {% if DEMO_MODE %}<div class="eip-demo-banner" role="note"><i class="bi bi-info-circle" aria-hidden="true"></i> نسخهٔ نمایشی: همهٔ نام‌ها و داده‌ها ساختگی است.</div>{% endif %}
+        <header class="eip-topbar">
+            <button class="btn btn-light btn-sm d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#eipSidebar" aria-controls="eipSidebar" aria-label="باز کردن منو"><i class="bi bi-list fs-5" aria-hidden="true"></i></button>
+            <div class="eip-topbar-title">{{ SCHOOL_NAME|default:PLATFORM_NAME }}</div>
+            <div class="ms-auto d-flex align-items-center gap-2">
+            {% if IS_SCHOOL_ADMIN or IS_GRADE_LEAD or IS_COUNSELOR %}<a class="btn btn-light btn-sm position-relative" href="{% url 'dashboard:notifications' %}" aria-label="اعلان‌ها"><i class="bi bi-bell" aria-hidden="true"></i>{% if NOTIF_COUNT %}<span class="badge text-bg-danger position-absolute top-0 start-0 translate-middle rounded-pill">{{ NOTIF_COUNT }}</span>{% endif %}</a>{% endif %}
+            <div class="dropdown">
+                <button class="eip-user dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    <span class="eip-avatar" aria-hidden="true"><i class="bi bi-person" aria-hidden="true"></i></span>
+                    <span class="d-none d-sm-inline"><span class="eip-user-name">{{ user.get_full_name|default:user.username }}</span>{% if ROLE_LABEL %} <span class="text-muted">· {{ ROLE_LABEL }}</span>{% endif %}</span>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><a class="dropdown-item" href="{% url 'dashboard:profile' %}"><i class="bi bi-person-gear" aria-hidden="true"></i> حساب من</a></li>
+                    <li><a class="dropdown-item text-danger" href="{% url 'dashboard:logout' %}"><i class="bi bi-box-arrow-right" aria-hidden="true"></i> خروج</a></li>
+                </ul>
+            </div>
+            </div>
+        </header>
+        <main id="eip-main" class="eip-content">
+            {% block page_header %}
+            <div class="eip-page-header">
+                <div><h1>{% block page_title %}پنل مدیریت{% endblock %}</h1>{% block subtitle %}{% endblock %}</div>
+                <div class="eip-page-actions">{% block page_actions %}{% endblock %}</div>
+            </div>
+            {% endblock %}
+            {% for n in TRIAL_NOTICES %}
+                <div class="alert alert-warning" role="alert">
+                    {% if n.kind == 'expiring' %}دورهٔ آزمایشی «{{ n.label }}» {{ n.days }} روز دیگر پایان می‌یابد.{% else %}دورهٔ آزمایشی «{{ n.label }}» پایان یافته است ({{ n.days }} روز پیش).{% endif %}
+                    برای ادامه با پشتیبانی پلتفرم تماس بگیرید.
+                </div>
+            {% endfor %}
+            {% for message in messages %}
+                <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="بستن"></button>
+                </div>
+            {% endfor %}
+            {% block content %}{% endblock %}
+        </main>
     </div>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    {% if FEEDBACK_URL %}
+    <footer class="eip-footer border-top text-center py-3 mt-3">
+        <a href="{{ FEEDBACK_URL }}"><i class="bi bi-chat-left-text" aria-hidden="true"></i> بازخورد و پیشنهاد</a>
+    </footer>
+    {% endif %}
+</div>
+<script src="{% static 'dashboard/vendor/bootstrap-5.3.0/bootstrap.bundle.min.js' %}"></script>
+<script src="{% static 'dashboard/js/eip-jdate.js' %}"></script>
+{% block scripts %}{% endblock %}
 </body>
 </html>

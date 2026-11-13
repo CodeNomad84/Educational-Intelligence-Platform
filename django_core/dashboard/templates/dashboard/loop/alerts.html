@@ -1,0 +1,34 @@
+{% extends 'dashboard/base.html' %}
+{% load eip_ui %}
+{% block title %}هشدارها و نگرانی‌ها{% endblock %}{% block page_title %}هشدارها و نگرانی‌ها{% endblock %}
+{% block content %}
+<p class="text-muted small">هشدارها فقط ثبت‌شدهٔ کارکنان‌اند و تصمیم نیستند؛ هر مورد باید توسط یک فرد بررسی شود.</p>
+<div class="mb-3">
+  {% for code, label in statuses %}<a class="btn btn-sm {% if code == status %}btn-primary{% else %}btn-outline-primary{% endif %}" href="?status={{ code }}"{% if code == status %} aria-current="page"{% endif %}>{{ label }}</a> {% endfor %}
+</div>
+<table class="table table-sm bg-white eip-stack">
+  <thead><tr><th scope="col">دانش‌آموز</th><th scope="col">نوع</th><th scope="col">شدت</th><th scope="col">توضیح</th><th scope="col">ثبت‌کننده</th><th scope="col">تاریخ</th><th scope="col">وضعیت</th><th scope="col"><span class="visually-hidden">اقدام‌ها</span></th></tr></thead>
+  <tbody>
+  {% for a in alerts %}
+    <tr>
+      <td data-label="دانش‌آموز">{{ a.student.first_name }} {{ a.student.last_name }}</td>
+      <td data-label="نوع">{{ a.risk_event.get_risk_type_display }}</td><td data-label="شدت">{{ a.risk_event.get_severity_display }}</td>
+      <td data-label="توضیح">{% if a.text_hidden %}<span class="text-muted">متن برای شما نمایش داده نمی‌شود</span>{% else %}{{ a.message }}{% endif %}{% for h in a.rule_hits.all %}<div class="small text-muted">ثبت‌شده توسط قاعدهٔ {{ h.rule.code }} نسخهٔ {{ h.rule.version }}</div>{% endfor %}{% if a.recurred_plan %}<div class="small text-warning">تکرار پس از مداخله <a href="{% url 'dashboard:plan_detail' a.recurred_plan %}">#{{ a.recurred_plan }}</a></div>{% endif %}</td><td data-label="ثبت‌کننده">{{ a.raised_by.username|default:"سامانه" }}</td><td data-label="تاریخ">{{ a.created_at|jdate }}</td>
+      <td data-label="وضعیت">{{ a.get_status_display }}{% if a.dismiss_reason %} ({{ a.get_dismiss_reason_display }}){% endif %}{% if a.review_note %}<div class="small text-muted">{{ a.review_note }}</div>{% endif %}</td>
+      <td data-label="اقدام">
+        {% if a.pk in reviewable and a.status == 'new' %}
+          <form method="post" action="{% url 'dashboard:alert_review' a.pk %}" class="d-inline">{% csrf_token %}<input type="hidden" name="decision" value="accept"><button class="btn btn-sm btn-success">پذیرش</button></form>
+          <form method="post" action="{% url 'dashboard:alert_review' a.pk %}" class="mt-1">{% csrf_token %}<input type="hidden" name="decision" value="dismiss">
+            <select name="reason" aria-label="دلیل رد" class="form-select form-select-sm d-inline w-auto">{% for code, label in reasons %}<option value="{{ code }}">{{ label }}</option>{% endfor %}</select>
+            <input name="note" maxlength="300" aria-label="یادداشت" class="form-control form-control-sm d-inline w-auto" placeholder="یادداشت">
+            <button class="btn btn-sm btn-outline-danger">رد</button></form>
+        {% endif %}
+        {% if a.status == 'accepted' and a.pk in reviewable %}<a class="btn btn-sm btn-primary" href="{% url 'dashboard:plan_new' a.student_id %}?alert={{ a.pk }}">ایجاد برنامهٔ مداخله</a>{% endif %}
+        {% if a.status == 'dismissed' and can_reopen %}<form method="post" action="{% url 'dashboard:alert_reopen' a.pk %}">{% csrf_token %}<button class="btn btn-sm btn-outline-secondary">بازکردن مجدد</button></form>{% endif %}
+      </td>
+    </tr>
+  {% empty %}<tr><td colspan="8" class="text-muted">مورد جدیدی وجود ندارد.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

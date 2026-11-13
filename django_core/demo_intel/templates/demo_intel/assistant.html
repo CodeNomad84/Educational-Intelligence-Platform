@@ -1,0 +1,29 @@
+{# DEMO SCOPE — whole file. #}
+{% extends 'demo_intel/base_demo.html' %}{% load demo_extras %}
+{% block title %}دستیار هوشمند آموزشی (نمونهٔ اولیه){% endblock %}
+{% block content %}
+<h3 class="mb-1">دستیار هوشمند آموزشی (نمونهٔ اولیه) <small class="text-muted fs-6">· Rule-Based Prototype Assistant</small></h3>
+<div class="proto mb-3">این دستیار <strong>مدل زبانی نیست</strong>؛ فقط بر اساس قواعد مشخص و داده‌های نمایشی پاسخ می‌دهد و هیچ تشخیص یا تصمیمی نمی‌گیرد. · Educational Intelligence Assistant (Prototype)</div>
+<div class="card mb-3"><div class="card-body">
+ <form method="post" class="input-group">{% csrf_token %}
+  <input name="query" class="form-control form-control-lg" value="{{ query }}" placeholder="سؤال خود را بنویسید…" required>
+  <button class="btn btn-primary px-4">بپرس</button>
+ </form>
+ <div class="mt-3 d-flex flex-wrap gap-2">
+  {% for s in suggestions %}<form method="post">{% csrf_token %}<input type="hidden" name="query" value="{{ s }}">
+   <button class="btn btn-sm btn-outline-secondary">{{ s }}</button></form>{% endfor %}
+ </div>
+</div></div>
+{% if cap_message %}<div class="alert alert-warning">{{ cap_message }}</div>{% endif %}
+{% if result %}
+<div class="card"><div class="card-header">{{ result.title|fa }}</div><div class="card-body">
+ <p class="text-muted small mb-2">سؤال: «{{ result.query }}»</p>
+ {% for p in result.paragraphs %}<p>{{ p|fa }}</p>{% endfor %}
+ {% if result.bullets %}<ul>{% for b in result.bullets %}<li>{{ b|fa }}</li>{% endfor %}</ul>{% endif %}
+ {% if result.rows %}<div class="table-responsive"><table class="table">
+  <tbody>{% for r in result.rows %}<tr><td><a href="{{ r.url }}">{{ r.name }}</a></td><td>{{ r.class|fa }}</td>
+   <td><span class="lvl lvl-{{ r.level }}">{{ r.level_fa }}</span></td><td class="small">{{ r.text|fa }}</td></tr>{% endfor %}</tbody></table></div>{% endif %}
+ <hr><div class="small text-muted">منبع: {{ result.sources.0 }}<br><strong>{{ result.disclaimer }}</strong> · <span dir="ltr">Rule-Based Prototype Assistant</span></div>
+</div></div>
+{% endif %}
+{% endblock %}

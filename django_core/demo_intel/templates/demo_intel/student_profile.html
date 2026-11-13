@@ -1,0 +1,67 @@
+{# DEMO SCOPE — whole file. #}
+{% extends 'demo_intel/base_demo.html' %}{% load demo_extras %}
+{% block title %}پروفایل هوشمند دانش‌آموز{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
+ <h3 class="mb-0">{{ student.first_name }} {{ student.last_name }}
+  <small class="text-muted">· {{ student.get_grade_display }} · کلاس {{ student.class_name|fa }}</small></h3>
+ <div class="proto">🔬 {{ PROTOTYPE_LABEL_FA }}</div>
+</div>
+
+<div class="row g-3 mb-3">
+ <div class="col-lg-4"><div class="card h-100"><div class="card-header">کارت هوشمند دانش‌آموز</div><div class="card-body">
+  <div class="d-flex align-items-center gap-3 mb-2">
+   <span class="lvl lvl-{{ r.level }}" style="font-size:1.05rem">{{ r.level_fa }}</span>
+   <span class="text-muted">امتیاز {{ r.score|fa }} از ۱۰۰</span></div>
+  <div class="bar mb-3"><span style="width:{{ r.score }}%;background:{% if r.level == 'HIGH' %}var(--high){% elif r.level == 'MEDIUM' %}#e0a030{% else %}var(--low){% endif %}"></span></div>
+  <div class="small text-muted">اطمینان داده: {{ r.confidence }}<br>
+   میانگین اخیر: {{ r.metrics.avg_recent|one }} · غیبت ۳۰ روز اخیر: {{ r.metrics.absence_recent|pct }}</div>
+  <hr><h6>نقاط قوت</h6>
+  <ul class="mb-0">{% for s in r.strengths %}<li>{{ s|fa }}</li>{% empty %}<li class="text-muted">مورد برجسته‌ای ثبت نشده.</li>{% endfor %}</ul>
+ </div></div></div>
+ <div class="col-lg-4"><div class="card h-100"><div class="card-header">نگرانی‌ها و دلایل (قابل توضیح)</div><div class="card-body">
+  {% for x in r.reasons %}<div class="reason {% if x.kind == 'protective' %}protective{% endif %}">{{ x.text|fa }}
+   <span class="pts">({{ x.points|fa }} امتیاز · {{ x.rule_fa }})</span></div>
+  {% empty %}<p class="text-muted">هیچ قاعدهٔ ریسکی فعال نشده است.</p>{% endfor %}
+ </div></div></div>
+ <div class="col-lg-4"><div class="card h-100"><div class="card-header">اقدامات پیشنهادی</div><div class="card-body">
+  <ul>{% for rec in r.recommendations %}<li>{{ rec|fa }}</li>{% endfor %}</ul>
+  <div class="proto mt-3">پیشنهادها فقط راهنما هستند؛ تصمیم نهایی با مشاور و کادر مدرسه است.</div>
+  <div class="small text-muted mt-3">امتیاز = جمع امتیاز قواعد بالا (از ۱۰۰). ۳۰ تا ۵۹: نیازمند توجه · ۶۰ به بالا: پرخطر.</div>
+ </div></div></div>
+</div>
+
+<div class="row g-3 mb-3">
+ <div class="col-lg-6"><div class="card"><div class="card-header">غیبت هفتگی (٪)</div><div class="card-body"><div class="chartbox"><canvas id="attChart"></canvas></div></div></div></div>
+ <div class="col-lg-6"><div class="card"><div class="card-header">میانگین نمرات (هر ۱۵ روز)</div><div class="card-body"><div class="chartbox"><canvas id="scChart"></canvas></div></div></div></div>
+</div>
+
+<div class="row g-3">
+ <div class="col-lg-4"><div class="card h-100"><div class="card-header">حضور و غیاب</div><div class="card-body">
+  <p>روزهای ثبت‌شده: {{ attendance_counts.total|fa }}<br>غیبت: {{ attendance_counts.absent|fa }} · تأخیر: {{ attendance_counts.late|fa }}</p>
+  <h6>مشاهدات اخیر</h6>
+  <ul class="small">{% for o in observations %}<li>{{ o.date|date:"Y-m-d"|fa }} — {{ o.get_category_display }} ({{ o.get_sentiment_display }}): {{ o.note }}</li>{% empty %}<li>—</li>{% endfor %}</ul>
+ </div></div></div>
+ <div class="col-lg-4"><div class="card h-100"><div class="card-header">نمرات اخیر</div>
+  <div class="table-responsive"><table class="table table-sm mb-0"><thead><tr><th>درس</th><th>نمره</th><th>تاریخ</th></tr></thead>
+  <tbody>{% for g in grades %}<tr><td>{{ g.get_subject_display }}</td><td>{{ g.score|one }}</td><td>{{ g.date|date:"Y-m-d"|fa }}</td></tr>{% endfor %}</tbody></table></div></div></div>
+ <div class="col-lg-4"><div class="card h-100"><div class="card-header">مداخله‌ها و مشاوره (محرمانه — فقط کادر)</div><div class="card-body small">
+  {% for i in interventions %}<p class="mb-1">• {{ i.get_kind_display }} — {{ i.get_status_display }} ({{ i.start_date|date:"Y-m-d"|fa }}): {{ i.description }}</p>{% empty %}<p class="text-muted">مداخله‌ای ثبت نشده.</p>{% endfor %}
+  {% if counseling %}<hr>{% for n in counseling %}<p class="mb-1">{{ n.date|date:"Y-m-d"|fa }} · {{ n.counselor_name }}: {{ n.summary }}</p>{% endfor %}{% endif %}
+ </div></div></div>
+</div>
+<a href="{% url 'dashboard:demo_students' %}" class="btn btn-secondary mt-3">بازگشت به فهرست</a>
+
+{{ trends.attendance|json_script:"t-att" }}
+{{ trends.scores|json_script:"t-sc" }}
+{% endblock %}
+{% block scripts %}
+<script>
+const J = id => JSON.parse(document.getElementById(id).textContent);
+const mk = (el, d, color, ymax) => new Chart(document.getElementById(el), {type:'line',
+  data:{labels:d.labels,datasets:[{data:d.values,borderColor:color,backgroundColor:color+'22',fill:true,tension:.3,spanGaps:true}]},
+  options:{maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:ymax==null,max:ymax||undefined}}}});
+mk('attChart', J('t-att'), '#c0392b');
+mk('scChart', J('t-sc'), '#2b5fd9', 20);
+</script>
+{% endblock %}

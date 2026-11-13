@@ -1,0 +1,15 @@
+# Phase 1 — Deferred Items
+
+Status label for every item: `DEFERRED` (consciously postponed; not blocking Phase 1 closure).
+Rule: none of these is to be done unless it becomes required by a failing test or a blocking issue.
+
+| # | Item | Why deferred | Revisit when |
+|---|---|---|---|
+| 1 | **Scaffold apps (C5)**: `academics`, `accounts`, `behavior`, `core`, `governance`, `interventions`, `risk`, `schools` | Present locally but untracked; not in `INSTALLED_APPS`; nothing imports them. | Phase 2 domain modelling, per an approved L2/L3 proposal. **2026-10-13:** all eight preserved verbatim on branch `archive/scaffold-apps-2026-10-13` (commit `45218a7`); `schools` is rewritten as a tracked app in 2.1 (C1), `risk` is activated in 2.3; the others stay inactive. |
+| 2 | **PostgreSQL verification** | Dev/demo run on SQLite. Migrations and FastAPI DB-role behaviour (`FASTAPI_DB_ROLE.md`) have not been verified against PostgreSQL in this pass. `NOT VERIFIED`. | Before any non-demo deployment. **VERIFIED 2026-10-15** (gate re-run on a fresh PostgreSQL 16 database: migrations clean, `fastapi_user` role created and verified, Django 232 tests green on PostgreSQL, FastAPI 24 tests; evidence in `TESTING.md`). Not covered: data in `data/postgres.bak-20261014`. |
+| 3 | **FastAPI venv rebuild** | The existing FastAPI environment was not rebuilt or re-validated from `requirements.txt`. `NOT VERIFIED`. | Before the next FastAPI dependency change or deployment. **VERIFIED 2026-10-15**: image rebuilt from `requirements.txt` with CPU-only torch `2.0.1+cpu` (`3f5681c`), 24 FastAPI tests pass, service-JWT probe 401/200/403/401 (evidence in `TESTING.md`). |
+| 4 | **Dead `django_core/config/settings.py`** | A module and a `settings/` package share the name `config.settings`; the package wins, so the module is dead config. Left in place (no silent deletion). | **DONE in Phase 2.0** (`48e8e1f`): nothing referenced it; the package already won at import. |
+| 5 | **Teacher assignment model** | Teacher → class/student scoping has no model yet; object-level teacher access cannot be fully enforced. `NOT YET IMPLEMENTED`. | Phase 2, together with the authorization matrix in `SECURITY.md`. |
+| 6 | **`.claude/commands/` missing** | `CLAUDE.md` §14 lists slash commands (`/propose-change`, …) but only `.claude/skills/` exists locally. | When the owner decides on the command set. |
+| 7 | **Untracked HuggingFace FastAPI variants** (`main_HuggingFace.py`, `rag_service_HuggingFace_Models.py`) | Experimental alternates; not reviewed for service-auth or ACL parity with the hardened files. | Only if the HuggingFace path is adopted (AI provider = L3). **CLOSED 2026-11-11 (T8, M-4):** the image cannot ship them — `fastapi_core/.dockerignore` excludes both files and `fastapi_core/tests/test_exposure.py::SingleApplicationTests` fails if a second `FastAPI(` application is in the build context. The local files are kept on the owner's disk (`D2=a`); ACL parity stays a Phase-2 question if the path is ever adopted. |
+| 8 | **CI (T-01)** | Explicitly out of scope for Phase 1 closure. | Phase 2. |

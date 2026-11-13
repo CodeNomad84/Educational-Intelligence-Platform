@@ -1,0 +1,25 @@
+{% extends 'dashboard/base.html' %}
+{% load eip_ui %}
+{% block title %}{% if exam %}ویرایش آزمون{% else %}آزمون جدید{% endif %}{% endblock %}{% block page_title %}{% if exam %}ویرایش آزمون{% else %}آزمون جدید{% endif %}{% endblock %}
+{% block content %}
+<a class="btn btn-link" href="{% url 'exams:teacher_home' %}">← بانک پرسش</a>
+{% for e in errors %}<div class="alert alert-danger">{{ e }}</div>{% endfor %}
+{% if locked %}<div class="alert alert-secondary">دانش‌آموزان این آزمون را شروع کرده‌اند؛ مجموعهٔ پرسش‌ها قفل است (عنوان، بازه، کلاس‌ها و انتشار قابل ویرایش‌اند).</div>{% endif %}
+<form method="post" class="card card-body">{% csrf_token %}
+  <div class="row g-2 mb-3">
+    <div class="col-md-4"><label>درس</label><select name="scope" class="form-select" {% if exam %}disabled{% endif %}>{% for key, label in scopes %}<option value="{{ key }}" {% if exam and key == scope_key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+    <div class="col-md-8"><label>عنوان</label><input name="title" class="form-control" maxlength="120" value="{{ state.title }}"></div>
+    <div class="col-md-3"><label>از تاریخ (اختیاری)</label><input type="date" name="opens_on" class="form-control" value="{{ state.opens_on|date:'Y-m-d' }}"></div>
+    <div class="col-md-3"><label>تا تاریخ (اختیاری)</label><input type="date" name="closes_on" class="form-control" value="{{ state.closes_on|date:'Y-m-d' }}"></div>
+    {% if exam and state.opens_on or exam and state.closes_on %}<div class="col-md-3 pt-4"><label><input type="checkbox" name="clear_window"> حذف بازهٔ زمانی</label></div>{% endif %}
+    <div class="col-md-3 pt-4"><label><input type="checkbox" name="published" {% if state.published %}checked{% endif %}> منتشر شود</label></div>
+  </div>
+  <h6>کلاس‌ها</h6>
+  {% for key, c in class_rows %}<label class="me-3"><input type="checkbox" name="classes" value="{{ c.pk }}" {% if c.pk in state.classes %}checked{% endif %}> {{ c.title }} <span class="text-muted small">({{ key }})</span></label>{% empty %}<span class="text-muted">کلاسی نیست.</span>{% endfor %}
+  <h6 class="mt-3">پرسش‌های تأییدشده (ترتیب همین فهرست است)</h6>
+  {% for q in questions %}<div><label><input type="checkbox" name="questions" value="{{ q.pk }}" {% if q.pk in state.questions %}checked{% endif %} {% if locked %}disabled{% endif %}> {{ q.stem|truncatechars:80 }} <span class="text-muted small">({{ q.topic.code }})</span></label></div>
+  {% empty %}<span class="text-muted">پرسش تأییدشده‌ای نیست.</span>{% endfor %}
+  <button class="btn btn-success mt-3">{% if exam %}ذخیره{% else %}ساخت آزمون{% endif %}</button>
+</form>
+{% include 'exams/_notice.html' %}
+{% endblock %}
