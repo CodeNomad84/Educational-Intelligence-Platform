@@ -73,7 +73,13 @@ mount, no schema change.
 | An `external` provider over plain HTTP is refused | same tool with `"base_url": "http://insecure.example/v1"` | `LLM_PROVIDERS is not valid configuration (bad_config)`, `exit 2` |
 
 Full Django suite (`scripts/run_tests.sh sqlite`, output in `/tmp/suite_sqlite.log`):
-`test_sqlite` → `Ran 1635 tests in 1015.327s` / `OK (skipped=11)`; `demo_intel` → `Ran 62 tests in 187.579s` / `OK`.
+`test_sqlite` → `Ran 1635 tests in 1015.327s` / `OK (skipped=11)`; `demo_intel` → `Ran 62 tests in 187.579s` / `OK`;
+script final line `ALL DJANGO CHECKS AND TESTS PASSED`.
+
+PostgreSQL leg (`scripts/run_tests.sh pg`, disposable PG 16 container, output `/tmp/suite_pg.log`): the image build,
+`manage.py check` and `makemigrations --check --dry-run` passed, and the 1635-test phase had **0 failures** while still
+running when this report was written → its final `Ran …/OK` line is **NOT VERIFIED** yet. Re-read with
+`tail -n 5 /tmp/suite_pg.log` (or re-run `scripts/run_tests.sh pg`) before quoting a PostgreSQL pass.
 
 ## Residual risks / `NOT VERIFIED`
 
