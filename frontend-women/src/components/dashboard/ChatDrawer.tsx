@@ -1,6 +1,16 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowUp, BookOpen, Building2, Check, Copy, GraduationCap, HeartHandshake, RotateCcw, X } from "lucide-react";
+import {
+  ArrowUp,
+  BookOpen,
+  Building2,
+  Check,
+  Copy,
+  GraduationCap,
+  HeartHandshake,
+  RotateCcw,
+  X,
+} from "lucide-react";
 import { useEffect, useRef, useState, type ComponentPropsWithoutRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -38,7 +48,10 @@ const SUGGESTIONS: Record<MentorRole, string[]> = {
 const toLatin = (s: string) => s.replace(/[۰-۹]/g, (d) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d)));
 
 function prepareMarkdown(text: string) {
-  return text.replace(/\[([0-9۰-۹]{1,2})\](?!\()/g, (_, n: string) => `[${toLatin(n)}](#cite-${toLatin(n)})`);
+  return text.replace(
+    /\[([0-9۰-۹]{1,2})\](?!\()/g,
+    (_, n: string) => `[${toLatin(n)}](#cite-${toLatin(n)})`,
+  );
 }
 
 function citedIndexes(text: string) {
@@ -61,7 +74,10 @@ function CitationBadge({ citation, n }: { citation: Citation | undefined; n: str
           {label}
         </button>
       </HoverCardTrigger>
-      <HoverCardContent dir="rtl" className="w-72 rounded-2xl border-border glass-strong text-start">
+      <HoverCardContent
+        dir="rtl"
+        className="w-72 rounded-2xl border-border glass-strong text-start"
+      >
         <p className="text-sm font-bold">{citation.title}</p>
         <p className="mt-0.5 text-xs text-primary-glow">{citation.source}</p>
         <p className="mt-2 text-xs leading-6 text-muted-foreground">{citation.snippet}</p>
@@ -93,10 +109,18 @@ function AssistantMessage({ message }: { message: ChatMessage }) {
             a: ({ href, children, ...rest }: ComponentPropsWithoutRef<"a">) => {
               if (href?.startsWith("#cite-")) {
                 const n = href.slice(6);
-                return <CitationBadge n={n} citation={citations.find((c) => c.index === Number(n))} />;
+                return (
+                  <CitationBadge n={n} citation={citations.find((c) => c.index === Number(n))} />
+                );
               }
               return (
-                <a href={href} target="_blank" rel="noreferrer" className="text-primary-glow underline underline-offset-4" {...rest}>
+                <a
+                  href={href}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-primary-glow underline underline-offset-4"
+                  {...rest}
+                >
                   {children}
                 </a>
               );
@@ -109,10 +133,18 @@ function AssistantMessage({ message }: { message: ChatMessage }) {
       <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
         {shown.length > 0 && (
           <>
-            <span className="flex items-center gap-1 text-xs text-muted-foreground"><BookOpen className="size-3.5" />منابع:</span>
+            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+              <BookOpen className="size-3.5" />
+              منابع:
+            </span>
             {shown.map((c) => (
-              <span key={c.index} className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/60 px-2 py-0.5 text-[11px] text-muted-foreground">
-                <span className="font-bold text-primary-glow">{c.index.toLocaleString("fa-IR")}</span>
+              <span
+                key={c.index}
+                className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/60 px-2 py-0.5 text-[11px] text-muted-foreground"
+              >
+                <span className="font-bold text-primary-glow">
+                  {c.index.toLocaleString("fa-IR")}
+                </span>
                 {c.title}
               </span>
             ))}
@@ -136,7 +168,8 @@ function AssistantMessage({ message }: { message: ChatMessage }) {
 }
 
 export function ChatDrawer() {
-  const { chatOpen, setChatOpen, messages, pending, role, setRole, send, clearChat, mascot } = useDashboard();
+  const { chatOpen, setChatOpen, messages, pending, role, setRole, send, clearChat, mascot } =
+    useDashboard();
   const [draft, setDraft] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -165,11 +198,16 @@ export function ChatDrawer() {
         >
           {/* Header */}
           <div className="relative overflow-hidden border-b border-border px-5 pb-4 pt-5">
-            <div aria-hidden className="pointer-events-none absolute -top-20 start-10 size-56 rounded-full bg-primary/25 blur-3xl" />
+            <div
+              aria-hidden
+              className="pointer-events-none absolute -top-20 start-10 size-56 rounded-full bg-primary/25 blur-3xl"
+            />
             <div className="relative flex items-center gap-3">
               <Mascot state={mascot} size={64} />
               <div className="min-w-0 flex-1">
-                <DialogPrimitive.Title className="text-lg font-extrabold">رهنما · دستیار مربیگری و رشد</DialogPrimitive.Title>
+                <DialogPrimitive.Title className="text-lg font-extrabold">
+                  رهنما · دستیار مربیگری و رشد
+                </DialogPrimitive.Title>
                 <DialogPrimitive.Description className="text-xs text-muted-foreground">
                   {STATE_LABEL[mascot]} · پاسخ‌ها از اسناد مدرسه و کارنامه ۳۶۰ با ارجاع
                 </DialogPrimitive.Description>
@@ -192,7 +230,11 @@ export function ChatDrawer() {
               </DialogPrimitive.Close>
             </div>
 
-            <div role="radiogroup" aria-label="نقش شما" className="relative mt-4 grid grid-cols-3 gap-1 rounded-2xl border border-border bg-surface/70 p-1">
+            <div
+              role="radiogroup"
+              aria-label="نقش شما"
+              className="relative mt-4 grid grid-cols-3 gap-1 rounded-2xl border border-border bg-surface/70 p-1"
+            >
               {ROLES.map((r) => {
                 const Icon = r.icon;
                 const active = role === r.id;
@@ -204,11 +246,17 @@ export function ChatDrawer() {
                     onClick={() => setRole(r.id)}
                     className={cn(
                       "relative flex items-center justify-center gap-2 rounded-xl py-2 text-sm font-medium transition-colors",
-                      active ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground",
+                      active
+                        ? "text-primary-foreground"
+                        : "text-muted-foreground hover:text-foreground",
                     )}
                   >
                     {active && (
-                      <motion.span layoutId="role-pill" className="absolute inset-0 rounded-xl bg-gradient-primary shadow-glow" transition={{ type: "spring", stiffness: 400, damping: 32 }} />
+                      <motion.span
+                        layoutId="role-pill"
+                        className="absolute inset-0 rounded-xl bg-gradient-primary shadow-glow"
+                        transition={{ type: "spring", stiffness: 400, damping: 32 }}
+                      />
                     )}
                     <Icon className="relative size-4" />
                     <span className="relative">{r.label}</span>
@@ -219,10 +267,15 @@ export function ChatDrawer() {
           </div>
 
           {/* Messages */}
-          <div ref={scrollRef} className="scrollbar-thin flex-1 space-y-4 overflow-y-auto px-5 py-5">
+          <div
+            ref={scrollRef}
+            className="scrollbar-thin flex-1 space-y-4 overflow-y-auto px-5 py-5"
+          >
             {messages.length === 0 && !pending && (
               <div className="space-y-3">
-                <p className="text-sm text-muted-foreground">پیشنهادهایی برای نقش «{ROLES.find((r) => r.id === role)?.label}»:</p>
+                <p className="text-sm text-muted-foreground">
+                  پیشنهادهایی برای نقش «{ROLES.find((r) => r.id === role)?.label}»:
+                </p>
                 {SUGGESTIONS[role].map((s, i) => (
                   <motion.button
                     key={s}
@@ -264,7 +317,11 @@ export function ChatDrawer() {
                 <div className="flex items-center gap-3 rounded-2xl border border-border bg-surface/80 px-4 py-3 text-sm text-muted-foreground">
                   <span className="flex gap-1" aria-hidden>
                     {[0, 1, 2].map((i) => (
-                      <span key={i} className="size-1.5 animate-typing rounded-full bg-primary-glow" style={{ animationDelay: `${i * 0.15}s` }} />
+                      <span
+                        key={i}
+                        className="size-1.5 animate-typing rounded-full bg-primary-glow"
+                        style={{ animationDelay: `${i * 0.15}s` }}
+                      />
                     ))}
                   </span>
                   در حال جست‌وجو در اسناد و کارنامه‌ها…
@@ -301,7 +358,9 @@ export function ChatDrawer() {
                 <ArrowUp className="size-5" />
               </button>
             </div>
-            <p className="mt-2 text-center text-[11px] text-muted-foreground">Enter برای ارسال · Shift+Enter برای خط جدید</p>
+            <p className="mt-2 text-center text-[11px] text-muted-foreground">
+              Enter برای ارسال · Shift+Enter برای خط جدید
+            </p>
           </div>
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>

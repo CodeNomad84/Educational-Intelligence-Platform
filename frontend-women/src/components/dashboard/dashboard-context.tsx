@@ -1,4 +1,12 @@
-import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useServerFn } from "@tanstack/react-start";
 
 import { STREAM, STUDENTS, type Observation, type StreamItem, type Student } from "@/data/school";
@@ -86,12 +94,20 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
           ]);
           flashMascot("analytical", 2400);
         } else {
-          setMessages((prev) => [...prev, { id: uid("e"), role: "assistant", content: reply.error, error: true }]);
+          setMessages((prev) => [
+            ...prev,
+            { id: uid("e"), role: "assistant", content: reply.error, error: true },
+          ]);
         }
       } catch {
         setMessages((prev) => [
           ...prev,
-          { id: uid("e"), role: "assistant", content: "ارتباط با دستیار قطع شد. دوباره تلاش کنید.", error: true },
+          {
+            id: uid("e"),
+            role: "assistant",
+            content: "ارتباط با دستیار قطع شد. دوباره تلاش کنید.",
+            error: true,
+          },
         ]);
       } finally {
         setPending(false);
@@ -111,12 +127,18 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const addObservation = useCallback(
     (studentId: string, obs: Observation) => {
       setStudents((prev) =>
-        prev.map((s) => (s.id === studentId ? { ...s, observations: [obs, ...s.observations] } : s)),
+        prev.map((s) =>
+          s.id === studentId ? { ...s, observations: [obs, ...s.observations] } : s,
+        ),
       );
       const student = students.find((s) => s.id === studentId);
       if (!student) return;
-      const kindLabel = obs.kind === "kudos" ? "تشویق" : obs.kind === "alert" ? "هشدار" : "پیشنهاد رشد";
-      setNotes((prev) => [...prev, `- ${student.name} (${kindLabel}، ${obs.mentor}، ${obs.date}): ${obs.text}`]);
+      const kindLabel =
+        obs.kind === "kudos" ? "تشویق" : obs.kind === "alert" ? "هشدار" : "پیشنهاد رشد";
+      setNotes((prev) => [
+        ...prev,
+        `- ${student.name} (${kindLabel}، ${obs.mentor}، ${obs.date}): ${obs.text}`,
+      ]);
       setStream((prev) => [
         {
           id: uid("st"),
@@ -153,7 +175,19 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       stream,
       addObservation,
     }),
-    [mascot, flashMascot, chatOpen, openChat, messages, pending, role, send, students, stream, addObservation],
+    [
+      mascot,
+      flashMascot,
+      chatOpen,
+      openChat,
+      messages,
+      pending,
+      role,
+      send,
+      students,
+      stream,
+      addObservation,
+    ],
   );
 
   return <DashboardContext.Provider value={value}>{children}</DashboardContext.Provider>;

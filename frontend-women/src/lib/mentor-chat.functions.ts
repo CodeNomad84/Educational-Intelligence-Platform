@@ -43,8 +43,7 @@ export interface Citation {
 }
 
 export type MentorReply =
-  | { ok: true; text: string; citations: Citation[] }
-  | { ok: false; error: string };
+  { ok: true; text: string; citations: Citation[] } | { ok: false; error: string };
 
 function tokenize(text: string): string[] {
   return text
@@ -64,13 +63,21 @@ function retrieve(query: string, k = 3): KnowledgeDoc[] {
     for (const t of q) if (doc.title.includes(t)) score += 3;
     return { doc, score };
   }).sort((a, b) => b.score - a.score);
-  const picked = scored.filter((s) => s.score > 0).slice(0, k).map((s) => s.doc);
-  if (picked.length === 0) return KNOWLEDGE_BASE.filter((d) => d.id === "kb-framework" || d.id === "kb-weekly");
+  const picked = scored
+    .filter((s) => s.score > 0)
+    .slice(0, k)
+    .map((s) => s.doc);
+  if (picked.length === 0)
+    return KNOWLEDGE_BASE.filter((d) => d.id === "kb-framework" || d.id === "kb-weekly");
   return picked;
 }
 
 /** Up to `limit` document lines that share vocabulary with the question; ties keep document order. */
-function relevantLines(query: string, docs: KnowledgeDoc[], limit = 4): { line: string; docIndex: number }[] {
+function relevantLines(
+  query: string,
+  docs: KnowledgeDoc[],
+  limit = 4,
+): { line: string; docIndex: number }[] {
   const words = new Set(tokenize(query));
   const rows: { line: string; score: number; docIndex: number; order: number }[] = [];
   docs.forEach((doc, docIndex) => {
@@ -116,11 +123,15 @@ function composeLocalAnswer(role: MentorRole, docs: KnowledgeDoc[], query: strin
 export const askMentor = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => InputSchema.parse(data))
   .handler(({ data }): MentorReply => {
-    const lastUser = [...data.messages].reverse().find((message) => message.role === "user")?.content ?? "";
+    const lastUser =
+      [...data.messages].reverse().find((message) => message.role === "user")?.content ?? "";
     const docs = retrieve(lastUser);
     const text = composeLocalAnswer(data.role, docs, lastUser);
     if (!text) {
-      return { ok: false, error: "برای این پرسش سندی در پایگاه دانش مدرسه پیدا نشد؛ پرسش را دقیق‌تر بپرسید." };
+      return {
+        ok: false,
+        error: "برای این پرسش سندی در پایگاه دانش مدرسه پیدا نشد؛ پرسش را دقیق‌تر بپرسید.",
+      };
     }
     const citations: Citation[] = docs.map((doc, index) => ({
       index: index + 1,

@@ -10,6 +10,10 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
 export default defineConfig({
+  // ADR-0015 (2026-11-13): the wrapper defaults nitro to `cloudflare-module`, which emits a Workers
+  // bundle, not a runnable server. The container runs the app as plain Node (`.output/server/index.mjs`,
+  // port 3000), so the preset is overridden here. `bun run dev` (5173 + /api proxy) is unaffected.
+  nitro: { preset: "node-server" },
   tanstackStart: {
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
     // nitro/vite builds from this
@@ -21,9 +25,14 @@ export default defineConfig({
   vite: {
     server: {
       port: 5173,
-      strictPort: true,   // fail loudly instead of drifting to 5174 and colliding with the other frontend
+      strictPort: true, // fail loudly instead of drifting to 5174 and colliding with the other frontend
       proxy: {
-        "/api": { target: "http://127.0.0.1:8000", changeOrigin: false },
+        // Default keeps the host workflow (`bun run dev` → 127.0.0.1:8000); the optional
+        // `frontends-dev` compose profile sets VITE_DEV_API_TARGET=http://django:8000 (ADR-0015 D3).
+        "/api": {
+          target: process.env["VITE_DEV_API_TARGET"] ?? "http://127.0.0.1:8000",
+          changeOrigin: false,
+        },
       },
     },
   },

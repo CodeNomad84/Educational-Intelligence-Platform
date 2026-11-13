@@ -26,7 +26,13 @@ const ORBIT = [0, 72, 144, 216, 288].map((deg, i) => {
   return { cx: 100 + Math.cos(r) * 86, cy: 108 + Math.sin(r) * 78, i };
 });
 
-const NODE_FILLS = ["var(--info)", "var(--success)", "var(--primary-glow)", "var(--warning)", "var(--info)"];
+const NODE_FILLS = [
+  "var(--info)",
+  "var(--success)",
+  "var(--primary-glow)",
+  "var(--warning)",
+  "var(--info)",
+];
 
 /** «رهنما» — the sprout-headed Smart Mentor. Emotionally responsive SVG companion. */
 export function Mascot({ state, size = 200, className }: MascotProps) {
@@ -46,7 +52,13 @@ export function Mascot({ state, size = 200, className }: MascotProps) {
 
   return (
     <div className={cn("relative select-none", className)} style={{ width: size, height: size }}>
-      <svg viewBox="0 0 200 200" width={size} height={size} role="img" aria-label={`دستیار رهنما — ${STATE_LABEL[state]}`}>
+      <svg
+        viewBox="0 0 200 200"
+        width={size}
+        height={size}
+        role="img"
+        aria-label={`دستیار رهنما — ${STATE_LABEL[state]}`}
+      >
         <defs>
           <radialGradient id="m-aura" cx="50%" cy="50%" r="50%">
             <stop offset="0%" stopColor="var(--primary-glow)" stopOpacity="0.55" />
@@ -77,7 +89,8 @@ export function Mascot({ state, size = 200, className }: MascotProps) {
           r="92"
           fill="url(#m-aura)"
           animate={{
-            opacity: isThinking || isAnalytical ? [0.7, 1, 0.7] : isCelebrate ? 1 : [0.35, 0.5, 0.35],
+            opacity:
+              isThinking || isAnalytical ? [0.7, 1, 0.7] : isCelebrate ? 1 : [0.35, 0.5, 0.35],
             scale: isThinking ? [0.95, 1.05, 0.95] : 1,
           }}
           transition={loop(isThinking ? 1.6 : 4)}
@@ -91,7 +104,13 @@ export function Mascot({ state, size = 200, className }: MascotProps) {
           ry="7"
           fill="var(--background)"
           opacity="0.6"
-          animate={{ scaleX: isCelebrate ? [1, 0.7, 1, 0.85, 1] : isThinking ? [0.85, 0.7, 0.85] : [1, 0.96, 1] }}
+          animate={{
+            scaleX: isCelebrate
+              ? [1, 0.7, 1, 0.85, 1]
+              : isThinking
+                ? [0.85, 0.7, 0.85]
+                : [1, 0.96, 1],
+          }}
           transition={bodyTransition}
         />
 
@@ -103,14 +122,34 @@ export function Mascot({ state, size = 200, className }: MascotProps) {
               initial={{ opacity: 0, scale: 0.6 }}
               animate={{ opacity: 1, scale: 1, rotate: 360 }}
               exit={{ opacity: 0, scale: 0.6 }}
-              transition={{ opacity: { duration: 0.3 }, scale: { duration: 0.4 }, rotate: { duration: 14, repeat: Infinity, ease: "linear" } }}
+              transition={{
+                opacity: { duration: 0.3 },
+                scale: { duration: 0.4 },
+                rotate: { duration: 14, repeat: Infinity, ease: "linear" },
+              }}
               style={{ transformBox: "view-box", transformOrigin: "100px 108px" }}
             >
-              <ellipse cx="100" cy="108" rx="86" ry="78" fill="none" stroke="var(--info)" strokeOpacity="0.25" strokeDasharray="3 6" />
+              <ellipse
+                cx="100"
+                cy="108"
+                rx="86"
+                ry="78"
+                fill="none"
+                stroke="var(--info)"
+                strokeOpacity="0.25"
+                strokeDasharray="3 6"
+              />
               {ORBIT.map((n) => (
                 <g key={n.i} filter="url(#m-glow)">
                   <circle cx={n.cx} cy={n.cy} r="5" fill={NODE_FILLS[n.i]} />
-                  <circle cx={n.cx} cy={n.cy} r="9" fill="none" stroke={NODE_FILLS[n.i]} strokeOpacity="0.4" />
+                  <circle
+                    cx={n.cx}
+                    cy={n.cy}
+                    r="9"
+                    fill="none"
+                    stroke={NODE_FILLS[n.i]}
+                    strokeOpacity="0.4"
+                  />
                 </g>
               ))}
             </motion.g>
@@ -118,14 +157,24 @@ export function Mascot({ state, size = 200, className }: MascotProps) {
         </AnimatePresence>
 
         {/* Character */}
-        <motion.g animate={bodyAnimate} transition={bodyTransition} style={{ transformBox: "view-box", transformOrigin: "100px 170px" }}>
+        <motion.g
+          animate={bodyAnimate}
+          transition={bodyTransition}
+          style={{ transformBox: "view-box", transformOrigin: "100px 170px" }}
+        >
           {/* Sprout */}
           <motion.g
             animate={{ rotate: isCelebrate ? [-14, 14, -14] : [-5, 5, -5] }}
             transition={loop(isCelebrate ? 0.6 : 3)}
             style={{ transformBox: "view-box", transformOrigin: "100px 58px" }}
           >
-            <path d="M100 58 C100 46 101 38 100 28" stroke="var(--mascot-leaf)" strokeWidth="4" strokeLinecap="round" fill="none" />
+            <path
+              d="M100 58 C100 46 101 38 100 28"
+              stroke="var(--mascot-leaf)"
+              strokeWidth="4"
+              strokeLinecap="round"
+              fill="none"
+            />
             <path d="M100 34 C88 20 72 22 68 30 C78 38 92 40 100 34 Z" fill="url(#m-leaf)" />
             <path d="M100 30 C110 14 128 14 134 22 C124 32 108 36 100 30 Z" fill="url(#m-leaf)" />
           </motion.g>
@@ -158,8 +207,22 @@ export function Mascot({ state, size = 200, className }: MascotProps) {
           <ellipse cx="100" cy="138" rx="36" ry="26" fill="var(--mascot-belly)" opacity="0.28" />
 
           {/* Cheeks */}
-          <ellipse cx="64" cy="124" rx="9" ry="5.5" fill="var(--mascot-cheek)" opacity={isCelebrate ? 0.8 : 0.5} />
-          <ellipse cx="136" cy="124" rx="9" ry="5.5" fill="var(--mascot-cheek)" opacity={isCelebrate ? 0.8 : 0.5} />
+          <ellipse
+            cx="64"
+            cy="124"
+            rx="9"
+            ry="5.5"
+            fill="var(--mascot-cheek)"
+            opacity={isCelebrate ? 0.8 : 0.5}
+          />
+          <ellipse
+            cx="136"
+            cy="124"
+            rx="9"
+            ry="5.5"
+            fill="var(--mascot-cheek)"
+            opacity={isCelebrate ? 0.8 : 0.5}
+          />
 
           {/* Eyes */}
           {isCelebrate ? (
@@ -175,7 +238,10 @@ export function Mascot({ state, size = 200, className }: MascotProps) {
             >
               <ellipse cx="79" cy="104" rx="13" ry="14.5" fill="var(--foreground)" />
               <ellipse cx="121" cy="104" rx="13" ry="14.5" fill="var(--foreground)" />
-              <motion.g animate={pupil} transition={{ type: "spring", stiffness: 120, damping: 14 }}>
+              <motion.g
+                animate={pupil}
+                transition={{ type: "spring", stiffness: 120, damping: 14 }}
+              >
                 <circle cx="80" cy="106" r="7.5" fill="var(--mascot-eye)" />
                 <circle cx="122" cy="106" r="7.5" fill="var(--mascot-eye)" />
                 <circle cx="83" cy="103" r="2.6" fill="var(--foreground)" />
@@ -195,13 +261,56 @@ export function Mascot({ state, size = 200, className }: MascotProps) {
                 transition={{ type: "spring", stiffness: 260, damping: 18 }}
                 filter="url(#m-glow)"
               >
-                <circle cx="79" cy="104" r="19" fill="var(--info)" fillOpacity="0.12" stroke="var(--info)" strokeWidth="3.5" />
-                <circle cx="121" cy="104" r="19" fill="var(--info)" fillOpacity="0.12" stroke="var(--info)" strokeWidth="3.5" />
-                <path d="M98 102 Q100 98 102 102" stroke="var(--info)" strokeWidth="3.5" fill="none" />
-                <path d="M60 100 L48 96" stroke="var(--info)" strokeWidth="3" strokeLinecap="round" />
-                <path d="M140 100 L152 96" stroke="var(--info)" strokeWidth="3" strokeLinecap="round" />
-                <path d="M68 96 L76 92" stroke="var(--foreground)" strokeOpacity="0.7" strokeWidth="2" strokeLinecap="round" />
-                <path d="M110 96 L118 92" stroke="var(--foreground)" strokeOpacity="0.7" strokeWidth="2" strokeLinecap="round" />
+                <circle
+                  cx="79"
+                  cy="104"
+                  r="19"
+                  fill="var(--info)"
+                  fillOpacity="0.12"
+                  stroke="var(--info)"
+                  strokeWidth="3.5"
+                />
+                <circle
+                  cx="121"
+                  cy="104"
+                  r="19"
+                  fill="var(--info)"
+                  fillOpacity="0.12"
+                  stroke="var(--info)"
+                  strokeWidth="3.5"
+                />
+                <path
+                  d="M98 102 Q100 98 102 102"
+                  stroke="var(--info)"
+                  strokeWidth="3.5"
+                  fill="none"
+                />
+                <path
+                  d="M60 100 L48 96"
+                  stroke="var(--info)"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                />
+                <path
+                  d="M140 100 L152 96"
+                  stroke="var(--info)"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                />
+                <path
+                  d="M68 96 L76 92"
+                  stroke="var(--foreground)"
+                  strokeOpacity="0.7"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+                <path
+                  d="M110 96 L118 92"
+                  stroke="var(--foreground)"
+                  strokeOpacity="0.7"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
               </motion.g>
             )}
           </AnimatePresence>
@@ -210,7 +319,15 @@ export function Mascot({ state, size = 200, className }: MascotProps) {
           {isCelebrate ? (
             <path d="M84 130 Q100 152 116 130 Z" fill="var(--mascot-eye)" />
           ) : isThinking ? (
-            <motion.ellipse cx="104" cy="134" rx="5" ry="5.5" fill="var(--mascot-eye)" animate={{ ry: [5.5, 4, 5.5] }} transition={loop(1.6)} />
+            <motion.ellipse
+              cx="104"
+              cy="134"
+              rx="5"
+              ry="5.5"
+              fill="var(--mascot-eye)"
+              animate={{ ry: [5.5, 4, 5.5] }}
+              transition={loop(1.6)}
+            />
           ) : (
             <path
               d={isAnalytical ? "M88 132 Q100 140 112 132" : "M86 130 Q100 144 114 130"}
@@ -225,7 +342,12 @@ export function Mascot({ state, size = 200, className }: MascotProps) {
         {/* Thought bubbles */}
         <AnimatePresence>
           {isThinking && (
-            <motion.g key="thought" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <motion.g
+              key="thought"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
               {[
                 { cx: 150, cy: 52, r: 4 },
                 { cx: 162, cy: 38, r: 6 },
@@ -246,7 +368,12 @@ export function Mascot({ state, size = 200, className }: MascotProps) {
         {/* Celebration burst */}
         <AnimatePresence>
           {isCelebrate && (
-            <motion.g key="burst" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <motion.g
+              key="burst"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
               {BURST.map((p) => (
                 <motion.rect
                   key={p.i}
@@ -255,9 +382,22 @@ export function Mascot({ state, size = 200, className }: MascotProps) {
                   width={p.i % 2 ? 6 : 8}
                   height={p.i % 2 ? 6 : 3}
                   rx="1.5"
-                  fill={["var(--warning)", "var(--success)", "var(--primary-glow)", "var(--info)", "var(--mascot-cheek)"][p.i % 5]}
+                  fill={
+                    [
+                      "var(--warning)",
+                      "var(--success)",
+                      "var(--primary-glow)",
+                      "var(--info)",
+                      "var(--mascot-cheek)",
+                    ][p.i % 5]
+                  }
                   animate={{ x: [0, p.x], y: [0, p.y], opacity: [1, 0], rotate: [0, 180] }}
-                  transition={{ duration: 1.1, repeat: Infinity, ease: "easeOut", delay: (p.i % 3) * 0.12 }}
+                  transition={{
+                    duration: 1.1,
+                    repeat: Infinity,
+                    ease: "easeOut",
+                    delay: (p.i % 3) * 0.12,
+                  }}
                 />
               ))}
               <motion.path

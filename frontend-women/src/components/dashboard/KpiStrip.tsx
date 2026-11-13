@@ -5,7 +5,12 @@ import { Area, AreaChart, ResponsiveContainer } from "recharts";
 import { KPIS, type KpiMetric } from "@/data/school";
 import { cn } from "@/lib/utils";
 
-const ICONS = { mentees: Users, projects: Rocket, growth: Activity, observations: ClipboardCheck } as const;
+const ICONS = {
+  mentees: Users,
+  projects: Rocket,
+  growth: Activity,
+  observations: ClipboardCheck,
+} as const;
 
 const TONE: Record<KpiMetric["tone"], { icon: string; stroke: string }> = {
   primary: { icon: "bg-primary/15 text-primary-glow", stroke: "var(--primary-glow)" },
@@ -16,7 +21,11 @@ const TONE: Record<KpiMetric["tone"], { icon: string; stroke: string }> = {
 
 export function KpiStrip() {
   return (
-    <section id="pulse" aria-label="نبض مدرسه" className="grid scroll-mt-24 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <section
+      id="pulse"
+      aria-label="نبض مدرسه"
+      className="grid scroll-mt-24 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"
+    >
       {KPIS.map((k, i) => {
         const Icon = ICONS[k.id as keyof typeof ICONS] ?? Activity;
         const tone = TONE[k.tone];
@@ -38,10 +47,16 @@ export function KpiStrip() {
               <span
                 className={cn(
                   "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold",
-                  k.trend === "up" ? "bg-success/15 text-success" : "bg-destructive/15 text-destructive",
+                  k.trend === "up"
+                    ? "bg-success/15 text-success"
+                    : "bg-destructive/15 text-destructive",
                 )}
               >
-                {k.trend === "up" ? <TrendingUp className="size-3.5" /> : <TrendingDown className="size-3.5" />}
+                {k.trend === "up" ? (
+                  <TrendingUp className="size-3.5" />
+                ) : (
+                  <TrendingDown className="size-3.5" />
+                )}
                 <span dir="ltr">{k.delta}</span>
               </span>
             </div>
@@ -59,7 +74,14 @@ export function KpiStrip() {
                       <stop offset="100%" stopColor={tone.stroke} stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <Area type="monotone" dataKey="v" stroke={tone.stroke} strokeWidth={2} fill={`url(#spark-${k.id})`} isAnimationActive />
+                  <Area
+                    type="monotone"
+                    dataKey="v"
+                    stroke={tone.stroke}
+                    strokeWidth={2}
+                    fill={`url(#spark-${k.id})`}
+                    isAnimationActive
+                  />
                 </AreaChart>
               </ResponsiveContainer>
             </div>

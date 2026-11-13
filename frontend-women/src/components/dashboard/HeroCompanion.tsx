@@ -6,10 +6,33 @@ import { useDashboard } from "./dashboard-context";
 import { Mascot, STATE_LABEL } from "./Mascot";
 
 const CHIPS = [
-  { emoji: "🎯", label: "تحلیل شایستگی‌های مأموریت‌محور", prompt: "شایستگی‌های شش‌گانه مدرسه را تحلیل کن: ضعیف‌ترین و قوی‌ترین محورها کدام‌اند و برای تقویت محور ضعیف چه مأموریت‌هایی پیشنهاد می‌کنی؟", mood: "analytical" as const },
-  { emoji: "📝", label: "ثبت مشاهده جدید برای پایه", prompt: "می‌خواهم برای پایه نهم یک مشاهده جدید ثبت کنم. طبق دستورالعمل، یک قالب مشاهده عینی و چند نمونه خوب برای تشویق و پیشنهاد رشد به من بده.", mood: "thinking" as const },
-  { emoji: "📊", label: "گزارش پیشرفت هفتگی", prompt: "گزارش پیشرفت هفتگی مدرسه را با شاخص‌های کلیدی، دستاوردها و هشدارها خلاصه کن.", mood: "analytical" as const },
-  { emoji: "💡", label: "پیشنهاد برنامه رشد انفرادی", prompt: "برای محمدرضا کاظمی یک برنامه رشد انفرادی ۶ هفته‌ای پیشنهاد بده که از علاقه او به فیزیک برای بهبود ریاضی استفاده کند.", mood: "thinking" as const },
+  {
+    emoji: "🎯",
+    label: "تحلیل شایستگی‌های مأموریت‌محور",
+    prompt:
+      "شایستگی‌های شش‌گانه مدرسه را تحلیل کن: ضعیف‌ترین و قوی‌ترین محورها کدام‌اند و برای تقویت محور ضعیف چه مأموریت‌هایی پیشنهاد می‌کنی؟",
+    mood: "analytical" as const,
+  },
+  {
+    emoji: "📝",
+    label: "ثبت مشاهده جدید برای پایه",
+    prompt:
+      "می‌خواهم برای پایه نهم یک مشاهده جدید ثبت کنم. طبق دستورالعمل، یک قالب مشاهده عینی و چند نمونه خوب برای تشویق و پیشنهاد رشد به من بده.",
+    mood: "thinking" as const,
+  },
+  {
+    emoji: "📊",
+    label: "گزارش پیشرفت هفتگی",
+    prompt: "گزارش پیشرفت هفتگی مدرسه را با شاخص‌های کلیدی، دستاوردها و هشدارها خلاصه کن.",
+    mood: "analytical" as const,
+  },
+  {
+    emoji: "💡",
+    label: "پیشنهاد برنامه رشد انفرادی",
+    prompt:
+      "برای محمدرضا کاظمی یک برنامه رشد انفرادی ۶ هفته‌ای پیشنهاد بده که از علاقه او به فیزیک برای بهبود ریاضی استفاده کند.",
+    mood: "thinking" as const,
+  },
 ];
 
 const BUBBLE: Record<string, string> = {
@@ -25,7 +48,9 @@ export function HeroCompanion() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
-      const typing = target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
+      const typing =
+        target &&
+        (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
       if (e.key === "/" && !typing) {
         e.preventDefault();
         openChat();
@@ -36,9 +61,19 @@ export function HeroCompanion() {
   }, [openChat]);
 
   return (
-    <section id="top" aria-labelledby="hero-title" className="relative overflow-hidden rounded-[2rem] glass px-5 py-8 sm:px-10 sm:py-10">
-      <div aria-hidden className="pointer-events-none absolute -top-24 start-1/3 size-80 rounded-full bg-primary/25 blur-3xl" />
-      <div aria-hidden className="pointer-events-none absolute -bottom-24 end-10 size-72 rounded-full bg-success/15 blur-3xl" />
+    <section
+      id="top"
+      aria-labelledby="hero-title"
+      className="relative overflow-hidden rounded-[2rem] glass px-5 py-8 sm:px-10 sm:py-10"
+    >
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -top-24 start-1/3 size-80 rounded-full bg-primary/25 blur-3xl"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -bottom-24 end-10 size-72 rounded-full bg-success/15 blur-3xl"
+      />
 
       <div className="relative grid items-center gap-8 lg:grid-cols-[auto_1fr]">
         {/* Mascot */}
@@ -77,13 +112,19 @@ export function HeroCompanion() {
 
         {/* Greeting + command bar */}
         <div className="min-w-0">
-          <p className="mb-2 text-sm font-medium text-primary-glow">سه‌شنبه، هفته سوم آبان · پایه نهم</p>
-          <h1 id="hero-title" className="text-3xl font-black leading-[1.35] tracking-tight sm:text-4xl lg:text-[2.75rem]">
+          <p className="mb-2 text-sm font-medium text-primary-glow">
+            سه‌شنبه، هفته سوم آبان · پایه نهم
+          </p>
+          <h1
+            id="hero-title"
+            className="text-3xl font-black leading-[1.35] tracking-tight sm:text-4xl lg:text-[2.75rem]"
+          >
             <span className="text-gradient">سلام خانم رضایی، امروز کدام نهال را آبیاری کنیم؟</span>
           </h1>
           <p className="mt-3 max-w-2xl text-base leading-8 text-muted-foreground">
             <strong className="font-semibold text-warning">۳ دانش‌آموز</strong> نیازمند توجه‌اند و{" "}
-            <strong className="font-semibold text-success">۲ دستاورد تازه</strong> برای جشن گرفتن داریم.
+            <strong className="font-semibold text-success">۲ دستاورد تازه</strong> برای جشن گرفتن
+            داریم.
           </p>
 
           <button
@@ -95,7 +136,9 @@ export function HeroCompanion() {
             <span className="min-w-0 flex-1 truncate py-2 text-sm text-muted-foreground sm:text-base">
               از دستیار مربیگری و رشد بپرسید (مثال: دانش‌آموزان نیازمند توجه در درس ریاضی...)
             </span>
-            <kbd className="hidden rounded-md border border-border bg-muted px-2 py-0.5 text-xs text-muted-foreground sm:inline">/</kbd>
+            <kbd className="hidden rounded-md border border-border bg-muted px-2 py-0.5 text-xs text-muted-foreground sm:inline">
+              /
+            </kbd>
             <span className="grid size-11 shrink-0 place-items-center rounded-full bg-gradient-primary text-primary-foreground shadow-glow transition-transform group-hover:-translate-y-0.5">
               <ArrowUp className="size-5" aria-hidden />
             </span>

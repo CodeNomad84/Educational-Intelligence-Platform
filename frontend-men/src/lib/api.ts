@@ -10,7 +10,8 @@
  *
  * No token is ever stored in localStorage: the server-side session is the credential.
  */
-const BASE_URL: string = import.meta.env.VITE_API_URL || "/api";
+// Bracket access because tsconfig sets `noPropertyAccessFromIndexSignature` (D6 typecheck gate, 0042).
+const BASE_URL: string = import.meta.env["VITE_API_URL"] || "/api";
 const CSRF_COOKIE = "csrftoken";
 const CSRF_HEADER = "X-CSRFToken";
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS", "TRACE"]);
@@ -48,7 +49,9 @@ export class ApiError extends Error {
 
   constructor(status: number, body: unknown) {
     const detail =
-      body && typeof body === "object" && "detail" in body ? String((body as { detail: unknown }).detail) : "";
+      body && typeof body === "object" && "detail" in body
+        ? String((body as { detail: unknown }).detail)
+        : "";
     super(detail || `HTTP ${status}`);
     this.name = "ApiError";
     this.status = status;
@@ -57,13 +60,17 @@ export class ApiError extends Error {
 
   /** A login the account may not complete until it has changed its password. */
   get mustChangePassword(): boolean {
-    return this.status === 403 && this.body !== null && typeof this.body === "object" &&
-      (this.body as { code?: unknown }).code === "password_change_required";
+    return (
+      this.status === 403 &&
+      this.body !== null &&
+      typeof this.body === "object" &&
+      (this.body as { code?: unknown }).code === "password_change_required"
+    );
   }
 }
 
 function readCookie(name: string): string | null {
-  if (typeof document === "undefined") return null;      // server render: there is no cookie jar here
+  if (typeof document === "undefined") return null; // server render: there is no cookie jar here
   const match = new RegExp(`(?:^|; )${name}=([^;]*)`).exec(document.cookie);
   const value = match?.[1];
   return value ? decodeURIComponent(value) : null;
@@ -110,9 +117,15 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   const method = (init.method ?? "GET").toUpperCase();
   const headers = new Headers(init.headers);
   headers.set("Accept", "application/json");
-  if (init.body !== undefined && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+  if (init.body !== undefined && !headers.has("Content-Type"))
+    headers.set("Content-Type", "application/json");
   if (!SAFE_METHODS.has(method)) headers.set(CSRF_HEADER, await csrfToken());
-  const response = await fetch(`${BASE_URL}${path}`, { ...init, method, headers, credentials: "include" });
+  const response = await fetch(`${BASE_URL}${path}`, {
+    ...init,
+    method,
+    headers,
+    credentials: "include",
+  });
   const body = await parseBody(response);
   if (!response.ok) throw new ApiError(response.status, body);
   return body as T;
@@ -133,5 +146,7 @@ export async function apiLogout(): Promise<void> {
 
 /** `GET /api/auth/me/` — the signed-in account; an anonymous caller gets `ApiError` with status 401. */
 export function apiMe(schoolId?: number): Promise<MeResponse> {
-  return apiFetch<MeResponse>(schoolId === undefined ? "/auth/me/" : `/auth/me/?school=${schoolId}`);
+  return apiFetch<MeResponse>(
+    schoolId === undefined ? "/auth/me/" : `/auth/me/?school=${schoolId}`,
+  );
 }

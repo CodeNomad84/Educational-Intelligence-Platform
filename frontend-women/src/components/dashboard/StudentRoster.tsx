@@ -4,15 +4,39 @@ import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { GRADES, MISSION_TRACKS, STATUS_META, type AcademicStatus, type Student } from "@/data/school";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  GRADES,
+  MISSION_TRACKS,
+  STATUS_META,
+  type AcademicStatus,
+  type Student,
+} from "@/data/school";
 import { cn } from "@/lib/utils";
 import { useDashboard } from "./dashboard-context";
 import { FeedbackDialog } from "./FeedbackDialog";
 import { Student360Dialog } from "./Student360Dialog";
 
-const TONE_TO_BADGE = { success: "success", info: "info", warning: "warning", destructive: "danger" } as const;
+const TONE_TO_BADGE = {
+  success: "success",
+  info: "info",
+  warning: "warning",
+  destructive: "danger",
+} as const;
 
 export const TRACK_COLOR: Record<string, string> = {
   "فناوری و نوآوری": "bg-info/20 text-info",
@@ -58,7 +82,9 @@ export function StudentRoster() {
           (grade === "all" || s.grade === grade) &&
           (track === "all" || s.track === track) &&
           (status === "all" || s.status === status) &&
-          (query.trim() === "" || s.name.includes(query.trim()) || s.classroom.includes(query.trim())),
+          (query.trim() === "" ||
+            s.name.includes(query.trim()) ||
+            s.classroom.includes(query.trim())),
       ),
     [students, grade, track, status, query],
   );
@@ -67,14 +93,19 @@ export function StudentRoster() {
   const feedbackStudent = students.find((s) => s.id === feedbackId) ?? null;
 
   return (
-    <section id="roster" aria-labelledby="roster-title" className="scroll-mt-24 rounded-3xl glass p-5 sm:p-6">
+    <section
+      id="roster"
+      aria-labelledby="roster-title"
+      className="scroll-mt-24 rounded-3xl glass p-5 sm:p-6"
+    >
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h2 id="roster-title" className="flex items-center gap-2 text-lg font-extrabold">
             <Users className="size-5 text-primary-glow" /> فهرست متربیان
           </h2>
           <p className="text-sm text-muted-foreground">
-            {filtered.length.toLocaleString("fa-IR")} از {students.length.toLocaleString("fa-IR")} دانش‌آموز
+            {filtered.length.toLocaleString("fa-IR")} از {students.length.toLocaleString("fa-IR")}{" "}
+            دانش‌آموز
           </p>
         </div>
         <div className="flex w-full flex-wrap gap-2 lg:w-auto">
@@ -89,24 +120,34 @@ export function StudentRoster() {
             />
           </div>
           <Select value={grade} onValueChange={setGrade}>
-            <SelectTrigger aria-label="فیلتر پایه" className="h-10 w-[130px] rounded-full bg-surface/70">
+            <SelectTrigger
+              aria-label="فیلتر پایه"
+              className="h-10 w-[130px] rounded-full bg-surface/70"
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">همه پایه‌ها</SelectItem>
               {GRADES.map((g) => (
-                <SelectItem key={g} value={g}>پایه {g}</SelectItem>
+                <SelectItem key={g} value={g}>
+                  پایه {g}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
           <Select value={track} onValueChange={setTrack}>
-            <SelectTrigger aria-label="فیلتر مسیر مأموریتی" className="h-10 w-[170px] rounded-full bg-surface/70">
+            <SelectTrigger
+              aria-label="فیلتر مسیر مأموریتی"
+              className="h-10 w-[170px] rounded-full bg-surface/70"
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">همه مسیرها</SelectItem>
               {MISSION_TRACKS.map((t) => (
-                <SelectItem key={t} value={t}>{t}</SelectItem>
+                <SelectItem key={t} value={t}>
+                  {t}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -121,7 +162,9 @@ export function StudentRoster() {
             aria-pressed={status === s}
             className={cn(
               "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-              status === s ? "border-primary/60 bg-primary/20 text-foreground" : "border-border text-muted-foreground hover:text-foreground",
+              status === s
+                ? "border-primary/60 bg-primary/20 text-foreground"
+                : "border-border text-muted-foreground hover:text-foreground",
             )}
           >
             {s === "all" ? "همه وضعیت‌ها" : STATUS_META[s].label}
@@ -151,7 +194,9 @@ export function StudentRoster() {
                       <StudentAvatar student={s} />
                       <div>
                         <p className="font-semibold">{s.name}</p>
-                        <p className="text-xs text-muted-foreground">معدل {s.gpa.toLocaleString("fa-IR")}</p>
+                        <p className="text-xs text-muted-foreground">
+                          معدل {s.gpa.toLocaleString("fa-IR")}
+                        </p>
                       </div>
                     </div>
                   </TableCell>
@@ -159,12 +204,27 @@ export function StudentRoster() {
                     {s.grade} · <span className="text-foreground">{s.classroom}</span>
                   </TableCell>
                   <TableCell>
-                    <span className={cn("rounded-full px-2.5 py-1 text-xs font-medium", TRACK_COLOR[s.track])}>{s.track}</span>
+                    <span
+                      className={cn(
+                        "rounded-full px-2.5 py-1 text-xs font-medium",
+                        TRACK_COLOR[s.track],
+                      )}
+                    >
+                      {s.track}
+                    </span>
                   </TableCell>
-                  <TableCell><StatusBadge status={s.status} /></TableCell>
+                  <TableCell>
+                    <StatusBadge status={s.status} />
+                  </TableCell>
                   <TableCell className="max-w-[280px]">
-                    <p className="truncate text-sm" title={obs?.text}>{obs?.text ?? "—"}</p>
-                    {obs && <p className="text-xs text-muted-foreground">{obs.mentor} · {obs.date}</p>}
+                    <p className="truncate text-sm" title={obs?.text}>
+                      {obs?.text ?? "—"}
+                    </p>
+                    {obs && (
+                      <p className="text-xs text-muted-foreground">
+                        {obs.mentor} · {obs.date}
+                      </p>
+                    )}
                   </TableCell>
                   <TableCell className="pe-4">
                     <div className="flex justify-end gap-2">

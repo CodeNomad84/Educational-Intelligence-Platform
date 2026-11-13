@@ -17,11 +17,16 @@ export function TopBar() {
           </span>
           <span className="leading-tight">
             <span className="block text-base font-extrabold tracking-tight">آرمان‌نو - نسیم</span>
-            <span className="hidden text-xs text-muted-foreground sm:block">سکوی آموزشی-تربیتی</span>
+            <span className="hidden text-xs text-muted-foreground sm:block">
+              سکوی آموزشی-تربیتی
+            </span>
           </span>
         </a>
 
-        <nav aria-label="بخش‌های داشبورد" className="mx-auto hidden items-center gap-1 rounded-full border border-border bg-surface/60 p-1 md:flex">
+        <nav
+          aria-label="بخش‌های داشبورد"
+          className="mx-auto hidden items-center gap-1 rounded-full border border-border bg-surface/60 p-1 md:flex"
+        >
           {NAV.map((n) => (
             <a
               key={n.href}
@@ -47,7 +52,9 @@ export function TopBar() {
               <span className="block text-sm font-semibold">خانم رضایی</span>
               <span className="block text-[11px] text-muted-foreground">مربی پایه نهم</span>
             </span>
-            <span className="grid size-8 place-items-center rounded-full bg-gradient-growth text-sm font-bold text-success-foreground">ر</span>
+            <span className="grid size-8 place-items-center rounded-full bg-gradient-growth text-sm font-bold text-success-foreground">
+              ر
+            </span>
           </div>
         </div>
       </div>
