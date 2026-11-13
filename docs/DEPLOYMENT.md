@@ -115,6 +115,23 @@ browser ──http://men.localhost:8080──┐
 5. CI (T-01) running both SQLite and PostgreSQL suites, so a deployment candidate is tested (currently deferred).
 6. Torch/model artifacts: S-11 (tracked pickle model binaries) decision made; model loading is `torch.load` on tracked files.
 
+## 3c. AI provider configuration (change 0043 / ADR-0008; scope S1 only)
+
+`CURRENT` in the repository, `NOT VERIFIED` against a real provider. Nothing is enabled by default: the pilot maps no
+school to any provider.
+
+- The configuration file is `.env.llm` (gitignored; copy `.env.llm.example`), injected into the `fastapi` service only
+  and optionally (`required: false`). Django, Celery, PostgreSQL and the frontends never see it.
+- Before a live call: `LLM_KEY_GAPGPT` (a real key), `LLM_PROVIDERS` (base URL and model — confirm both against the
+  provider's documentation, they are placeholders here), and `LLM_SCHOOL_MAP` (empty = no school has AI).
+- Check the wiring without any key: `python3 tools/llm_smoke.py --mock` (offline, sends nothing, exits 0). Then, on the
+  server, one real call with a fixed non-personal prompt: `python3 tools/llm_smoke.py --live --env-file .env.llm`.
+- Apply: `docker compose up -d fastapi` (or `restart fastapi`). `docker compose config --quiet` proves the compose file
+  is still valid with or without the file.
+- Rollback: set `LLM_SCHOOL_MAP={}` (or remove `.env.llm`) and restart `fastapi`. No migration, no data change.
+- `NOT VERIFIED`: the provider's real base URL, model ids, retention/residency and terms, plus the latency and cost of a
+  call. Do not map a school before those are recorded (ADR-0008 decision 8). Document QA stays local-only either way.
+
 ## 5. Secrets handling (PROPOSED)
 
 - Secrets only via environment / secret files outside git (`.env`, `.env.fastapi` are untracked; never printed or committed).

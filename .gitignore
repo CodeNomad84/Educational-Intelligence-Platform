@@ -5,6 +5,7 @@ admin_logs.txt
 .env
 .env.*
 !.env.example
+!.env.llm.example
 *.pem
 *.ppk
 *.key
