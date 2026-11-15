@@ -12,7 +12,9 @@ Configuration (environment, operator-owned; nothing is read from a request):
   LLM_PROVIDERS   JSON {"<name>": {"class": "external"|"local", "base_url": "...", "model": "...", "api_key_env": "ENV_NAME",
                   "timeout": 30, "max_tokens": 600}}
   LLM_SCHOOL_MAP  JSON {"<school id>": "<provider name>"}      (a school absent from the map has NO AI)
-  LLM_DAILY_CAP   integer, per-school calls per UTC day (default 200; 0 = block all)
+  LLM_DAILY_CAP   integer, per-school ANSWERED calls per UTC day (default 200; 0 = block all). A call that fails at the
+                  provider (5xx, timeout, malformed answer) or is refused as busy is refunded, so an outage cannot use
+                  the cap up (E2E F05, change 0044).
 """
 import json
 import logging
@@ -171,6 +173,15 @@ def _take_slot(school_id, env):
     _USAGE[key] = _USAGE.get(key, 0) + 1
 
 
+def _refund_slot(school_id):
+    """Give back the slot ``_take_slot`` took when the call delivered no answer (E2E F05): a provider 5xx, a timeout, a
+    malformed answer or a refused (busy) call must not consume the school's cap. Never below zero; a day rollover is a
+    no-op, because ``_take_slot`` already dropped yesterday's keys."""
+    key = (school_id, datetime.now(timezone.utc).date())
+    if _USAGE.get(key, 0):
+        _USAGE[key] -= 1
+
+
 _BUSY, _BUSY_LOCK, MAX_CONCURRENT_PER_SCHOOL = {}, threading.Lock(), 3
 
 
@@ -236,26 +247,32 @@ def complete(provider, messages, purpose, *, school_id, roster_names=(), env=Non
     if provider.kind == EXTERNAL and not key:
         raise LLMError("not_configured")
     _take_slot(school_id, env)
-    headers = {"Content-Type": "application/json", "Accept": "application/json"}
-    if key:
-        headers["Authorization"] = f"Bearer {key}"
-    body = json.dumps({"model": provider.model, "messages": messages, "max_tokens": provider.max_tokens, "temperature": 0.2}).encode()
-    gate = _school_gate(school_id)               # at most MAX_CONCURRENT_PER_SCHOOL calls in flight per school (threadpool protection)
+    delivered = False                   # F05: the slot is given back below unless this call returns an answer
     try:
-        status, raw = (transport or _urllib_transport)(provider.base_url + "/chat/completions", headers, body, provider.timeout)
+        headers = {"Content-Type": "application/json", "Accept": "application/json"}
+        if key:
+            headers["Authorization"] = f"Bearer {key}"
+        body = json.dumps({"model": provider.model, "messages": messages, "max_tokens": provider.max_tokens, "temperature": 0.2}).encode()
+        gate = _school_gate(school_id)               # at most MAX_CONCURRENT_PER_SCHOOL calls in flight per school (threadpool protection)
+        try:
+            status, raw = (transport or _urllib_transport)(provider.base_url + "/chat/completions", headers, body, provider.timeout)
+        finally:
+            gate.release()
+        usage = {}
+        try:
+            if status != 200:
+                raise ValueError
+            data = json.loads(raw)
+            text = data["choices"][0]["message"]["content"]
+            if not isinstance(text, str):
+                raise ValueError
+            usage = {k: data.get("usage", {}).get(k) for k in ("prompt_tokens", "completion_tokens") if isinstance(data.get("usage"), dict)}
+        except (ValueError, KeyError, IndexError, TypeError):
+            logger.warning("llm_call school=%s class=%s status=error http=%s", school_id, provider.kind, status)
+            raise LLMError("upstream_error") from None
+        logger.info("llm_call school=%s class=%s purpose=%s status=ok tokens=%s", school_id, provider.kind, purpose, usage)      # no content
+        delivered = True
+        return {"text": text, "label": LABEL_FA, "provider_class": provider.kind, "model": provider.model, "usage": usage}
     finally:
-        gate.release()
-    usage = {}
-    try:
-        if status != 200:
-            raise ValueError
-        data = json.loads(raw)
-        text = data["choices"][0]["message"]["content"]
-        if not isinstance(text, str):
-            raise ValueError
-        usage = {k: data.get("usage", {}).get(k) for k in ("prompt_tokens", "completion_tokens") if isinstance(data.get("usage"), dict)}
-    except (ValueError, KeyError, IndexError, TypeError):
-        logger.warning("llm_call school=%s class=%s status=error http=%s", school_id, provider.kind, status)
-        raise LLMError("upstream_error") from None
-    logger.info("llm_call school=%s class=%s purpose=%s status=ok tokens=%s", school_id, provider.kind, purpose, usage)      # no content
-    return {"text": text, "label": LABEL_FA, "provider_class": provider.kind, "model": provider.model, "usage": usage}
+        if not delivered:
+            _refund_slot(school_id)

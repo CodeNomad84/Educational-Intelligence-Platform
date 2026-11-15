@@ -6,9 +6,7 @@ import secrets
 from unittest import mock
 
 import jwt
-import requests
 from django.core.exceptions import ImproperlyConfigured
-from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
@@ -35,16 +33,19 @@ class DashboardAuthzTests(TestCase):
     # -- unauthenticated --------------------------------------------------
     def test_anonymous_redirected_to_login_everywhere(self):
         for name, args in [('dashboard', ()), ('student_list', ()), ('student_detail', (self.child_a.pk,)),
-                           ('chat', ()), ('library', ()), ('student_add', ()), ('school_accounts', ())]:
+                           ('student_add', ()), ('school_accounts', ())]:
             resp = self.client.get(self.url(name, *args))
             self.assertEqual(resp.status_code, 302, name)
             self.assertTrue(resp['Location'].startswith(reverse('dashboard:login')), name)
 
-    def test_anonymous_cannot_mutate(self):
-        for name in ('upload_document', 'delete_document'):
-            resp = self.client.post(self.url(name), {'parent_id': 'x'})
-            self.assertEqual(resp.status_code, 302)
-            self.assertTrue(resp['Location'].startswith(reverse('dashboard:login')))
+    def test_the_legacy_chat_and_library_routes_are_gone(self):
+        """F12 (change 0044 tranche 2): /chat/, /library/, /upload-document/ and /delete-document/ are 404 for everyone,
+        anonymous included - no login redirect, because the route no longer exists. /assistant/ (docqa) is the only
+        document surface; it has its own access tests in docqa/tests.py and dashboard/test_e2e_user_flow.py test_10/11."""
+        for path in ('/chat/', '/library/', '/upload-document/', '/delete-document/'):
+            with self.subTest(path=path):
+                self.assertEqual(self.client.get(path).status_code, 404)
+                self.assertEqual(self.client.post(path).status_code, 404)
 
     # -- parent: own child allowed, other child denied -------------------
     def test_parent_own_child_allowed(self):
@@ -73,55 +74,41 @@ class DashboardAuthzTests(TestCase):
 
     def test_parent_denied_staff_and_admin_pages(self):
         self.client.force_login(self.parent_a)
-        for name in ('chat', 'library', 'student_add', 'school_accounts'):
+        for name in ('student_add', 'school_accounts'):
             self.assertEqual(self.client.get(self.url(name)).status_code, 403, name)
-        self.assertEqual(self.client.post(self.url('upload_document')).status_code, 403)
-        self.assertEqual(self.client.post(self.url('delete_document'), {'parent_id': 'x'}).status_code, 403)
 
     # -- unauthorized role (no recognised group) --------------------------
     def test_user_without_role_denied(self):
         self.client.force_login(self.nogroup)
         for name, args in [('dashboard', ()), ('student_list', ()), ('student_detail', (self.child_a.pk,)),
-                           ('chat', ()), ('library', ()), ('student_add', ())]:
+                           ('student_add', ())]:
             self.assertEqual(self.client.get(self.url(name, *args)).status_code, 403, name)
 
-    def test_teacher_predict_flag_on_unrelated_student_is_denied(self):
+    def test_teacher_predicting_an_unrelated_student_is_denied(self):
+        # F04 (change 0044): the trigger is a POST with `action=predict`, sent by the page's form.
         self.client.force_login(self.teacher)
         with mock.patch('dashboard.views.requests.post') as post:
-            resp = self.client.get(self.url('student_detail', self.child_b.pk), {'predict': 'true'})
+            resp = self.client.post(self.url('student_detail', self.child_b.pk), {'action': 'predict'})
         self.assertEqual(resp.status_code, 404)  # the student is not visible to a teacher
         post.assert_not_called()
 
     def test_unmapped_staff_roles_denied_everywhere(self):
         for group in ('Mentor', 'Manager'):   # Counselor is a recognised role since Slice 4a (dashboard/test_counselor.py)
             self.client.force_login(make_user(f'{group.lower()}_a', group))
-            for name, args in [('dashboard', ()), ('chat', ()), ('library', ()), ('student_add', ())]:
+            for name, args in [('dashboard', ()), ('student_add', ())]:
                 self.assertEqual(self.client.get(self.url(name, *args)).status_code, 403, f'{group} {name}')
             self.assertEqual(self.client.get(self.url('student_detail', self.child_a.pk)).status_code, 403, group)
-            self.assertEqual(self.client.post(self.url('upload_document')).status_code, 403, group)
-
-    def test_chat_disabled_for_every_role_and_never_calls_ai(self):
-        root = make_user('root', is_superuser=True)
-        for user in (self.admin, root, self.teacher, self.parent_a, self.nogroup):
-            self.client.force_login(user)
-            with mock.patch('dashboard.views.requests.post') as post:
-                self.assertEqual(self.client.get(self.url('chat')).status_code, 403, user.username)
-                self.assertEqual(self.client.post(self.url('chat'), {'query': 'q'}).status_code, 403, user.username)
-            post.assert_not_called()
 
     # -- staff ------------------------------------------------------------
-    def test_teacher_denied_student_data_and_documents(self):
-        # A Teacher WITHOUT an assignment sees no student data; documents and writes stay denied.
+    def test_teacher_denied_student_data_and_writes(self):
+        # A Teacher WITHOUT an assignment sees no student data; writes stay denied.
         # (C5a: aggregates stay SchoolAdmin only, so the landing is a redirect to the teacher's own home, /teacher/.)
         self.client.force_login(self.teacher)
         self.assertRedirects(self.client.get(self.url('dashboard')), self.url('teacher_home'))
         self.assertEqual(self.client.get(self.url('student_detail', self.child_b.pk)).status_code, 404)
         self.assertEqual(list(self.client.get(self.url('student_list')).context['students']), [])
-        self.assertEqual(self.client.get(self.url('library')).status_code, 403)
-        self.assertEqual(self.client.get(self.url('chat')).status_code, 403)
         self.assertEqual(self.client.get(self.url('student_add')).status_code, 403)
-        self.assertEqual(self.client.post(self.url('upload_document')).status_code, 403)
-        self.assertEqual(self.client.post(self.url('delete_document'), {'parent_id': 'x'}).status_code, 403)
+        self.assertEqual(self.client.get('/library/').status_code, 404)      # F12: the legacy page is gone, not 403
 
     def test_admin_can_create_student(self):
         self.client.force_login(self.admin)
@@ -138,10 +125,10 @@ class DashboardAuthzTests(TestCase):
         self.assertRedirects(resp, reverse('dashboard:login'))
 
     # -- predict is staff-only and never called for parents ---------------
-    def test_parent_predict_flag_does_not_call_ai_service(self):
+    def test_parent_cannot_trigger_a_prediction(self):
         self.client.force_login(self.parent_a)
         with mock.patch('dashboard.views.requests.post') as post:
-            resp = self.client.get(self.url('student_detail', self.child_a.pk), {'predict': 'true'})
+            resp = self.client.post(self.url('student_detail', self.child_a.pk), {'action': 'predict'})
         self.assertEqual(resp.status_code, 200)
         post.assert_not_called()
 
@@ -188,21 +175,6 @@ class ServiceTokenTests(TestCase):
             with override_settings(SERVICE_JWT_SECRET=value):
                 with self.assertRaises(ImproperlyConfigured, msg=value[:8]):
                     service_headers(self.teacher)
-
-    def test_library_admin_sends_token_and_survives_missing_secret(self):
-        self.client.force_login(self.admin)
-        fake = mock.Mock(status_code=200)
-        fake.json.return_value = {'documents': []}
-        with override_settings(SERVICE_JWT_SECRET=self.secret):
-            with mock.patch('dashboard.views.requests.get', return_value=fake) as get:
-                resp = self.client.get(reverse('dashboard:library'))
-        self.assertEqual(resp.status_code, 200)
-        self.assertIn('Authorization', get.call_args.kwargs['headers'])
-        with override_settings(SERVICE_JWT_SECRET=''):
-            with mock.patch('dashboard.views.requests.get') as get:
-                resp = self.client.get(reverse('dashboard:library'))
-        self.assertEqual(resp.status_code, 200)
-        get.assert_not_called()
 
 
 class StudentFormClassSelectorTests(TestCase):
@@ -292,33 +264,6 @@ class AdminRoleContextTests(TestCase):
         self.assertNotIn(upload, self.render_base(PARENT))
 
 
-class LegacyUploadTimeoutTests(TestCase):
-    """M-1 (T7): the legacy library upload forwards to a disabled route with a bounded timeout.
-
-    It was `timeout=3000` (50 minutes) while every neighbour uses 5 s; compose also starts gunicorn with
-    `--timeout 3000`, so a hanging AI container pinned a worker for the whole 50 minutes."""
-
-    def test_the_ai_upload_timeout_is_bounded(self):
-        self.client.force_login(make_user('timeout_admin', ADMIN))
-        upload = SimpleUploadedFile('roster.pdf', b'%PDF-1.4 minimal', content_type='application/pdf')
-        fake = mock.Mock(status_code=403, json=lambda: {'detail': 'disabled in phase 1'})
-        with override_settings(SERVICE_JWT_SECRET=secrets.token_urlsafe(48)):
-            with mock.patch('dashboard.views.requests.post', return_value=fake) as post:
-                self.client.post(reverse('dashboard:upload_document'), {'document_file': upload})
-        post.assert_called_once()
-        self.assertLessEqual(post.call_args.kwargs['timeout'], 30)
-
-    def test_a_timeout_gets_a_fixed_sentence(self):
-        self.client.force_login(make_user('timeout_admin2', ADMIN))
-        upload = SimpleUploadedFile('roster.pdf', b'%PDF-1.4 minimal', content_type='application/pdf')
-        with override_settings(SERVICE_JWT_SECRET=secrets.token_urlsafe(48)):
-            with mock.patch('dashboard.views.requests.post',
-                            side_effect=requests.exceptions.Timeout('read timed out')):
-                resp = self.client.post(reverse('dashboard:upload_document'), {'document_file': upload},
-                                        follow=True)
-        self.assertContains(resp, 'سرویس هوش مصنوعی پاسخ نداد؛ دوباره تلاش کنید.')
-
-
 class AIErrorLeakTests(TestCase):
     """M-3: the AI service's error text is never rendered into a page - the user gets a fixed sentence, the log the detail."""
 
@@ -332,7 +277,8 @@ class AIErrorLeakTests(TestCase):
     def detail(self, **kwargs):
         with override_settings(SERVICE_JWT_SECRET=secrets.token_urlsafe(48)):
             with mock.patch('dashboard.views.requests.post', **kwargs):
-                return self.client.get(reverse('dashboard:student_detail', args=(self.student.pk,)), {'predict': 'true'})
+                # F04 (change 0044): the prediction runs on an explicit POST, not on `GET ?predict=true`.
+                return self.client.post(reverse('dashboard:student_detail', args=(self.student.pk,)), {'action': 'predict'})
 
     def test_an_upstream_error_body_is_not_rendered(self):
         fake = mock.Mock(status_code=500, text='secret-upstream-body')
@@ -351,17 +297,54 @@ class AIErrorLeakTests(TestCase):
         self.assertNotContains(resp, 'secret-host-10.0.0.5')
         self.assertEqual(resp.context['prediction']['error'], 'خطا در ارتباط با سرویس هوش مصنوعی.')
 
-    def test_a_document_upload_failure_does_not_render_the_exception_text(self):
-        import requests as http
 
-        upload = SimpleUploadedFile('roster.pdf', b'%PDF-1.4 minimal', content_type='application/pdf')
-        boom = http.exceptions.RequestException('secret-upload-detail')
-        with override_settings(SERVICE_JWT_SECRET=secrets.token_urlsafe(48)):
-            with mock.patch('dashboard.views.requests.post', side_effect=boom):
-                with self.assertLogs('dashboard.views', level='WARNING'):
-                    resp = self.client.post(reverse('dashboard:upload_document'), {'document_file': upload},
-                                            follow=True)
-        self.assertEqual(resp.status_code, 200)
-        self.assertNotContains(resp, 'secret-upload-detail')
-        self.assertContains(resp, 'خطا در ارتباط با سرویس هوش مصنوعی.')
+class FastApiBaseUrlTests(TestCase):
+    """Change 0044 / E2E F03: the FastAPI address lives in one setting, so the AI service can be moved (or pointed at a
+    stub) without editing call sites. `http://fastapi:8001` used to be repeated in dashboard/views.py, students/views.py
+    and docqa/services.py, with different timeouts copied next to each literal."""
+
+    def test_the_prediction_posts_to_the_configured_base_url(self):
+        school = School.objects.create(name='Url School', code='url')
+        admin = make_user('url_admin', ADMIN)
+        SchoolMembership.objects.create(user=admin, school=school)
+        student = make_student('0000000017', first='Url', school=school)
+        self.client.force_login(admin)
+        reply = mock.Mock(status_code=200, json=lambda: {'risk_probability': 0.5, 'is_high_risk': False, 'message': 'm'})
+        with override_settings(SERVICE_JWT_SECRET=secrets.token_urlsafe(48), FASTAPI_BASE_URL='http://ai.internal:9999'):
+            with mock.patch('dashboard.views.requests.post', return_value=reply) as post:
+                response = self.client.post(reverse('dashboard:student_detail', args=(student.pk,)), {'action': 'predict'})
+        self.assertEqual(response.status_code, 200)
+        post.assert_called_once()
+        self.assertEqual(post.call_args.args[0], 'http://ai.internal:9999/predict/')
+
+
+class PersianDigitFilterTests(TestCase):
+    """Change 0044 / E2E F01: probabilities are displayed as whole Persian-digit percentages. The filters are display
+    only - they touch no model and must never raise inside a template."""
+
+    def test_fa_digits_turns_ascii_into_persian_digits_only(self):
+        from dashboard.templatetags.eip_ui import fa_digits
+
+        self.assertEqual(fa_digits(12), '۱۲')
+        self.assertEqual(fa_digits(1405), '۱۴۰۵')
+        self.assertEqual(fa_digits(None), '')
+        self.assertEqual(fa_digits('a-1'), 'a-۱')          # non-digits are left alone
+        self.assertEqual(fa_digits('۷۰'), '۷۰')            # idempotent for digits that are already Persian
+
+    def test_fa_percent_converts_a_0_to_1_risk_into_a_whole_persian_percentage(self):
+        from dashboard.templatetags.eip_ui import fa_percent
+
+        self.assertEqual(fa_percent(0.7), '۷۰')
+        self.assertEqual(fa_percent(0.7000000000000001), '۷۰')  # round() absorbs the float noise of 0.7*100
+        self.assertEqual(fa_percent(1.0), '۱۰۰')
+        self.assertEqual(fa_percent(0), '۰')
+        self.assertEqual(fa_percent(0.04), '۴')
+        self.assertEqual(fa_percent(0.995), '۱۰۰')         # rounded, never a fraction
+
+    def test_a_non_numeric_probability_renders_empty_instead_of_raising(self):
+        from dashboard.templatetags.eip_ui import fa_percent
+
+        for bad in (None, '', 'unknown', object()):
+            with self.subTest(value=bad):
+                self.assertEqual(fa_percent(bad), '')
 

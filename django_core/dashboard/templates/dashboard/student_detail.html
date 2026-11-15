@@ -26,7 +26,12 @@
             <div class="col-md-6">
                 {# DEMO SCOPE begin — no AI prediction button in the demo (FastAPI/ML are out of scope) #}
                 {% if not DEMO_MODE and can_predict %}
-                <a href="?predict=true" class="btn btn-success w-100">🤖 پیش‌بینی وضعیت با هوش مصنوعی</a>
+                {# F04 (change 0044): an explicit POST with CSRF, not a GET side effect — a refresh no longer re-runs the model #}
+                <form method="post" action="{% url 'dashboard:student_detail' student.pk %}" class="d-grid">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="predict">
+                    <button type="submit" class="btn btn-outline-secondary w-100">🤖 نمایش آزمایشی وضعیت (داده‌های تکمیلی موجود نیست)</button>
+                </form>
                 {% endif %}
                 {# DEMO SCOPE end #}
                 {% if prediction %}
@@ -37,18 +42,19 @@
                         </div>
                     {% else %}
                         <div class="mt-3 alert {% if not prediction.is_high_risk %}alert-success{% else %}alert-warning{% endif %}">
-                            <h5>🤖 نتیجه‌ی پیش‌بینی:</h5>
-                            <p><strong>وضعیت:</strong> {{ prediction.message }}</p>
-                            <p><strong>احتمال ریسک:</strong> {{ prediction.risk_probability|floatformat:2 }}%</p>
-                            <p><strong>وضعیت ریسک:</strong> 
+                            <h5>🤖 نتیجه‌ی نمایشی</h5>
+                            {# F02 (change 0044): the three features below are placeholders, so the block must not be presented as a prediction #}
+                            <p class="fw-bold mb-2">نمایشی / داده‌های تکمیلی موجود نیست</p>
+                            <p class="small mb-2">نرخ تکمیل تکالیف، تعداد ارتباطات و تعداد تکالیف انجام‌شده در سامانه ثبت نمی‌شوند و با مقدار پیش‌فرض وارد شده‌اند؛ این خروجی مبنای تصمیم نیست.</p>
+                            <p><strong>وضعیت (خروجی مدل آزمایشی):</strong> {{ prediction.message }}</p>
+                            <p><strong>احتمال ریسک (نمایشی):</strong> {{ prediction.risk_probability|fa_percent }}%</p>
+                            <p><strong>وضعیت ریسک (نمایشی):</strong> 
                                 {% if prediction.is_high_risk %}
-                                    <span class="badge bg-danger">پرریسک</span>
+                                    <span class="badge bg-danger">پرریسک (نمایشی)</span>
                                 {% else %}
-                                    <span class="badge bg-success">کم‌ریسک</span>
+                                    <span class="badge bg-success">کم‌ریسک (نمایشی)</span>
                                 {% endif %}
                             </p>
-                            <hr>
-                            <p class="text-muted small">(داده‌های ارسال‌شده به هوش مصنوعی: {{ input_data }})</p>
                         </div>
                     {% endif %}
                 {% endif %}

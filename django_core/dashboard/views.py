@@ -2,6 +2,7 @@
 import logging
 
 from django.shortcuts import render, redirect, get_object_or_404
+from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import login, authenticate, logout
 from django.contrib import messages
@@ -27,11 +28,6 @@ from students.enrollment_sync import ensure_current_enrollment
 # model paths or provider messages. The user gets these fixed sentences; the detail goes to the server log.
 AI_SERVICE_ERROR = 'خطا در سرویس هوش مصنوعی (کد {status}).'
 AI_UNREACHABLE = 'خطا در ارتباط با سرویس هوش مصنوعی.'
-AI_TIMED_OUT = 'سرویس هوش مصنوعی پاسخ نداد؛ دوباره تلاش کنید.'
-# M-1 (T7): the legacy library upload forwarded to the disabled ingestion route with timeout=3000 (50 minutes) while
-# every neighbour uses 5 s, and compose starts gunicorn with --timeout 3000, so a hung AI container pinned a worker for
-# the whole window. 30 s matches the slowest real call (docqa's LLM complete: 65 s is the outlier, this route is off).
-AI_UPLOAD_TIMEOUT = 30
 
 logger = logging.getLogger(__name__)
 
@@ -101,7 +97,7 @@ def student_list_view(request):
     return render(request, 'dashboard/student_list.html', {'students': rows, 'show_support': bool(roles & {ADMIN, GRADE_LEAD}),
                                                             'search': request.GET.get('search', '')})
 
-# جزئیات یک دانش‌آموز + نمایش نتیجه‌ی پیش‌بینی
+# جزئیات یک دانش‌آموز + نمایش آزمایشی وضعیت (خروجی مدل، برچسب «نمایشی» — تغییر ۰۰۴۴)
 # dashboard/views.py (قسمت student_detail_view)
 
 @role_required(ADMIN, GRADE_LEAD, TEACHER, PARENT)
@@ -149,6 +145,10 @@ def student_detail_view(request, pk):
     
     # 6. تعداد تکالیف انجام‌شده (پیش‌فرض)
     completed_homework = 12  # مقدار پیش‌فرض
+
+    # F02 (change 0044): avg_completion_rate, total_communications and completed_homework above are placeholders -
+    # nothing writes the Homework / TeacherParentCommunication tables yet. The page therefore labels the result
+    # «نمایشی / داده‌های تکمیلی موجود نیست» and never calls it a real prediction.
     
     # ساخت دیکشنری ورودی برای FastAPI (با ۸ ویژگی)
     input_data = {
@@ -163,12 +163,14 @@ def student_detail_view(request, pk):
     }
     
     # ---------- ارسال درخواست به FastAPI ----------
+    # F03 (change 0044): the address is the ONE setting (settings.FASTAPI_BASE_URL), never a literal in this file.
+    # F04 (change 0044): an explicit POST from the page's form, never a GET side effect. With `?predict=true` every
+    # refresh, prefetch, bookmark or back-button view ran (and paid for) another inference.
     prediction_result = None
-    if request.GET.get('predict') == 'true' and ADMIN in roles_for(request.user):  # Admin only (S-04)
+    if request.method == 'POST' and request.POST.get('action') == 'predict' and ADMIN in roles_for(request.user):  # Admin only (S-04)
         try:
-            fastapi_url = "http://fastapi:8001/predict/"
             response = requests.post(
-                fastapi_url, json=input_data, headers=service_headers(request.user), timeout=5
+                f'{settings.FASTAPI_BASE_URL}/predict/', json=input_data, headers=service_headers(request.user), timeout=5
             )
             if response.status_code == 200:
                 prediction_result = response.json()
@@ -188,147 +190,11 @@ def student_detail_view(request, pk):
         'avg_score': avg_score,
         'absences_count': total_absences,
         'prediction': prediction_result,
-        'input_data': input_data,  # برای نمایش در قالب (اختیاری)
         'can_predict': ADMIN in roles_for(request.user),
         'recommendations': visible_recommendations(request.user).filter(student=student),
     }
     return render(request, 'dashboard/student_detail.html', context)
 
-@role_required()  # RAG chat is disabled for every role in Phase 1 (nobody holds an empty role set)
-def chat_view(request):
-    if request.method == 'POST':
-        query = request.POST.get('query')
-        if query:
-            try:
-                fastapi_url = "http://fastapi:8001/chat/"
-                response = requests.post(
-                    fastapi_url, json={"query": query}, headers=service_headers(request.user), timeout=30
-                )
-                if response.status_code == 200:
-                    result = response.json()
-                    return render(request, 'dashboard/chat.html', {
-                        'query': query,
-                        'answer': result.get('answer'),
-                        'sources': result.get('sources', [])
-                    })
-                else:
-                    logger.warning('AI chat failed with status %s', response.status_code)
-                    error_msg = AI_SERVICE_ERROR.format(status=response.status_code)
-            except ImproperlyConfigured:
-                error_msg = "سرویس AI پیکربندی نشده است."
-            except requests.exceptions.RequestException as e:
-                logger.warning('AI chat is unreachable: %s', e, exc_info=True)
-                error_msg = AI_UNREACHABLE
-            
-            return render(request, 'dashboard/chat.html', {
-                'query': query,
-                'error': error_msg
-            })
-    
-    return render(request, 'dashboard/chat.html')
-
-@role_required(ADMIN)  # document-level authorization is unverified for other roles
-def library_view(request):
-    """
-    صفحه‌ی کتابخانه: نمایش لیست اسناد و فرم آپلود
-    """
-    # دریافت لیست اسناد از FastAPI (اختیاری)
-    documents = []
-    try:
-        response = requests.get(
-            "http://fastapi:8001/documents/list/", headers=service_headers(request.user), timeout=5
-        )
-        if response.status_code == 200:
-            documents = response.json().get('documents', [])
-    except:
-        pass  # در صورت عدم دسترسی، لیست خالی می‌ماند
-
-    context = {
-        'documents': documents,
-    }
-    return render(request, 'dashboard/library.html', context)
-
-@role_required(ADMIN)
-def upload_document_view(request):
-    if request.method != 'POST':
-        return redirect('dashboard:library')
-    
-    uploaded_file = request.FILES.get('document_file')
-    if not uploaded_file:
-        messages.error(request, 'لطفاً یک فایل انتخاب کنید.')
-        return redirect('dashboard:library')
-    
-    # بررسی حجم
-    if uploaded_file.size > 10 * 1024 * 1024:
-        messages.error(request, 'حجم فایل نباید بیشتر از ۱۰ مگابایت باشد.')
-        return redirect('dashboard:library')
-    
-    # بررسی فرمت
-    allowed_extensions = ['.pdf', '.docx', '.doc']
-    file_name = uploaded_file.name.lower()
-    if not any(file_name.endswith(ext) for ext in allowed_extensions):
-        messages.error(request, 'فرمت فایل پشتیبانی نمی‌شود. فقط PDF و Word مجاز است.')
-        return redirect('dashboard:library')
-    
-    try:
-        files = {'file': (uploaded_file.name, uploaded_file.read(), uploaded_file.content_type)}
-        response = requests.post(
-            "http://fastapi:8001/upload-document/",
-            files=files,
-            headers=service_headers(request.user),
-            timeout=AI_UPLOAD_TIMEOUT
-        )
-        
-        if response.status_code == 200:
-            result = response.json()
-            messages.success(
-                request, 
-                f"فایل با موفقیت آپلود شد و به {result.get('chunks', 0)} بخش تقسیم شد."
-            )
-        else:
-            error_detail = response.json().get('detail', 'خطای ناشناخته')
-            messages.error(request, f"خطا در آپلود: {error_detail}")
-            
-    except ImproperlyConfigured:
-        messages.error(request, 'سرویس AI پیکربندی نشده است.')
-    except requests.exceptions.Timeout:
-        logger.warning('AI document upload timed out after %ss', AI_UPLOAD_TIMEOUT)
-        messages.error(request, AI_TIMED_OUT)
-    except requests.exceptions.RequestException as e:
-        logger.warning('AI document upload is unreachable: %s', e, exc_info=True)
-        messages.error(request, AI_UNREACHABLE)
-    
-    return redirect('dashboard:library')
-
-@role_required(ADMIN)
-def delete_document_view(request):
-    """حذف یک فایل (همه بخش‌ها) از کتابخانه"""
-    if request.method != 'POST':
-        return redirect('dashboard:library')
-    
-    parent_id = request.POST.get('parent_id')  # ✅ دریافت parent_id به جای doc_id
-    if not parent_id:
-        messages.error(request, 'شناسه فایل ارسال نشد.')
-        return redirect('dashboard:library')
-    
-    try:
-        response = requests.delete(
-            f"http://fastapi:8001/documents/parent/{parent_id}",
-            headers=service_headers(request.user),
-            timeout=5
-        )
-        if response.status_code == 200:
-            messages.success(request, 'فایل با موفقیت حذف شد.')
-        else:
-            error_detail = response.json().get('detail', 'خطای ناشناخته')
-            messages.error(request, f'خطا در حذف فایل: {error_detail}')
-    except ImproperlyConfigured:
-        messages.error(request, 'سرویس AI پیکربندی نشده است.')
-    except requests.exceptions.RequestException as e:
-        logger.warning('AI document delete is unreachable: %s', e, exc_info=True)
-        messages.error(request, AI_UNREACHABLE)
-    
-    return redirect('dashboard:library')
 
 
 from .forms import StudentForm

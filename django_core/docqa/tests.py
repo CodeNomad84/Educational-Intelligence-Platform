@@ -282,6 +282,20 @@ class PageAccessTests(Base):
         for event in AuditEvent.objects.filter(action='doc_ask'):
             self.assertNotIn('ساعت', event.detail)
 
+    def test_the_ask_form_states_the_wait_and_blocks_a_second_submit(self):
+        """F06 (change 0044 tranche 2): one ask is a blocking POST of up to 68 s (3 s status + 65 s complete). The page
+        shows the wait, a spinner and disables the button on submit. Feedback only: no fetch, no polling, no streaming
+        (owner decision D8), and the form still works without JS."""
+        self.client.force_login(self.teacher)
+        page = self.client.get(reverse('docqa:home'))
+        self.assertEqual(page.status_code, 200)
+        html = page.content.decode()
+        for marker in ('id="ask-form"', 'id="ask-submit"', 'id="ask-wait"', 'spinner-border',
+                       'ممکن است تا ۳۰ ثانیه طول بکشد', 'button.disabled = true', "form.dataset.submitted === '1'"):
+            self.assertIn(marker, html)
+        for absent in ('fetch(', 'XMLHttpRequest', 'EventSource'):      # UI feedback only; no async client
+            self.assertNotIn(absent, html)
+
     def test_demo_documents_are_synthetic_and_pass_the_screen(self):
         for title, text in demo_docs.DOCS.items():
             self.assertEqual(screen_text(text, self.a.pk), [], title)

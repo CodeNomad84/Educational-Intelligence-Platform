@@ -1,4 +1,6 @@
-"""Presentation helpers of the design system (P8-3). No data access: links, labels, CSS classes and date display only."""
+"""Presentation helpers of the design system (P8-3). No data access: links, labels, CSS classes, dates and Persian-digit
+display only."""
+
 from django import template
 from django.urls import reverse
 from django.utils.html import format_html
@@ -86,3 +88,25 @@ def mask_nid(value):
     """National id with all but the last four digits hidden; the full value is fetched by an audited click."""
     from students.masking import mask_national_id
     return mask_national_id(value)
+
+
+# --- Persian digits: display only; the database and every calculation keep ASCII -----------------------------------
+_FA_DIGITS = str.maketrans('0123456789', '۰۱۲۳۴۵۶۷۸۹')
+
+
+@register.filter
+def fa_digits(value):
+    """``{{ 12|fa_digits }}`` -> ۱۲. Persian/Arabic-Indic input is normalised to ASCII on the way in, so display is the
+    only direction this file needs."""
+    return '' if value is None else str(value).translate(_FA_DIGITS)
+
+
+@register.filter
+def fa_percent(probability):
+    """``{{ 0.7|fa_percent }}`` -> ۷۰: a 0..1 probability as a whole Persian-digit percentage. E2E audit F01: the page
+    printed ``0.70%`` for a 70 % risk (a 100x understatement). No decimals for a probability, and a value that is not a
+    number gives '' rather than an exception, so an unexpected service payload cannot break the page."""
+    try:
+        return fa_digits(round(float(probability) * 100))
+    except (TypeError, ValueError):
+        return ''

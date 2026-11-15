@@ -63,6 +63,9 @@ def role_names(request):
             # Pilot config (T6): the global feedback link and the pilot marker for templates.
             'FEEDBACK_URL': getattr(settings, 'FEEDBACK_URL', ''),
             'PILOT_MODE': getattr(settings, 'PILOT_MODE', False),
+            # The assistant's own gate is require_pilot_flag('ENABLE_AI_FEATURES'); the menu reads the same switch, so a
+            # link never opens a 403 (change 0044 tranche 2, F11/F12).
+            'AI_FEATURES_ON': getattr(settings, 'ENABLE_AI_FEATURES', False),
             # Platform branding (T10): read from settings, so no template carries the product name as a literal.
             'PLATFORM_NAME': getattr(settings, 'PLATFORM_NAME', ''),
             'PLATFORM_NAME_EN': getattr(settings, 'PLATFORM_NAME_EN', '')}

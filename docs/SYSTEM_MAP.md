@@ -5,11 +5,12 @@ Derived from code at commit `3404a1a` (Verified-at); the commit `3404a1a` is res
 ## CURRENT (Phase 1: runs in Docker Compose; behavior verified 2026-10-12)
 ```
 Browser ──> Django (django_core)
-             ├─ dashboard app: login, student list/detail/create, library, chat, uploads  (server-rendered templates)
+             ├─ dashboard app: login, student list/detail/create, alerts, plans (server-rendered templates);
+             │  the document assistant lives in the docqa app at /assistant/ (F12: /library/, /chat/, /upload-document/ removed)
              ├─ students app : Student / Grade / Attendance models, DRF API /api/students/, import, features action
              ├─ Celery worker + beat (Redis)         [tasks.py: unused welcome email; no beat schedule — B-11]
              └─ HTTP + service token (role-bearing, 60 s; config/service_auth.py) ──> FastAPI (fastapi_core, :8001, published on 127.0.0.1 only)
-                                          ├─ /chat/  ──> [DISABLED for every role in Phase 1] rag_service ──> Ollama (LLM + embeddings; no embedding model pulled)
+                                          ├─ /chat/  ──> [DISABLED for every role in Phase 1; the Django /chat/ page that called it was removed in change 0044 tranche 2] rag_service ──> Ollama (LLM + embeddings; no embedding model pulled)
                                           ├─ /documents/ (list, delete: Admin) ; ingestion + search [DISABLED] ──> `documents` table (pgvector; created by Django migration 0007; FastAPI role `fastapi_user`: SELECT, DELETE)
                                           └─ predict (Admin only; risk model, joblib/torch files)  [prototype — non-discriminating, advisory only]
 PostgreSQL (shared by Django and FastAPI — D-03) · Redis · MinIO (present in compose, unpublished; use NOT VERIFIED) · Ollama

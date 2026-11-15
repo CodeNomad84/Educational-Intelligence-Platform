@@ -24,7 +24,9 @@ directly) stays off unless an operator sets the environment variables.
 - School Assistant `docqa` (`home`, `documents`, `document_action`, `ai_setting`) — 403 (gated by `ENABLE_AI_FEATURES`).
 - Study Assistant `dashboard:me_assistant` (`tutor_ai`) — 403 (same switch).
 - FastAPI `/chat/`, `POST /documents/`, `GET /documents/search/`, `POST /upload-document/` — 403 while `ENABLE_AI_FEATURES` is off (and still 403 while RAG is unverified; see below).
-- Django `/chat/` (`dashboard:chat`) is already `@role_required()` (always 403) and is unchanged.
+- Django `/library/`, `/chat/`, `/upload-document/`, `/delete-document/` — **removed** (change 0044 tranche 2): the routes and
+  templates are gone, so they answer 404 for every role, including the SchoolAdmin. Documents are managed only in
+  `/assistant/documents/` (admin) and read/asked in `/assistant/`.
 
 The gate is `dashboard.decorators.require_pilot_flag(flag)`, stacked **inside** `role_required`, so the
 order is: login redirect → role/module check → flag check (403). Anonymous users still get the login

@@ -2,7 +2,9 @@
 
 A config value, not billing: ``School.ai_daily_cap`` / ``ai_monthly_cap`` (platform admin, Django admin), falling back to
 ``settings.AI_DEFAULT_DAILY_CAP`` / ``AI_DEFAULT_MONTHLY_CAP``. Call ``consume`` in the Django caller BEFORE any LLM or
-FastAPI request; it counts the call and raises ``AICapReached`` (nothing is sent) when a cap is hit. Counts only, no content.
+FastAPI request; it takes a slot and raises ``AICapReached`` (nothing is sent) when a cap is hit. A call that produced no
+answer must be given back with ``refund`` (change 0044 / E2E F05): the cap counts delivered answers, not attempts, so a
+provider outage cannot exhaust a school's day. Counts only, no content.
 """
 from django.conf import settings
 from django.db import transaction
@@ -41,3 +43,19 @@ def consume(school, module_key, on=None):
         if used >= monthly:
             raise AICapReached('monthly')
         AICallUsage.objects.filter(pk=row.pk).update(count=F('count') + 1)
+
+
+def refund(school, module_key, on=None):
+    """Give back one unit taken by ``consume`` when the call delivered no answer (E2E F05).
+
+    A provider 5xx, a timeout or a refused request used to keep the slot, so one outage could exhaust the school's whole
+    daily cap with zero answers delivered. Never below zero: a duplicated refund, or a refund after the day rolled over,
+    is a no-op instead of a negative count.
+    """
+    on = on or timezone.localdate()
+    school_id = getattr(school, 'pk', school)
+    with transaction.atomic():
+        row = (AICallUsage.objects.select_for_update()
+               .filter(school_id=school_id, module_key=module_key, day=on, count__gt=0).first())
+        if row is not None:
+            AICallUsage.objects.filter(pk=row.pk).update(count=F('count') - 1)
