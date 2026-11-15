@@ -33,7 +33,8 @@ non-number gives `''`, so a provider surprise cannot 500 the page.
  docs/MODULE_MAP.md                                            |  4 ++--
  docs/manuals/school-admin.md                                  |  1 +
 ```
-
+(plus this report, `docs/changes/0044-ux-audit-fixes-REPORT.md`, new — `11 files changed, 287 insertions(+), 37 deletions(-)`
+from `git show --stat HEAD`.)
 
 ## 3. Models / migrations
 
@@ -102,6 +103,32 @@ Count: the audit base had 1674 tests; this branch has 1678 (+3 `PersianDigitFilt
 failures drop from 6 to 5 — F01 and F02 left the expected-failure list, `test_29b` (F02b) entered it. `(skipped=11)` and
 the demo seed warning are pre-existing and unrelated.
 
+PostgreSQL leg — `scripts/run_tests.sh pg`, **NOT VERIFIED (the leg did not finish)**:
+
+```
+>> building eip-test-django:local from django_core/Dockerfile and requirements.txt
+ERROR: failed to build: ... docker.io/library/python:3.10-slim: 403 Forbidden     (registry unreachable)
+>> WARNING: ... ALLOW_STALE_IMAGE=1, so the existing local image is used. Its dependencies may NOT match
+   requirements.txt: do not trust this run as a dependency check.
+>> [PostgreSQL 16 container] manage.py check                      → System check identified no issues (0 silenced).
+>> [PostgreSQL 16 container] manage.py makemigrations --check --dry-run → No changes detected
+>> [PostgreSQL 16 container] manage.py test students dashboard schools ... docqa
+Found 1678 test(s).   ... 648 tests passed, no FAIL/ERROR line ...
+[E2E] student_detail status=200 queries=58 model_calls=58 server_ms=316
+.................EXIT=137          (killed by me after ~11 minutes of a stalled test phase)
+```
+
+The first attempt exited 3 without starting anything (the image could not be built because the Docker registry answered
+403). The second attempt reused the local `eip-test-django:local` through the script's documented `ALLOW_STALE_IMAGE=1`
+path: PG `check` and `makemigrations --check` were clean and 648 of 1678 tests passed with no failure, then the run
+stalled. Diagnosis, not a guess: the runner container was at 0 % CPU with only its Postgres socket open, blocked in
+`poll()`, while the server sat in `idle in transaction … ClientRead` for 183 s and only 8 threads were alive; killing the
+container ended the script with `EXIT=137` and its `trap` removed the disposable container and network (no leftovers).
+So this is an **infrastructure/prerequisite failure** (unreachable registry ⇒ stale image, whose psycopg may not match
+`requirements.txt`) — **not** a failing assertion: zero `FAIL:`/`ERROR:` test lines. The PostgreSQL result for this change
+is therefore `NOT VERIFIED`; the SQLite result above is `CURRENT`. To get it: rebuild the image once Docker Hub is
+reachable and run `scripts/run_tests.sh pg` again.
+
 ## 9. Documentation updated
 
 - `docs/AI_GOVERNANCE.md` §Risk model — F01/F02 `CURRENT`, F02b and F21 still open, the label must stay until both close.
@@ -143,6 +170,9 @@ the demo seed warning are pre-existing and unrelated.
 2. `test_29b` is an expected failure by design, so "tests pass" here means `OK (expected failures=5)`, not zero expected
    failures.
 3. `?predict=true` remains a GET side effect (F04) and the DRF copy remains unmetered (F21) — both out of scope.
+4. The PostgreSQL leg is `NOT VERIFIED` for this change: the test image could not be rebuilt (registry 403) and the stale
+   image ran 648/1678 tests without a failure before hanging (see §8). Nothing in this change is database-engine
+   specific — no model, no migration, no raw SQL — but the missing pg run is a real gap, not a formality.
 
 ## 13. Remaining TODOs
 
