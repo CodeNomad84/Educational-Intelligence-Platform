@@ -180,3 +180,73 @@ None. No threshold, school name, model id or branding is introduced. The wording
 | **Gap** | The outbound vector has no audit row beyond `view_detail` | `DEFERRED` to F21; documented in `AI_GOVERNANCE` now |
 
 **Gate:** implementation starts only after the owner signs this record off. `NOT VERIFIED` until the tests are run.
+
+---
+
+# Tranche 2 — F11 (no way into the assistant), F12 (the legacy library dead end), F06 (no wait state)
+
+Added 2026-11-15 on the same branch. **Level: L2** (navigation visible to four roles, removal of three routes and their
+templates, a new user-visible form behaviour). The owner gave the instruction and the decisions in chat on 2026-11-15, so
+this section records scope and decisions rather than asking for them:
+
+> "Fix F11 … GradeLead, Teacher, and Counselor can also see and click the link to `/assistant/`. Fix F12: Remove or hide
+> the legacy `/library/`, `/upload-document/`, and `/chat/` links and their templates. Route users strictly to
+> `/assistant/documents/` as the single source of truth for documents. Fix F06 … disable the submit button upon click,
+> show a simple loading spinner … Do NOT implement async polling or streaming; just UI feedback."
+
+Truth labels as in the header of this document. Evidence below is `CURRENT` in this working tree.
+
+## 17. Current behaviour (`CURRENT`)
+
+| # | Fact | Evidence |
+|---|---|---|
+| F11 | `/assistant/` is open to Admin, GradeLead, Teacher and Counselor | `docqa/views.py:44` `role_required(*STAFF, module='advisor_ai')`; `test_10` passes for all four |
+| F11 | the only menu entry is the SchoolAdmin's module loop | `dashboard/templates/dashboard/base.html:58` `{% if IS_SCHOOL_ADMIN %}{% for m in VISIBLE_MODULES %}` |
+| F11 | measured: no link for the other three roles | `E2E_AUDIT_REPORT.md:262` `{'GradeLead': False, 'Teacher': False, 'Counselor': False}` |
+| F12 | `/library/` is live for the admin and forwards to a route that is off for every role | `dashboard/urls.py:16-17`; `dashboard/views.py:234-304`; `test_37` |
+| F12 | `/chat/` is 403 for every role but still ships a view and a template | `dashboard/views.py:200` `role_required()` with an empty role set; `templates/dashboard/chat.html` |
+| F12 | the admin's menu advertises both as «به‌زودی» (coming soon) while the real assistant is elsewhere | `base.html:70-73`; `test_trials.py:81` counts exactly 2 such stubs |
+| F06 | the ask form is a bare POST with no feedback | `docqa/templates/docqa/home.html:7-11`; worst case 3 s + 65 s (`E2E_AUDIT_REPORT.md:207-215`) |
+
+
+## 18. What this tranche changes (`PROPOSED` → implemented below)
+
+1. **F11** — `base.html` renders one entry, `دستیار اسناد مدرسه` → `docqa:home`, for GradeLead / Teacher / Counselor, when
+   `AI_FEATURES_ON` **and** `'advisor_ai' in ENABLED_MODULES`. `AI_FEATURES_ON` is added to `dashboard/context_processors.py`
+   from `settings.ENABLE_AI_FEATURES`, because the view also has `require_pilot_flag('ENABLE_AI_FEATURES')`
+   (`docqa/views.py:48`): a link that opens a 403 is the same class of defect as F12. The SchoolAdmin keeps the existing
+   `VISIBLE_MODULES` entry; it is not duplicated (that would break the one-link-per-page rule in `dashboard/test_menu.py`).
+2. **F12** — `dashboard/urls.py` loses `chat/`, `library/`, `upload-document/`, `delete-document/`; `dashboard/views.py`
+   loses `chat_view`, `library_view`, `upload_document_view`, `delete_document_view`, `AI_UPLOAD_TIMEOUT` and the now
+   unused `AI_TIMED_OUT`; `templates/dashboard/chat.html` and `templates/dashboard/library.html` are deleted; the two
+   «به‌زودی» stubs are replaced by the real entry above. **No redirect**: the single library `/assistant/documents/` is
+   SchoolAdmin-only (`docqa/views.py:69`), so redirecting `/library/` there would turn a teacher's bookmark into a 403 —
+   a plain 404 states the page no longer exists. `delete-document` is removed with its only caller (the library template).
+3. **F06** — `docqa/home.html`: `id="ask-form"`, `id="ask-submit"`, `id="ask-wait"`; a vanilla script in
+   `{% block scripts %}` disables the button on submit, shows a Bootstrap spinner and the sentence
+   «در حال ارسال… ممکن است تا ۳۰ ثانیه طول بکشد.»; a second submit event is cancelled. No polling, no streaming, no
+   fetch: the response is still the plain POST render. The 3 s / 65 s timeouts are **not** changed.
+4. **Tests** — `test_12` loses `@expectedFailure` and gains the flag-off case; `test_37` moves from *characterising the
+   dead end* to *asserting the dead end is gone* (404 for all four paths, `/assistant/documents/` 200 for the admin, no
+   «به‌زودی» stub); `dashboard/tests.py` drops the four URL names from its permission matrices and deletes the classes
+   that only exercised the removed route (`LegacyUploadTimeoutTests`, the library-token test, and the upload leg of
+   `AIErrorLeakTests` — M-3 stays covered by the two prediction tests); `test_trials.py` expects 0 stubs instead of 2; a
+   new test in `docqa/tests.py` asserts the wait state (ids, the sentence, `disabled = true`).
+5. **Docs** — `docs/SYSTEM_MAP.md` (routes), `docs/MODULE_MAP.md` (dashboard row), `docs/CHANGE_GUIDE.md` (`Verified-at`),
+   `docs/AI_GOVERNANCE.md` (the wait sentence is a hint, not a guarantee), and the four role manuals that gain or lose a
+   menu entry.
+
+## 19. Decisions recorded
+
+| # | Item | State |
+|---|---|---|
+| **D5** | F12 = **remove** the routes, views and templates (not hide behind a flag) | **DECIDED by the owner (2026-11-15)**; what the removal gives up is written below |
+| **D6** | `/delete-document/` goes with them | **DECIDED** — its only caller is the deleted template |
+| **D7** | The F11 entry is gated on role + module + `ENABLE_AI_FEATURES` | `PROPOSED` — no dead links, no duplicate for the admin |
+| **D8** | F06 is UI feedback only; the sentence says ~30 s while the true worst case is 68 s | **DECIDED** («Do NOT implement async polling or streaming») — recorded as a known limitation |
+| **F13** | `library_view` swallows every exception | **CLOSED by removal** — the bare `except` went with the view |
+
+**What the removal gives up:** the legacy route was the only place that accepted PDF/DOC (`views.py:270`) and the only
+caller of FastAPI's `/upload-document/` and `/documents/parent/<id>`. Both are `disabled_in_phase1` for every role
+(`E2E_AUDIT_REPORT.md:271`), so nothing that worked is being removed; a PDF path would have to come back through
+`docqa.extract`, which accepts txt/md/docx only.

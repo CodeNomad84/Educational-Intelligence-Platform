@@ -189,8 +189,94 @@ text is the owner's call.
 
 ## 15. User manuals updated
 
-`docs/manuals/school-admin.md` (the only role whose view changed). Parent/teacher/counselor manuals: no change needed.
+`docs/manuals/school-admin.md` (the only role whose view changed in tranche 1 — F01/F02). Tranche 2 (F11/F12/F06) also
+changed what teacher, grade-lead and counselor see; see §21.
 
 ## 16. Migration required?
+
+
+---
+
+# Tranche 2 — F11 (nav entry), F12 (legacy pages removed), F06 (wait state)
+
+Implemented 2026-11-15 on the same branch under the owner's instruction (recorded verbatim in the proposal, §18). Code
+level: L2. Nothing below was run against PostgreSQL in this tranche; the missing pg leg is the same gap recorded in §8.
+
+## 17. What changed
+
+| File | Change |
+|---|---|
+| `dashboard/templates/dashboard/base.html` | the two «به‌زودی» stubs are gone; one `دستیار اسناد مدرسه` → `/assistant/` entry for GradeLead/Teacher/Counselor |
+| `dashboard/context_processors.py` | new `AI_FEATURES_ON` (from `settings.ENABLE_AI_FEATURES`), so the entry follows the view's own flag |
+| `dashboard/urls.py` | `chat/`, `library/`, `upload-document/`, `delete-document/` removed |
+| `dashboard/views.py` | `chat_view`, `library_view`, `upload_document_view`, `delete_document_view`, `AI_UPLOAD_TIMEOUT`, `AI_TIMED_OUT` removed (the bare `except` of F13 went with them) |
+| `dashboard/templates/dashboard/{chat,library}.html` | deleted (`git rm`) |
+| `docqa/templates/docqa/home.html` | `id="ask-form"/"ask-submit"/"ask-wait"`, a Bootstrap spinner, «در حال ارسال… ممکن است تا ۳۰ ثانیه طول بکشد.» and a vanilla script that disables the button and cancels a second submit |
+| `docs/pilot/PILOT_CONFIG.md` | the «Django `/chat/` is unchanged» line was false after this change: it now lists the four removed paths as 404 for every role |
+| `docs/marketing/capabilities.md` | P4 pointed at the deleted `dashboard/views.py::chat_view`; it now points at `docqa/views.py` and says the chat page was removed. **Local only**: `docs/marketing/` is in `.gitignore`, so this edit is not part of the commit |
+| `docs/SYSTEM_MAP.md` | the FastAPI `/chat/` line notes that the Django page which called it is gone |
+
+## 18. Verification (commands actually run, outputs copied)
+
+| Run | Result |
+|---|---|
+| `manage.py test docqa dashboard.tests dashboard.test_menu dashboard.test_trials dashboard.test_pilot_config` | **first attempt FAILED**: `Ran 86 tests in 30.533s` / `FAILED (failures=1)` — `test_trials` counted **1** «به‌زودی» instead of 0 |
+| cause | my own edit: Django's `{# … #}` is single-line only, so a 5-line comment was rendered as literal nav text. Changed to `{% comment %}…{% endcomment %}` |
+| same groups after the fix | `Ran 61 tests in 12.004s` / `OK` |
+| `manage.py test docqa dashboard.test_trials dashboard.test_e2e_user_flow -v 2` | `Ran 80 tests in 62.175s` / `OK (expected failures=4)`; `[E2E] F11: a nav link to /assistant/ on each role home: {'GradeLead': True, 'Teacher': True, 'Counselor': True}`; `[E2E] F12: removed pages still advertised in the admin menu? []` |
+| the F06 guard | `docqa.tests.PageAccessTests.test_the_ask_form_states_the_wait_and_blocks_a_second_submit` ran and passed in the 80-test run — it asserts the three ids, the spinner class, the sentence, `button.disabled = true`, and that the page contains **no** `fetch(` / `XMLHttpRequest` / `EventSource` |
+| `manage.py test dashboard.test_menu` | `Ran 7 tests in 11.116s` / `OK` — includes the new dual-role regression `test_an_admin_who_is_also_a_teacher_gets_one_assistant_link` (a SchoolAdmin in the Teacher group sees exactly **one** `/assistant/` link). Its first version FAILED (`0 != 1`) because `test_counselor.make_user(..., 'SchoolAdmin', school)` deliberately does **not** create a `SchoolStaff` row, so the throw-away user had no school and no entitlements; the test now promotes the fixture admin instead |
+| `scripts/run_tests.sh sqlite` (final, all edits in place) | `manage.py check`: `System check identified no issues (0 silenced).` · `makemigrations --check --dry-run`: `No changes detected` · `Ran 1675 tests in 1406.237s` / **`OK (skipped=11, expected failures=4)`** · `demo` settings: `Ran 62 tests in 170.398s` / **`OK`** · runner's own last line: `ALL DJANGO CHECKS AND TESTS PASSED (FastAPI / PostgreSQL / Docker not covered)`. Log: `/tmp/full_0044b_final.log` |
+
+Expected failures 5 → 4 (`test_12` flipped from `@expectedFailure` to a passing test). Test count 1678 → **1675**, measured,
+not estimated: six tests went with the legacy URLs (`test_chat_disabled…`, `test_library_admin_sends_token…`,
+`test_the_ai_upload_timeout_is_bounded`, `test_a_timeout_gets_a_fixed_sentence`,
+`test_a_document_upload_failure_does_not_render_the_exception_text`, and `test_anonymous_cannot_mutate`, whose whole body
+POSTed to `/upload-document/` and `/delete-document/`) and three were added (`test_the_legacy_chat_and_library_routes_are_gone`,
+`test_the_ask_form_states_the_wait_and_blocks_a_second_submit`,
+`test_an_admin_who_is_also_a_teacher_gets_one_assistant_link`); `test_37` and `test_teacher_denied…` were rewritten in place.
+
+## 19. Security & permissions review
+
+- **Authorization is unchanged and server-side.** F11 only adds a link; `docqa/views.py` still gates `/assistant/` with
+  `role_required(*STAFF, module='advisor_ai')` + `require_pilot_flag('ENABLE_AI_FEATURES')` (test_10/test_11 unchanged).
+- **F12 removes endpoints, so the attack surface shrinks**: `/upload-document/` accepted a 10 MB unvalidated upload and
+  forwarded it to FastAPI; it is a 404 now. The only addition is the nav link.
+- **The removed views were admin-only or unreachable** (`role_required(ADMIN)` / `role_required()` with an empty set), so
+  no role loses a capability it could actually use: every legacy capability ended in `disabled_in_phase1` (E2E F12).
+- **No new data access**, no new query, no student data touched; the new context key is one settings boolean.
+- **No inline-script risk introduced**: no CSP middleware exists in this repo (checked), the script is a `submit` listener
+  with no network call, and the form still submits without JS (progressive enhancement).
+- `AI_FEATURES_ON` is a display switch only. It is not, and must not become, an authorization check.
+
+## 20. Known limitations
+
+1. **D8:** the sentence says «تا ۳۰ ثانیه» while the true worst case is 68 s (3 s + 65 s). The timeout was not changed;
+   the copy is a hint to stop re-clicking, and `docs/AI_GOVERNANCE.md` now says exactly that.
+2. The ask is still one blocking POST (the streaming half of F06 is out of scope by decision); F14 (no answer cache) and
+   F05 (cap charged for failed calls) are untouched, so a retry still costs a second unit.
+3. **PDF/DOC upload died with the legacy page.** Nothing usable is lost (that route was disabled for every role), but a
+   PDF import would need a new path through `docqa.extract`, which accepts txt/md/docx only.
+4. Removed with the pages: `test_chat_disabled_for_every_role_and_never_calls_ai` (it asserted the unreachable chat view
+   made no AI call) and `LegacyUploadTimeoutTests` (the M-1 bounded-timeout guard for a route that no longer exists). The
+   M-3 error-leak guard still covers the prediction path; the docqa upload path keeps its own tests.
+5. PostgreSQL: `NOT VERIFIED` for this tranche too — same registry/stale-image gap as §8; nothing here is
+   database-engine specific (no model, no migration, no raw SQL).
+
+## 21. User manuals updated (tranche 2)
+
+`docs/manuals/school-admin.md` (the legacy «کتابخانه»/«چت» pages are gone; documents live in «دستیار اسناد» +
+«مدیریت اسناد»; the wait sentence), `docs/manuals/teacher.md`, `docs/manuals/grade-lead.md`,
+`docs/manuals/counselor.md` (the «دستیار اسناد مدرسه» entry appears only when the module and the AI switch are on, and
+the button disables itself). `docs/manuals/parent.md` and `docs/manuals/student.md`: no change (never had access).
+
+## 22. Owner acceptance (tranche 2)
+
+pending — two pieces of copy are the owner's call: the menu label `دستیار اسناد مدرسه`, and the wait sentence
+«در حال ارسال… ممکن است تا ۳۰ ثانیه طول بکشد.» (D8 notes the 30 s vs 68 s gap).
+
+## 23. Migration required (tranche 2)
+
+No. No model, no field, no data change; URLs, views and templates only.
 
 No.

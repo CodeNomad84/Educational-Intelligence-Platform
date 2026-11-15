@@ -232,11 +232,10 @@ class AssistantAccessTests(E2EUserJourney):
                 self.client.force_login(user)
                 self.assertEqual(self.client.get(reverse('docqa:documents')).status_code, expected)
 
-    @unittest.expectedFailure
     def test_12_F11_staff_who_may_use_the_assistant_have_a_link_to_it(self):
-        """F11: /assistant/ is open to GradeLead/Teacher/Counselor, but base.html only renders the module menu for
-        IS_SCHOOL_ADMIN (base.html:58), so the other three roles can only reach it by typing the URL.
-        TARGET: every role that passes role_required(*STAFF) gets a nav entry."""
+        """F11: /assistant/ is open to GradeLead/Teacher/Counselor (test_10) and each of them now has a menu entry on
+        their own home. The entry is gated on the same two switches as the view (the advisor_ai module and
+        ENABLE_AI_FEATURES), so when the view would answer 403 the link is absent instead of dead."""
         homes = {self.lead: reverse('dashboard:grade_dashboard'),
                  self.teacher: reverse('dashboard:teacher_home'),
                  self.counselor: reverse('dashboard:counselor_home')}
@@ -249,7 +248,11 @@ class AssistantAccessTests(E2EUserJourney):
             linked[role] = reverse('docqa:home') in page.content.decode()
         print(f'[E2E] F11: a nav link to /assistant/ on each role home: {linked}')
         self.assertEqual(linked, {role: True for role in linked})
-        # Companion evidence: the page itself is reachable for these same users (test_10), so the gap is navigation only.
+        with override_settings(ENABLE_AI_FEATURES=False):      # the view 403s, so no link: not a dead end
+            for user, home in homes.items():
+                self.client.force_login(user)
+                self.assertNotIn(reverse('docqa:home'), self.client.get(home).content.decode(), user.username)
+        # Companion evidence: the page itself is reachable for these same users (test_10), so the gap was navigation only.
 
 
 class UploadJourneyTests(E2EUserJourney):
@@ -607,29 +610,26 @@ class AuditAndCostTests(E2EUserJourney):
 
 
 class LegacyPagesAndApiTests(E2EUserJourney):
-    """The pre-P7 pages (/library/, /upload-document/) and the DRF predict action still exist next to the live
-    assistant. These tests pin what they do today."""
+    """The DRF predict action still exists next to the page, and this class pins what it does today. The legacy
+    /library/, /upload-document/, /delete-document/ and /chat/ pages are gone (F12, change 0044 tranche 2)."""
 
-    @override_settings(SERVICE_JWT_SECRET=SECRET)
-    def test_37_F12_the_legacy_library_upload_always_ends_in_an_error(self):
-        """F12: dashboard.views.upload_document_view accepts .pdf/.doc/.docx up to 10 MB and forwards to FastAPI's
-        /upload-document/, which is disabled_in_phase1 for EVERY role (auth.py) -- so an admin who uses the library
-        page always gets an error, in English, after the upload. Meanwhile the live assistant only accepts txt/md/docx.
-        TARGET: one document library (docqa), or the legacy page hidden/removed."""
-        from dashboard import views as dashboard_views
+    def test_37_F12_the_legacy_library_and_chat_pages_are_gone(self):
+        """F12: the pre-P7 pages were removed with their views and templates (dashboard/urls.py, dashboard/views.py).
+        Their job is /assistant/ and /assistant/documents/. The old admin page forwarded PDFs to a FastAPI route that is
+        disabled_in_phase1 for EVERY role (auth.py), so it always ended in an English error message after a full upload;
+        the live assistant accepts txt/md/docx only, so the two pages contradicted each other."""
         self.client.force_login(self.admin)
-        self.assertEqual(self.client.get(reverse('dashboard:library')).status_code, 200)     # the page is live
-        post = mock.Mock(return_value=_Response(403, {'detail': 'AI features are disabled.'}))
-        patcher = mock.patch.object(dashboard_views.requests, 'post', post)
-        patcher.start()
-        self.addCleanup(patcher.stop)
-        response = self.client.post(reverse('dashboard:upload_document'),
-                                    {'document_file': SimpleUploadedFile('rules.pdf', b'%PDF-1.4 fake')}, follow=True)
-        messages = self.messages_of(response)
-        print(f'[E2E] F12: legacy PDF upload answered with {messages}')
-        self.assertIn('خطا در آپلود: AI features are disabled.', messages)
+        for path in ('/library/', '/upload-document/', '/delete-document/', '/chat/'):
+            with self.subTest(path=path):
+                self.assertEqual(self.client.get(path).status_code, 404)
+                self.assertEqual(self.client.post(path).status_code, 404)
+        self.assertEqual(self.client.get(reverse('docqa:documents')).status_code, 200)     # the one document library
+        page = self.client.get(reverse('dashboard:school_home')).content.decode()
+        advertised = [path for path in ('/library/', '/chat/') if path in page]
+        print(f'[E2E] F12: removed pages still advertised in the admin menu? {advertised}')
+        self.assertEqual(advertised, [])
+        self.assertNotIn('به‌زودی', page)          # the «coming soon» stubs went with the pages
         self.assertEqual(SchoolDocument.objects.count(), 0)
-        self.assertEqual(post.call_args.kwargs['timeout'], dashboard_views.AI_UPLOAD_TIMEOUT)
 
     @override_settings(SERVICE_JWT_SECRET=SECRET)
     def test_38_F21_the_api_predict_action_is_a_second_unmetered_copy(self):

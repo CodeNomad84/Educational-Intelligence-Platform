@@ -62,6 +62,14 @@ class SidebarTests(Base):
             with self.subTest(user=user.username):
                 self.assertIn(home, self.sidebar_links(user))
 
+    def test_an_admin_who_is_also_a_teacher_gets_one_assistant_link(self):
+        """F11 (change 0044 tranche 2): the SchoolAdmin reaches /assistant/ through VISIBLE_MODULES; the staff block that
+        gives GradeLead/Teacher/Counselor their entry must not add a second copy for a dual-role user."""
+        from django.contrib.auth.models import Group
+        self.admin.groups.add(Group.objects.get(name='Teacher'))
+        links = self.sidebar_links(self.admin)
+        self.assertEqual(links.count('/assistant/'), 1, links)
+
     def test_no_sidebar_link_ends_in_a_server_error(self):
         """Guards the class of bug where a menu entry points at a broken page (the old /upload/ stub)."""
         self.client.raise_request_exception = False

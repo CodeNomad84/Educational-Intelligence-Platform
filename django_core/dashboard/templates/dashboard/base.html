@@ -65,13 +65,17 @@
             {% endif %}
             {% if IS_GRADE_LEAD and GRADE_RESETS_ENABLED %}{% nav_link 'dashboard:grade_resets' 'key' 'بازنشانی رمز' %}{% endif %}
 
-            {# DEMO SCOPE begin — chat/library are disabled in Phase 1 (403); hidden in the demo #}
-            {% if not DEMO_MODE %}
-            <div class="eip-nav-section">دستیار و منابع</div>
-            <span class="eip-nav-link is-disabled" aria-disabled="true"><i class="bi bi-chat-dots" aria-hidden="true"></i><span>چت با هوش مصنوعی</span><small class="eip-soon">به‌زودی</small></span>
-            <span class="eip-nav-link is-disabled" aria-disabled="true"><i class="bi bi-book" aria-hidden="true"></i><span>کتابخانه</span><small class="eip-soon">به‌زودی</small></span>
-            {% endif %}
-            {# DEMO SCOPE end #}
+            {% comment %}
+            F11/F12 (change 0044 tranche 2): the document assistant has ONE entry, /assistant/. The legacy
+            «چت با هوش مصنوعی» and «کتابخانه» stubs and their routes/templates are gone; /library/ and /chat/ are 404 now.
+            The SchoolAdmin already gets /assistant/ through VISIBLE_MODULES above, so it is not repeated here. Shown only
+            when the view's own gates pass (role_required(*STAFF, module='advisor_ai') plus
+            require_pilot_flag('ENABLE_AI_FEATURES')) - a menu link that opens a 403 is a dead end.
+            {% endcomment %}
+            {% if AI_FEATURES_ON and 'advisor_ai' in ENABLED_MODULES %}{% if not IS_SCHOOL_ADMIN %}{% if IS_GRADE_LEAD or IS_TEACHER or IS_COUNSELOR %}
+            <div class="eip-nav-section">دستیار</div>
+            {% nav_link 'docqa:home' 'chat-square-text' 'دستیار اسناد مدرسه' %}
+            {% endif %}{% endif %}{% endif %}
 
             <div class="eip-nav-section">حساب</div>
             {% if IS_PLATFORM_OPERATOR %}{% nav_link 'dashboard:operator_overview' 'diagram-3' 'نمای کلی پلتفرم' %}{% endif %}

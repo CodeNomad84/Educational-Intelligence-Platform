@@ -4,10 +4,11 @@
 {% block page_actions %}{% if is_admin %}<a class="btn btn-sm btn-outline-secondary" href="{% url 'docqa:documents' %}">مدیریت اسناد</a>{% endif %}{% endblock %}
 {% block content %}
 <p class="text-muted small">پرسش دربارهٔ <strong>اسناد غیرشخصی مدرسه</strong> ({{ doc_count }} سند فعال). نام یا شناسهٔ دانش‌آموز نپرسید. {% if ai_on %}پاسخ هوشمند فقط وقتی داده می‌شود که مدل محلی فعال باشد؛ در غیر این صورت بخش‌های مرتبط سند را می‌بینید.{% else %}پاسخ هوشمند برای این مدرسه خاموش است؛ این صفحه جست‌وجوی ساده در اسناد است.{% endif %}</p>
-<form method="post" class="bg-white p-3 border rounded mb-3" style="max-width:48rem">{% csrf_token %}
+<form method="post" id="ask-form" class="bg-white p-3 border rounded mb-3" style="max-width:48rem">{% csrf_token %}
   <label class="form-label" for="q">سؤال شما</label>
   <textarea id="q" name="question" class="form-control mb-2" rows="2" maxlength="500" required>{{ question|default:'' }}</textarea>
-  <button class="btn btn-primary">پرسش</button>
+  <button class="btn btn-primary" id="ask-submit" type="submit">پرسش</button>
+  <span id="ask-wait" class="small text-muted ms-2 d-none" role="status" aria-live="polite"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span> در حال ارسال… ممکن است تا ۳۰ ثانیه طول بکشد.</span>
 </form>
 {% if result %}
   {% if result.mode == 'none' %}<div class="alert alert-secondary">در اسناد مدرسه بخش مرتبطی پیدا نشد.</div>{% endif %}
@@ -17,4 +18,25 @@
   {% for e in result.excerpts %}<div class="card mb-2 {% if forloop.counter in result.cited %}border-primary{% endif %}"><div class="card-body">
     <div class="small text-muted">[{{ forloop.counter }}] {{ e.document.title }}{% if forloop.counter in result.cited %} · در پاسخ ارجاع شده{% endif %}</div>{{ e.text|linebreaksbr }}</div></div>{% endfor %}{% endif %}
 {% endif %}
+{% endblock %}
+{% block scripts %}
+<script>
+  // F06 (change 0044 tranche 2): one ask is a plain POST that can hold the worker for up to 68 s (3 s status + 65 s
+  // complete). This is feedback only: the button is disabled so a second click cannot spend a second unit of the daily
+  // cap; there is no fetch, no polling and no streaming. Progressive enhancement: without JS the form submits as before.
+  (function () {
+    var form = document.getElementById('ask-form');
+    var button = document.getElementById('ask-submit');
+    var wait = document.getElementById('ask-wait');
+    if (!form || !button || !wait) { return; }
+    form.addEventListener('submit', function (event) {
+      if (form.dataset.submitted === '1') { event.preventDefault(); return; }   // a second submit event
+      if (form.checkValidity && !form.checkValidity()) { return; }               // let the browser report the empty box
+      form.dataset.submitted = '1';
+      button.disabled = true;
+      button.setAttribute('aria-disabled', 'true');
+      wait.classList.remove('d-none');
+    });
+  })();
+</script>
 {% endblock %}
