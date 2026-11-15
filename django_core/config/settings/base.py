@@ -94,6 +94,11 @@ CORS_ALLOW_ALL_ORIGINS = False                        # never: a wildcard with c
 # there is deliberately NO default. Empty/short value => service calls fail closed.
 SERVICE_JWT_SECRET = os.environ.get('SERVICE_JWT_SECRET', '')
 
+# The ONE address of the FastAPI (AI) service (change 0044 / E2E F03): every caller appends its path to this value
+# instead of repeating the literal. The Docker service name is the default; a deployment that moves or renames the
+# service sets FASTAPI_BASE_URL. No trailing slash (the callers add "/path/").
+FASTAPI_BASE_URL = os.environ.get('FASTAPI_BASE_URL', 'http://fastapi:8001').rstrip('/')
+
 # Display name of the single default School row created by the class-link data migration (ADR-0004).
 # Deliberately neutral: a deployment must set the real school name here (or edit the School in the admin).
 DEFAULT_SCHOOL_NAME = os.environ.get('DEFAULT_SCHOOL_NAME', 'Default School')

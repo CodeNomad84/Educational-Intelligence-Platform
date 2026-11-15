@@ -2,6 +2,7 @@
 import logging
 
 from django.shortcuts import render, redirect, get_object_or_404
+from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import login, authenticate, logout
 from django.contrib import messages
@@ -162,12 +163,14 @@ def student_detail_view(request, pk):
     }
     
     # ---------- ارسال درخواست به FastAPI ----------
+    # F03 (change 0044): the address is the ONE setting (settings.FASTAPI_BASE_URL), never a literal in this file.
+    # F04 (change 0044): an explicit POST from the page's form, never a GET side effect. With `?predict=true` every
+    # refresh, prefetch, bookmark or back-button view ran (and paid for) another inference.
     prediction_result = None
-    if request.GET.get('predict') == 'true' and ADMIN in roles_for(request.user):  # Admin only (S-04)
+    if request.method == 'POST' and request.POST.get('action') == 'predict' and ADMIN in roles_for(request.user):  # Admin only (S-04)
         try:
-            fastapi_url = "http://fastapi:8001/predict/"
             response = requests.post(
-                fastapi_url, json=input_data, headers=service_headers(request.user), timeout=5
+                f'{settings.FASTAPI_BASE_URL}/predict/', json=input_data, headers=service_headers(request.user), timeout=5
             )
             if response.status_code == 200:
                 prediction_result = response.json()

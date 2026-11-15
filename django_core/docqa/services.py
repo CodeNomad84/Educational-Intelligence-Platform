@@ -1,12 +1,19 @@
 """Document assistant pipeline (P7-5). ACL first: retrieval reads only the caller's school and active documents. The prompt contains
 ONLY the question and numbered excerpts of those documents (no student data; the question is screened). A call is made only if the
 school setting is on AND FastAPI reports a LOCAL provider for the school AND the daily/monthly cap allows; otherwise the user gets the
-retrieved excerpts (a plain document search). Audit rows carry counts and codes, never the question or the answer."""
+retrieved excerpts (a plain document search). Audit rows carry counts and codes, never the question or the answer.
+
+E2E audit F05/F17 (change 0044): the daily cap is given back when the call delivered no answer, and a missing
+``SERVICE_JWT_SECRET`` degrades to the excerpts with the usual notice instead of Django's 500 page.
+"""
+import logging
 import math
 import re
 from collections import Counter
 
 import requests
+from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
 
 from config.service_auth import service_headers
@@ -16,7 +23,6 @@ from .extract import ExtractError, extract_text
 from .models import AssistantSettings, DocumentChunk, SchoolDocument
 from .screen import normalize, screen_text
 
-FASTAPI = 'http://fastapi:8001'
 CHUNK_CHARS, TOP_K, MAX_QUESTION = 900, 4, 500
 MAX_DOCS, MAX_CHUNKS = 50, 5000
 STOP = {'و', 'در', 'به', 'از', 'که', 'را', 'این', 'آن', 'با', 'برای', 'است', 'شد', 'شود', 'می', 'یا', 'تا', 'بر', 'هم', 'یک', 'های', 'ها'}
@@ -25,6 +31,14 @@ CITE = re.compile(r'\[(\d{1,2})\]')
 SYSTEM_PROMPT = ('You answer questions for school staff ONLY from the numbered excerpts of the school documents below. '
                  'If the answer is not in the excerpts, say that you cannot find it in the documents. Cite the excerpt numbers like [1]. '
                  'Answer in Persian, briefly. Never invent rules, names or numbers.')
+OFFLINE_NOTICE = 'پاسخ هوشمند در دسترس نبود؛ بخش‌های مرتبط سند نمایش داده می‌شود.'
+
+logger = logging.getLogger(__name__)
+
+
+def service_url(path):
+    """The ONE FastAPI address (E2E F03): ``settings.FASTAPI_BASE_URL`` + the route path. No host literal in this module."""
+    return f'{settings.FASTAPI_BASE_URL}{path}'
 
 
 class AskRefused(Exception):
@@ -104,7 +118,7 @@ def retrieve(school_id, question, k=TOP_K):
 
 def _local_provider_active(headers):
     try:
-        r = requests.get(f'{FASTAPI}/llm/status/', headers=headers, timeout=3)
+        r = requests.get(service_url('/llm/status/'), headers=headers, timeout=3)
         body = r.json() if r.status_code == 200 else None
         return isinstance(body, dict) and body.get('enabled') is True and body.get('class') == 'local'
     except (requests.RequestException, ValueError, AttributeError):
@@ -115,7 +129,7 @@ def _complete(headers, excerpts, question):
     context = '\n\n'.join(f'[{i}] ({e.document.title}) {e.text}' for i, e in enumerate(excerpts, 1))
     body = {'purpose': 'document_qa', 'messages': [{'role': 'system', 'content': SYSTEM_PROMPT},
                                                   {'role': 'user', 'content': f'Excerpts:\n{context}\n\nQuestion: {question}'}]}
-    r = requests.post(f'{FASTAPI}/llm/complete/', json=body, headers=headers, timeout=65)
+    r = requests.post(service_url('/llm/complete/'), json=body, headers=headers, timeout=65)
     if r.status_code != 200:
         raise AskRefused(f'llm_{r.status_code}')
     return r.json()
@@ -134,11 +148,19 @@ def ask(user, school, question):
         audit.record(user, audit.DOC_ASK, school=school.pk, detail='none')
         return {'mode': 'none', 'excerpts': [], 'cited': [], 'notice': ''}
     result = {'mode': 'search', 'excerpts': excerpts, 'cited': [], 'answer': '', 'label': '', 'notice': ''}
-    settings = AssistantSettings.objects.filter(school=school).first()
-    if not (settings and settings.ai_enabled):
+    config = AssistantSettings.objects.filter(school=school).first()      # not `settings`: that would shadow django.conf.settings
+    if not (config and config.ai_enabled):
         audit.record(user, audit.DOC_ASK, school=school.pk, detail=f'search:k{len(excerpts)}')
         return result
-    headers = service_headers(user, with_school=school.pk)
+    try:
+        # F17 (change 0044): without a usable SERVICE_JWT_SECRET this raises ImproperlyConfigured. It used to escape
+        # every try and turn the ask page into Django's 500 page; now it degrades exactly like an unreachable provider.
+        headers = service_headers(user, with_school=school.pk)
+    except ImproperlyConfigured:
+        logger.warning('docqa: SERVICE_JWT_SECRET is missing or weak; showing the retrieved excerpts instead')
+        result['notice'] = OFFLINE_NOTICE
+        audit.record(user, audit.DOC_ASK, school=school.pk, detail=f'search:k{len(excerpts)}:unconfigured')
+        return result
     if not _local_provider_active(headers):
         result['notice'] = 'مدل زبانی محلی برای این مدرسه فعال نیست؛ بخش‌های مرتبط سند نمایش داده می‌شود.'
         audit.record(user, audit.DOC_ASK, school=school.pk, detail=f'search:k{len(excerpts)}:nolocal')
@@ -152,7 +174,8 @@ def ask(user, school, question):
     try:
         out = _complete(headers, excerpts, question)
     except (requests.RequestException, ValueError, AskRefused):
-        result['notice'] = 'پاسخ هوشمند در دسترس نبود؛ بخش‌های مرتبط سند نمایش داده می‌شود.'
+        ai_guard.refund(school, 'advisor_ai')      # F05: a call that delivered no answer must not burn the daily cap
+        result['notice'] = OFFLINE_NOTICE
         audit.record(user, audit.DOC_ASK, school=school.pk, detail=f'search:k{len(excerpts)}:error')
         return result
     cited = sorted({int(n) for n in CITE.findall(out['text']) if 1 <= int(n) <= len(excerpts)})

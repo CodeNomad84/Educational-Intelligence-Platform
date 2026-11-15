@@ -250,3 +250,56 @@ Truth labels as in the header of this document. Evidence below is `CURRENT` in t
 caller of FastAPI's `/upload-document/` and `/documents/parent/<id>`. Both are `disabled_in_phase1` for every role
 (`E2E_AUDIT_REPORT.md:271`), so nothing that worked is being removed; a PDF path would have to come back through
 `docqa.extract`, which accepts txt/md/docx only.
+
+---
+
+# Tranche 3 — F05 (a failed AI call was charged), F17 (a missing secret was a 500), F03 (one AI address), F04 (the prediction was a GET side effect)
+
+Added 2026-11-15 on the same branch. **Level: L2** (the prediction trigger and the meaning of the AI quota are
+user-visible; a new settings key). The owner gave the instruction in chat on 2026-11-15, so this section records scope and
+decisions rather than asking for them:
+
+> "Fix F05: Charge the daily AI quota only if the LLM provider returns a successful response … Fix F17: catch
+> `ImproperlyConfigured` for a missing `SERVICE_JWT_SECRET` and gracefully display the offline/fallback AI notice … Fix
+> F03 & F04: Consolidate the FastAPI base URL into a single Django setting … change the predict trigger from a GET `<a>`
+> link to a simple POST `<form>` with CSRF token … Update the view to handle this POST."
+
+## 20. Current behaviour (`CURRENT`)
+
+| # | Fact | Evidence |
+|---|---|---|
+| F05 | the licensed cap is charged *before* the call, on both sides | `docqa/services.py:147` `consume()` before `_complete()`; `llm_adapter.py:238` `_take_slot()` before the transport. Measured: a provider 500 leaves `AICallUsage.count=1` (`test_20`) and, service-side, one 502 with `LLM_DAILY_CAP=1` made the next call a 429 (`test_16`) |
+| F17 | a missing `SERVICE_JWT_SECRET` is a 500 on the ask page | `services.py:141` `service_headers()` outside every `try`; `test_39` measured `status=500` while the predict page degrades to a sentence (`views.py:178`) |
+| F03 | `http://fastapi:8001` is a literal in three modules | `dashboard/views.py:168`, `students/views.py:509`, `docqa/services.py:19` (the audit counts seven occurrences) |
+| F04 | the prediction runs on GET | `student_detail.html:29` `<a href="?predict=true">`; `test_30` measured 2 calls for 2 page views |
+
+## 21. What this tranche changes
+
+1. **F05 (Django)** — `schools/ai_guard.py` gains `refund(school, module_key, on=None)`: it gives back one unit, never
+   below zero, and is a no-op after the day rolled over. `docqa/services.ask()` still *takes* the slot before the request
+   (so the cap stays race-free through `select_for_update`) and refunds it when `_complete()` raises.
+2. **F05 (service)** — `llm_adapter._refund_slot()`; `complete()` refunds in a `finally` unless an answer is returned, so
+   a provider 5xx, a timeout, a malformed answer **and** a `busy` refusal no longer consume `LLM_DAILY_CAP`.
+3. **F17** — `service_headers()` is wrapped; `ImproperlyConfigured` produces the same offline sentence every other AI
+   failure uses ("پاسخ هوشمند در دسترس نبود؛ بخش‌های مرتبط سند نمایش داده می‌شود."), the audit code
+   `search:k{n}:unconfigured`, and one server-log line naming `SERVICE_JWT_SECRET`. No new user-visible copy (D12).
+4. **F03** — `settings.FASTAPI_BASE_URL` (env `FASTAPI_BASE_URL`, default `http://fastapi:8001`, trailing slash stripped)
+   is the single address; `dashboard/views.py`, `students/views.py` and `docqa/services.py` build their path from it
+   (`docqa.services.service_url()`), so no caller holds a host literal.
+5. **F04** — `student_detail.html` renders a `<form method="post">` with `{% csrf_token %}` and a hidden
+   `action=predict`; `student_detail_view` runs the model only for `request.method == 'POST'` with that field, still
+   SchoolAdmin-only. A GET never calls FastAPI. POST-and-render (no redirect-after-post, no result cache) is D10.
+6. **Tests** — `test_21` (Django F05), `test_30` (Django F04), `test_39` (Django F17) and `test_16` (service F05) lose
+   `@expectedFailure`; `test_39` additionally asserts the notice, the audit code and the log line; `test_27`–`test_33`
+   submit the form; `dashboard/tests.py` parent/teacher cases post; `students/test_access_c5a.py` checks the button
+   label instead of `?predict=true`; new `FastApiBaseUrlTests` proves the configured base URL is the one called;
+   `fastapi_core/tests/test_exposure.py` now asserts the three callers hold no literal and that the setting exists.
+
+## 22. Decisions recorded
+
+| # | Item | State |
+|---|---|---|
+| **D9** | F05 = the slot is taken before the call and **refunded** on failure (not "charge after the call") | **DECIDED** — keeps the cap race-free: the `select_for_update` reservation still happens before the provider, and a concurrent burst cannot overshoot |
+| **D10** | F04 = POST + render the result, no redirect-after-post and no per-student/day result cache | **DECIDED** — the smallest change that makes GET pure. A refresh *after* a POST still asks the browser to confirm a resubmission; a cached result stays the alternative in the audit's TARGET |
+| **D11** | FastAPI's duplicate `/predict/` route (`@app.post("/predict/")` + `@router_v1.post("/predict/")`) is **not** removed here | **DEFERRED** — removing `/api/v1/predict/` is a breaking API change and both paths are exercised; needs an owner decision |
+| **D12** | F17 reuses the existing offline sentence instead of new copy | **DECIDED** — no new user-visible string to approve; the deploy problem goes to the server log |

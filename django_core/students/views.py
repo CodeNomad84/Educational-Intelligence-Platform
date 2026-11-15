@@ -9,6 +9,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters
+from django.conf import settings
 from collections import defaultdict, namedtuple
 from django.db import transaction
 from django.db.models import ProtectedError
@@ -506,7 +507,8 @@ class StudentViewSet(viewsets.ModelViewSet):
         }
 
         try:
-            fastapi_url = "http://fastapi:8001/predict/"
+            # F03 (change 0044): one settings-driven base URL; this file used to repeat 'http://fastapi:8001/predict/'.
+            fastapi_url = f'{settings.FASTAPI_BASE_URL}/predict/'
             response = requests.post(
                 fastapi_url, json=input_data, headers=service_headers(request.user), timeout=5
             )

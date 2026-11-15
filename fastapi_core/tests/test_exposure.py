@@ -71,12 +71,15 @@ class ExposureTests(unittest.TestCase):
                 for forbidden in ('8001', 'fastapi', '/llm', 'llm/complete'):
                     self.assertNotIn(forbidden, text, f'{path.name} must not reference {forbidden}')
 
-    def test_django_is_the_only_caller_it_names_fastapi_by_internal_host(self):
-        # Django reaches FastAPI by the compose service name only (never a public URL).
-        for rel in ('django_core/dashboard/views.py', 'django_core/students/views.py'):
+    def test_the_fastapi_address_lives_in_one_setting(self):
+        # Change 0044 / F03: Django reaches FastAPI by ONE settings-driven address (FASTAPI_BASE_URL in
+        # config/settings/base.py, default the compose service name). A literal host in a caller would let the service be
+        # renamed or moved only by a code change, so the callers must stay free of one.
+        for rel in ('django_core/dashboard/views.py', 'django_core/students/views.py', 'django_core/docqa/services.py'):
             text = (REPO / rel).read_text(encoding='utf-8')
-            for url in re.findall(r'https?://[^"\']*8001[^"\']*', text):
-                self.assertTrue(url.startswith('http://fastapi:8001/'), url)
+            self.assertEqual(re.findall(r'https?://[^"\']*8001[^"\']*', text), [], f'{rel} must not hard-code the AI host')
+        settings_text = (REPO / 'django_core/config/settings/base.py').read_text(encoding='utf-8')
+        self.assertIn("FASTAPI_BASE_URL = os.environ.get('FASTAPI_BASE_URL', 'http://fastapi:8001')", settings_text)
 
 
 @unittest.skipUnless((REPO / 'docker-compose.yml').exists(), 'repository root not available')

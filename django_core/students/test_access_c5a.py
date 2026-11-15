@@ -345,7 +345,7 @@ class DashboardHtmlTests(Base):
             self.assertNotIn(secret, body)
         self.assertEqual({g.subject for g in detail.context["grades"]}, {"math"})
         self.assertEqual(list(detail.context["attendances"]), [])
-        self.assertNotIn("predict=true", body)
+        self.assertNotIn("نمایش آزمایشی وضعیت", body)      # F04 (change 0044): the trigger is a POST form, admin-only
         self.assertEqual(
             self.client.get(reverse("dashboard:student_detail", args=[self.s10b.pk])).status_code, 404)
 

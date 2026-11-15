@@ -26,7 +26,12 @@
             <div class="col-md-6">
                 {# DEMO SCOPE begin — no AI prediction button in the demo (FastAPI/ML are out of scope) #}
                 {% if not DEMO_MODE and can_predict %}
-                <a href="?predict=true" class="btn btn-outline-secondary w-100">🤖 نمایش آزمایشی وضعیت (داده‌های تکمیلی موجود نیست)</a>
+                {# F04 (change 0044): an explicit POST with CSRF, not a GET side effect — a refresh no longer re-runs the model #}
+                <form method="post" action="{% url 'dashboard:student_detail' student.pk %}" class="d-grid">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="predict">
+                    <button type="submit" class="btn btn-outline-secondary w-100">🤖 نمایش آزمایشی وضعیت (داده‌های تکمیلی موجود نیست)</button>
+                </form>
                 {% endif %}
                 {# DEMO SCOPE end #}
                 {% if prediction %}

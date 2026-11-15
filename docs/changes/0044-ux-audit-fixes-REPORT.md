@@ -279,4 +279,83 @@ pending — two pieces of copy are the owner's call: the menu label `دستیا�
 
 No. No model, no field, no data change; URLs, views and templates only.
 
-No.
+---
+
+# Tranche 3 — F05 (a failed call was charged), F17 (a missing secret was a 500), F03 (one AI address), F04 (a GET side effect)
+
+Added 2026-11-15 on the same branch; scope and decisions are in the proposal's tranche-3 section (§20–§22 there).
+
+## 24. What changed
+
+| File | Change |
+|---|---|
+| `schools/ai_guard.py` | new `refund(school, module_key, on=None)`: gives one unit back, filtered by `count__gt=0` so it can never go negative, a no-op after the day rolled over; the module docstring now says the cap counts answers |
+| `docqa/services.py` | `service_headers()` is wrapped: `ImproperlyConfigured` → excerpts + the ordinary offline sentence + audit `search:k{n}:unconfigured` + one log line naming the variable (F17); `ai_guard.refund()` when `_complete()` raises (F05); the `FASTAPI` literal is replaced by `service_url()` reading `settings.FASTAPI_BASE_URL` (F03); the offline sentence became one constant `OFFLINE_NOTICE` |
+| `fastapi_core/llm_adapter.py` | `_refund_slot()`; `complete()` refunds in a `finally` unless an answer was returned — covers a 5xx, a timeout, a malformed answer and a `busy` refusal (F05); the module docstring says `LLM_DAILY_CAP` counts answered calls |
+| `config/settings/base.py` | `FASTAPI_BASE_URL` (env `FASTAPI_BASE_URL`, default `http://fastapi:8001`, `.rstrip('/')`) |
+| `dashboard/views.py` | the model runs only on `POST` with `action=predict` (SchoolAdmin only, as before); the URL comes from the setting |
+| `students/views.py` | the DRF predict action builds its URL from the setting (the literal is gone) |
+| `dashboard/templates/dashboard/student_detail.html` | `<form method="post">` + `{% csrf_token %}` + hidden `action=predict`; the button text is unchanged |
+| tests | see §25 |
+| docs | `docs/AI_GOVERNANCE.md` (accounting), `docs/ARCHITECTURE.md` (refund), `docs/CHANGE_GUIDE.md` (`Verified-at`), `docs/manuals/school-admin.md` (the trigger is a form; only delivered answers are counted; the misconfigured-server fallback) |
+
+## 25. Verification (commands actually run, outputs copied)
+
+| Run | Result |
+|---|---|
+| `manage.py test dashboard.tests dashboard.test_e2e_user_flow docqa students.test_access_c5a --settings=config.settings.test_sqlite` | `Ran 135 tests in 28.510s` / **`OK (expected failures=1)`** (the one left is F02b, DEFERRED). Printed: `[E2E] F05: quota consumed by a failed provider call = 0`, `[E2E] provider 500 -> quota_used=0`, `[E2E] F17: ask without SERVICE_JWT_SECRET -> status=200`, `[E2E] F04: two page views made predict_calls=1`. Log: `/tmp/t3_django.log` |
+| `docker run --rm --network none -v "$PWD/fastapi_core:/app:ro" -w /app educational-intelligence-platform-fastapi:latest python -m unittest discover -s tests -t .` | `Ran 124 tests in 10.724s` / **`OK (skipped=32)`** — the suite has no expected failure left. Log: `/tmp/t3_fastapi.log` |
+| `scripts/run_tests.sh sqlite` (all edits in place) | `manage.py check`: `System check identified no issues (0 silenced).` · `makemigrations --check --dry-run`: `No changes detected` · `Ran 1676 tests in 989.083s` / **`OK (skipped=11, expected failures=1)`** · demo settings: `Ran 62 tests in 176.731s` / **`OK`** · runner's last line: `ALL DJANGO CHECKS AND TESTS PASSED (FastAPI / PostgreSQL / Docker not covered)`. Log: `/tmp/full_0044c_final.log` |
+
+Expected failures 4 → **1**: `test_21` (F05), `test_30` (F04) and `test_39` (F17) now pass; the only one left is `test_29b`,
+the DEFERRED F02b. The FastAPI suite's only expected failure (`test_16`) is gone too. Test count 1675 → **1676**, measured:
+one test was added (`FastApiBaseUrlTests.test_the_prediction_posts_to_the_configured_base_url`); four others were renamed
+and rewritten in place (`test_teacher_predicting…`, `test_parent_cannot_trigger…`, `test_31_…`, `test_39_…` naming).
+PostgreSQL: `NOT VERIFIED` (the same carry-over as tranche 1 — the registry is still unreachable); nothing in this tranche
+is engine-specific (one setting, no model, no raw SQL).
+
+## 26. Known limitations (tranche 3)
+
+1. **The cap now bounds delivered answers, not attempts.** A provider that keeps failing lets a school retry at zero quota
+   cost; the attempt rate stays bounded elsewhere (the adapter's 3 concurrent calls per school, the docqa
+   `QUESTIONS_PER_WINDOW` throttle). Recorded in D9 rather than hidden.
+2. **D10:** POST-and-render, no redirect-after-post and no result cache. A refresh *after* a submission still asks the
+   browser to confirm a resubmission; the alternative (a per-student/day cache) stays the audit's TARGET.
+3. **D11:** FastAPI still serves `/predict/` twice (`/predict/` and `/api/v1/predict/`). Removing the second is a breaking
+   API change and was not part of the instruction; `DECISION REQUIRED` if the duplicate is to go.
+4. **F17 is a fallback, not a deploy check.** Nothing refuses to start without `SERVICE_JWT_SECRET`; the audit's
+   "and/or fail at startup" half stays open (the predict page and the ask page now degrade the same way).
+5. **The DRF action `GET /api/students/<id>/predict/` is unchanged** (F04 was scoped to the HTML page). It is still a GET
+   with an inference side effect, so an API client that polls it pays per call; turning it into a POST is a breaking API
+   change — `DECISION REQUIRED`.
+
+## 27. Security & permissions review (tranche 3)
+
+- **F04:** the model is reachable only by a POST that carries a CSRF token (Django's `CsrfViewMiddleware` is on for the
+  page), and only for a SchoolAdmin: the role check that was on the GET branch is unchanged. A GET no longer performs any
+  outbound request, so a prefetch, a bookmark or the back button cannot spend a call.
+- **F05:** `refund()` can never go below zero and is scoped to one school/day/module; the caller cannot ask for a refund,
+  only a failed provider call produces one. No new data access, no new query beyond the same `AICallUsage` row.
+- **F17:** the fallback carries no exception detail to the page; the audit row holds a fixed code, the log line names the
+  variable but never a value.
+- **F03:** `FASTAPI_BASE_URL` is operator configuration (environment), not request data; the signed service token still
+  goes only to the configured internal address, and `fastapi_core/tests/test_exposure.py` now fails if a caller
+  reintroduces a literal host or the setting disappears.
+- No student data is sent anywhere new; the two AI prompts are unchanged.
+
+## 28. User manuals updated (tranche 3)
+
+`docs/manuals/school-admin.md` only: the demo button is a form (one submission = one request, a failed call is given
+back, a refresh does not re-run the model) and the assistant falls back to the excerpts when the server has no service
+key. No other role has the prediction button or the assistant's quota.
+
+## 29. Owner acceptance (tranche 3)
+
+Scope and decisions were given in chat on 2026-11-15 ("Fix F05 … Fix F17 … Fix F03 & F04"), so this tranche introduces no
+new user-visible copy to approve: the button label, the demo sentences and the offline sentence are unchanged (D12). Two
+items stay with the owner as `DECISION REQUIRED`, not as acceptance blockers: **D11** (drop FastAPI's duplicate
+`/api/v1/predict/`) and the DRF `GET …/predict/` action (§26 item 5).
+
+## 30. Migration required (tranche 3)
+
+No. One new setting (`FASTAPI_BASE_URL`, default unchanged), no model, no field, no data change.

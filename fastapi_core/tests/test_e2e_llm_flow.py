@@ -231,12 +231,10 @@ class LLMFlowTests(unittest.TestCase):
         self.assertEqual((response.status_code, response.json()['detail']), (429, 'cap_reached'))
         self.assertEqual(len(STUB.calls), 1)
 
-    @unittest.expectedFailure
     def test_16_F05_a_call_that_failed_at_the_provider_does_not_use_up_the_cap(self):
-        """F05 (service side): llm_adapter._take_slot() increments the counter BEFORE the call (llm_adapter.py:238),
-        so a 5xx / timeout / bad answer blocks the school's next request once the cap is reached.
-        Companion test_15 proves the 429 mapping works, test_07 proves the 502, so this failure is about accounting.
-        TARGET: count only calls that returned an answer."""
+        """F05 (service side): ``_take_slot`` used to keep the slot after a 5xx, so one outage could use the school's
+        whole cap up with zero answers. Change 0044 refunds the slot unless the call returns an answer; companion
+        test_15 proves the 429 mapping, test_07 proves the 502, so this test is about accounting only."""
         self.configure(cap='1')
         STUB.configure(mode='http500')
         first = self.complete()

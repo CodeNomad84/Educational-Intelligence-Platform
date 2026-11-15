@@ -366,16 +366,14 @@ class AskJourneyTests(E2EUserJourney):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'پاسخ هوشمند در دسترس نبود')
         self.assertEqual(post.call_count, 1)
-        print(f'[E2E] provider 500 -> quota_used={self.usage()} (F05: a failed call consumes the daily cap)')
+        print(f'[E2E] provider 500 -> quota_used={self.usage()} (F05: refunded — the cap counts delivered answers)')
         self.assertEqual(AuditEvent.objects.filter(action=audit.DOC_ASK).latest('pk').detail, 'search:k1:error')
 
     @override_settings(SERVICE_JWT_SECRET=SECRET)
-    @unittest.expectedFailure
     def test_21_F05_a_failed_llm_call_does_not_burn_the_daily_quota(self):
-        """F05: services.ask() calls ai_guard.consume() (services.py:147) BEFORE _complete(), so a provider 5xx, a
-        timeout or a 502 still counts against School.ai_daily_cap. Companion test_20 proves the request does reach the
-        provider and does fall back, so this failure is about the cap only.
-        TARGET: charge the cap only for a call that produced an answer (or refund it on failure)."""
+        """F05 (fixed in change 0044): services.ask() used to call ai_guard.consume() BEFORE _complete(), so a provider
+        5xx, a timeout or a 502 still counted against School.ai_daily_cap. It now refunds the slot when the call
+        delivered no answer; companion test_20 proves the request reaches the provider and falls back."""
         self.enable_ai()
         self.provider(status=500)
         self.ask()
@@ -457,15 +455,19 @@ class PredictionJourneyTests(E2EUserJourney):
         self.addCleanup(patcher.stop)
         return post
 
-    def detail_url(self, predict=True):
-        url = reverse('dashboard:student_detail', args=[self.s7.pk])
-        return f'{url}?predict=true' if predict else url
+    def detail_url(self):
+        return reverse('dashboard:student_detail', args=[self.s7.pk])
+
+    def run_prediction(self):
+        """F04 (change 0044): the page triggers the model with an explicit POST — it used to be `GET ?predict=true`, so
+        a refresh, a prefetch, a bookmark or the back button each spent another inference."""
+        return self.client.post(self.detail_url(), {'action': 'predict'})
 
     def test_27_the_admin_gets_the_demo_block_and_the_models_own_message(self):
         """F02 (change 0044): the prediction block is still shown to the admin and still carries the model's message,
         but it is labelled a demo and the internal feature dict is no longer printed."""
         post = self.predict()
-        response = self.client.get(self.detail_url())
+        response = self.run_prediction()
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'نتیجه‌ی نمایشی')
         self.assertContains(response, 'در معرض ریسک افت تحصیلی')
@@ -480,7 +482,7 @@ class PredictionJourneyTests(E2EUserJourney):
         as '0.70%' -- a 100x understatement of the number the admin acts on.
         TARGET: multiply by 100, whole number, Persian digits."""
         self.predict(body={'risk_probability': 0.7, 'is_high_risk': True, 'message': 'm'})
-        html = self.client.get(self.detail_url()).content.decode()
+        html = self.run_prediction().content.decode()
         percent = self.rendered_risk_percent(html)
         print(f'[E2E] F01: model probability 0.70 is rendered as {percent}%')
         self.assertAlmostEqual(percent, 70.0)
@@ -492,7 +494,7 @@ class PredictionJourneyTests(E2EUserJourney):
         homework / communication tables yet, so the block must say so, must not call itself a prediction and must not
         print the internal dict to the principal. The real-data TARGET stays pinned by test_29b."""
         post = self.predict()
-        response = self.client.get(self.detail_url())
+        response = self.run_prediction()
         self.assertContains(response, 'نمایشی / داده‌های تکمیلی موجود نیست')
         self.assertContains(response, 'احتمال ریسک (نمایشی)')
         self.assertContains(response, 'این خروجی مبنای تصمیم نیست')
@@ -509,27 +511,27 @@ class PredictionJourneyTests(E2EUserJourney):
         Until real homework/communication rows exist and are read, this stays expected to fail; the demo label
         (test_29) is what the owner chose in the meantime."""
         post = self.predict()
-        self.client.get(self.detail_url())
+        self.run_prediction()
         sent = post.call_args.kwargs['json']
         print(f'[E2E] F02b: features sent for a student with no homework records: {sent}')
         self.assertNotEqual(sent['total_communications'], 3, 'F02b: total_communications is a constant in views.py')
         self.assertNotEqual(sent['completed_homework'], 12, 'F02b: completed_homework is a constant in views.py')
         self.assertNotEqual(sent['avg_completion_rate'], 0.8, 'F02b: avg_completion_rate is a constant in views.py')
 
-    @unittest.expectedFailure
     def test_30_F04_a_refresh_does_not_repeat_the_prediction_call(self):
-        """F04: the prediction is a GET side effect (``<a href="?predict=true">``), so F5, a browser prefetch, a shared
-        link or the back button each cause another FastAPI inference.
-        TARGET: POST with CSRF, or a cached result for the same student/day."""
+        """F04 (fixed in change 0044): the prediction used to be a GET side effect (``<a href="?predict=true">``), so F5,
+        a browser prefetch, a shared link or the back button each caused another FastAPI inference. The page now posts
+        an explicit form with CSRF (`action=predict`); a plain GET never calls the model."""
         post = self.predict()
-        self.client.get(self.detail_url())
-        self.client.get(self.detail_url())
+        self.run_prediction()
+        self.assertEqual(self.client.get(self.detail_url()).status_code, 200)
+        self.assertEqual(self.client.get(self.detail_url()).status_code, 200)
         print(f'[E2E] F04: two page views made predict_calls={post.call_count}')
         self.assertEqual(post.call_count, 1)
 
-    def test_31_opening_the_page_without_the_button_makes_no_call(self):
+    def test_31_opening_the_page_without_submitting_the_form_makes_no_call(self):
         post = self.predict()
-        self.assertEqual(self.client.get(self.detail_url(predict=False)).status_code, 200)
+        self.assertEqual(self.client.get(self.detail_url()).status_code, 200)
         self.assertEqual(post.call_count, 0)
 
     def test_32_only_the_school_admin_can_spend_a_prediction(self):
@@ -541,13 +543,13 @@ class PredictionJourneyTests(E2EUserJourney):
                 self.assertEqual(post.call_count, 0)
                 self.assertNotContains(response, 'نمایش آزمایشی وضعیت')
         self.client.force_login(self.admin)
-        self.assertContains(self.client.get(self.detail_url(predict=False)), 'نمایش آزمایشی وضعیت')
+        self.assertContains(self.client.get(self.detail_url()), 'نمایش آزمایشی وضعیت')
 
     def test_33_a_provider_error_is_shown_in_the_page_with_its_http_code(self):
         """CHARACTERISATION (F19): the failure message carries the upstream HTTP status into the school admin's page
         ('کد 500') -- an internal detail the admin cannot act on -- and the same box is used for every failure."""
         self.predict(status=500)
-        response = self.client.get(self.detail_url())
+        response = self.run_prediction()
         self.assertEqual(response.status_code, 200)                           # the page still renders
         self.assertContains(response, 'خطا در سرویس هوش مصنوعی (کد 500).')
 
@@ -661,23 +663,21 @@ class LegacyPagesAndApiTests(E2EUserJourney):
         self.assertEqual(AICallUsage.objects.count(), 0)            # nothing metered on this path
 
     @override_settings(SERVICE_JWT_SECRET='')
-    @unittest.expectedFailure
-    def test_39_F17_a_missing_service_secret_is_a_500_not_a_friendly_fallback(self):
-        """F17: SERVICE_JWT_SECRET defaults to '' (base.py:95) and nothing checks it at deploy time. services.ask()
-        calls service_headers() at services.py:141, OUTSIDE its try/except, so with the switch on and a matching
-        document the admin gets Django's 500 page instead of the search fallback every other AI failure produces.
-        TARGET: catch ImproperlyConfigured like the predict page does (views.py:178) and show the excerpts + a notice."""
-        import logging as _logging
+    def test_39_F17_a_missing_service_secret_falls_back_to_the_excerpts(self):
+        """F17 (fixed in change 0044): SERVICE_JWT_SECRET defaults to '' (base.py) and services.ask() called
+        service_headers() outside every try, so with the switch on and a matching document the admin got Django's 500
+        page. It now catches ImproperlyConfigured, shows the excerpts with the usual offline notice, records the refusal
+        in the audit row and logs the deploy problem -- the same degradation every other AI failure produces."""
         self.add_document(self.a, 'Handbook', HANDBOOK)
         self.client.force_login(self.admin)
         AssistantSettings.objects.update_or_create(school=self.a, defaults={'ai_enabled': True})
-        self.client.raise_request_exception = False
-        self.addCleanup(setattr, self.client, 'raise_request_exception', True)
-        _logging.disable(_logging.CRITICAL)
-        self.addCleanup(_logging.disable, _logging.NOTSET)
-        response = self.ask()
+        with self.assertLogs('docqa.services', level='WARNING') as logs:
+            response = self.ask()
         print(f'[E2E] F17: ask without SERVICE_JWT_SECRET -> status={response.status_code}')
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'پاسخ هوشمند در دسترس نبود')
+        self.assertIn('SERVICE_JWT_SECRET', logs.output[0])
+        self.assertEqual(AuditEvent.objects.filter(action=audit.DOC_ASK).latest('pk').detail, 'search:k1:unconfigured')
 
 
 

@@ -84,10 +84,11 @@ class DashboardAuthzTests(TestCase):
                            ('student_add', ())]:
             self.assertEqual(self.client.get(self.url(name, *args)).status_code, 403, name)
 
-    def test_teacher_predict_flag_on_unrelated_student_is_denied(self):
+    def test_teacher_predicting_an_unrelated_student_is_denied(self):
+        # F04 (change 0044): the trigger is a POST with `action=predict`, sent by the page's form.
         self.client.force_login(self.teacher)
         with mock.patch('dashboard.views.requests.post') as post:
-            resp = self.client.get(self.url('student_detail', self.child_b.pk), {'predict': 'true'})
+            resp = self.client.post(self.url('student_detail', self.child_b.pk), {'action': 'predict'})
         self.assertEqual(resp.status_code, 404)  # the student is not visible to a teacher
         post.assert_not_called()
 
@@ -124,10 +125,10 @@ class DashboardAuthzTests(TestCase):
         self.assertRedirects(resp, reverse('dashboard:login'))
 
     # -- predict is staff-only and never called for parents ---------------
-    def test_parent_predict_flag_does_not_call_ai_service(self):
+    def test_parent_cannot_trigger_a_prediction(self):
         self.client.force_login(self.parent_a)
         with mock.patch('dashboard.views.requests.post') as post:
-            resp = self.client.get(self.url('student_detail', self.child_a.pk), {'predict': 'true'})
+            resp = self.client.post(self.url('student_detail', self.child_a.pk), {'action': 'predict'})
         self.assertEqual(resp.status_code, 200)
         post.assert_not_called()
 
@@ -276,7 +277,8 @@ class AIErrorLeakTests(TestCase):
     def detail(self, **kwargs):
         with override_settings(SERVICE_JWT_SECRET=secrets.token_urlsafe(48)):
             with mock.patch('dashboard.views.requests.post', **kwargs):
-                return self.client.get(reverse('dashboard:student_detail', args=(self.student.pk,)), {'predict': 'true'})
+                # F04 (change 0044): the prediction runs on an explicit POST, not on `GET ?predict=true`.
+                return self.client.post(reverse('dashboard:student_detail', args=(self.student.pk,)), {'action': 'predict'})
 
     def test_an_upstream_error_body_is_not_rendered(self):
         fake = mock.Mock(status_code=500, text='secret-upstream-body')
@@ -294,6 +296,26 @@ class AIErrorLeakTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertNotContains(resp, 'secret-host-10.0.0.5')
         self.assertEqual(resp.context['prediction']['error'], 'خطا در ارتباط با سرویس هوش مصنوعی.')
+
+
+class FastApiBaseUrlTests(TestCase):
+    """Change 0044 / E2E F03: the FastAPI address lives in one setting, so the AI service can be moved (or pointed at a
+    stub) without editing call sites. `http://fastapi:8001` used to be repeated in dashboard/views.py, students/views.py
+    and docqa/services.py, with different timeouts copied next to each literal."""
+
+    def test_the_prediction_posts_to_the_configured_base_url(self):
+        school = School.objects.create(name='Url School', code='url')
+        admin = make_user('url_admin', ADMIN)
+        SchoolMembership.objects.create(user=admin, school=school)
+        student = make_student('0000000017', first='Url', school=school)
+        self.client.force_login(admin)
+        reply = mock.Mock(status_code=200, json=lambda: {'risk_probability': 0.5, 'is_high_risk': False, 'message': 'm'})
+        with override_settings(SERVICE_JWT_SECRET=secrets.token_urlsafe(48), FASTAPI_BASE_URL='http://ai.internal:9999'):
+            with mock.patch('dashboard.views.requests.post', return_value=reply) as post:
+                response = self.client.post(reverse('dashboard:student_detail', args=(student.pk,)), {'action': 'predict'})
+        self.assertEqual(response.status_code, 200)
+        post.assert_called_once()
+        self.assertEqual(post.call_args.args[0], 'http://ai.internal:9999/predict/')
 
 
 class PersianDigitFilterTests(TestCase):
