@@ -101,7 +101,7 @@ def student_list_view(request):
     return render(request, 'dashboard/student_list.html', {'students': rows, 'show_support': bool(roles & {ADMIN, GRADE_LEAD}),
                                                             'search': request.GET.get('search', '')})
 
-# جزئیات یک دانش‌آموز + نمایش نتیجه‌ی پیش‌بینی
+# جزئیات یک دانش‌آموز + نمایش آزمایشی وضعیت (خروجی مدل، برچسب «نمایشی» — تغییر ۰۰۴۴)
 # dashboard/views.py (قسمت student_detail_view)
 
 @role_required(ADMIN, GRADE_LEAD, TEACHER, PARENT)
@@ -149,6 +149,10 @@ def student_detail_view(request, pk):
     
     # 6. تعداد تکالیف انجام‌شده (پیش‌فرض)
     completed_homework = 12  # مقدار پیش‌فرض
+
+    # F02 (change 0044): avg_completion_rate, total_communications and completed_homework above are placeholders -
+    # nothing writes the Homework / TeacherParentCommunication tables yet. The page therefore labels the result
+    # «نمایشی / داده‌های تکمیلی موجود نیست» and never calls it a real prediction.
     
     # ساخت دیکشنری ورودی برای FastAPI (با ۸ ویژگی)
     input_data = {
@@ -188,7 +192,6 @@ def student_detail_view(request, pk):
         'avg_score': avg_score,
         'absences_count': total_absences,
         'prediction': prediction_result,
-        'input_data': input_data,  # برای نمایش در قالب (اختیاری)
         'can_predict': ADMIN in roles_for(request.user),
         'recommendations': visible_recommendations(request.user).filter(student=student),
     }

@@ -389,7 +389,7 @@ class HardeningViewAndAssistantTests(TestCase):
         self.client.force_login(user)
         own = Student.objects.get(parent_user=user)
         html = self.client.get(f"/students/{own.id}/").content.decode()
-        self.assertNotIn("پیش‌بینی وضعیت با هوش مصنوعی", html)
+        self.assertNotIn("نمایش آزمایشی وضعیت", html)      # the label renamed by change 0044; still hidden in the demo
         self.assertNotIn("/chat/", html)
         self.assertNotIn("/library/", html)
 

@@ -23,6 +23,7 @@ CURRENT gaps: no ACL/metadata/threshold/injection defense, zero-vector embedding
 
 ## Risk model
 CURRENT: EXPERIMENTAL/PROTOTYPE — trained on a synthetic label, 3 of 8 serving features constant (A-01, A-02). Must not drive real decisions. Rules (deterministic, versioned, simulated, human-approved; lifecycle Draft→Simulated→Pending Approval→Active→Paused→Archived) precede ML. AI-suggested rules always need human approval.
+Change 0044 (2026-11-15, E2E audit F01/F02): the school-admin student page shows the probability as a whole Persian-digit percentage (`fa_percent` in `dashboard/templatetags/eip_ui.py`: ×100, no decimals — the page used to print a 0..1 value as `0.70%`) and labels the block «نمایشی / دادههای تکمیلی موجود نیست», with a sentence naming the three placeholder features and «این خروجی مبنای تصمیم نیست»; the outbound feature dict is no longer printed for the principal. Real homework/communication features remain DEFERRED (F02b), and the outbound vector still has no audit row beyond `view_detail` (F21) — the label must stay until both are closed.
 
 ## Versioning
 Prompts, models and embedding versions are recorded in code/config and changes are L2 (L3 if provider/architecture changes).

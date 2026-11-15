@@ -47,6 +47,8 @@ MODULE = 'advisor_ai'
 GOOD_QUESTION = 'ساعت شروع کلاس‌ها چه زمانی است؟'
 HANDBOOK = 'ساعت شروع کلاس‌ها هشت صبح است.\n\nغیبت موجه نیازمند گواهی پزشک است.'
 HANDBOOK_B = 'ساعت شروع کلاس‌ها در مدرسهٔ دیگر نه صبح است. رمزعبور بیرونی.'
+# The page prints Persian digits; float() accepts ASCII only. Display-only normalisation for assertions.
+_DIGITS = str.maketrans('۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩', '01234567890123456789')
 
 
 def docx(paragraphs):
@@ -134,9 +136,11 @@ class E2EUserJourney(LoopBase):
         return [str(m) for m in response.context['messages']] if response.context else []
 
     def rendered_risk_percent(self, html):
-        match = re.search(r'احتمال ریسک:</strong>\s*([\d.]+)%', html)
+        """The percentage on the student page, as a number. F01: the page prints it in Persian digits (۰.۷ → ۷۰%), and
+        ``\\d`` does match those, but ``float('۷۰')`` raises, so the captured digits are normalised to ASCII first."""
+        match = re.search(r'احتمال ریسک[^<]*</strong>\s*([\d.]+)%', html)
         self.assertIsNotNone(match, 'the prediction block is missing from the detail page')
-        return float(match.group(1))
+        return float(match.group(1).translate(_DIGITS))
 
 class LoginJourneyTests(E2EUserJourney):
     def test_01_a_bad_password_shows_one_message_and_creates_no_session(self):
@@ -454,41 +458,60 @@ class PredictionJourneyTests(E2EUserJourney):
         url = reverse('dashboard:student_detail', args=[self.s7.pk])
         return f'{url}?predict=true' if predict else url
 
-    def test_27_the_admin_gets_the_prediction_block_and_the_sent_features(self):
+    def test_27_the_admin_gets_the_demo_block_and_the_models_own_message(self):
+        """F02 (change 0044): the prediction block is still shown to the admin and still carries the model's message,
+        but it is labelled a demo and the internal feature dict is no longer printed."""
         post = self.predict()
         response = self.client.get(self.detail_url())
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'نتیجه‌ی پیش‌بینی')
+        self.assertContains(response, 'نتیجه‌ی نمایشی')
         self.assertContains(response, 'در معرض ریسک افت تحصیلی')
-        self.assertContains(response, 'داده‌های ارسال‌شده به هوش مصنوعی')      # the raw feature dict is shown to the user
+        self.assertContains(response, 'نمایشی / داده‌های تکمیلی موجود نیست')
+        self.assertNotContains(response, 'داده‌های ارسال‌شده به هوش مصنوعی')
         self.assertEqual(post.call_count, 1)
         self.assertEqual(post.call_args.kwargs['timeout'], 5)
 
-    @unittest.expectedFailure
     def test_28_F01_the_risk_probability_is_shown_as_a_percentage(self):
-        """F01: the model returns a probability in 0..1 (FastAPI /predict/ rounds to 4 decimals) but
-        student_detail.html:42 renders ``{{ prediction.risk_probability|floatformat:2 }}%``, so a 70% risk is shown as
-        '0.70%' -- a 100x understatement of the number the admin acts on.
-        TARGET: multiply by 100 (or format in the view) before the % sign."""
+        """F01 (fixed in change 0044): the model returns a probability in 0..1 (FastAPI /predict/ rounds to 4
+        decimals) and the page used to render ``{{ prediction.risk_probability|floatformat:2 }}%``, so a 70% risk read
+        as '0.70%' -- a 100x understatement of the number the admin acts on.
+        TARGET: multiply by 100, whole number, Persian digits."""
         self.predict(body={'risk_probability': 0.7, 'is_high_risk': True, 'message': 'm'})
         html = self.client.get(self.detail_url()).content.decode()
         percent = self.rendered_risk_percent(html)
         print(f'[E2E] F01: model probability 0.70 is rendered as {percent}%')
         self.assertAlmostEqual(percent, 70.0)
+        self.assertIn('۷۰%', html)                     # Persian digits, no decimals
+        self.assertNotIn('0.70%', html)                # the 100x-understated rendering is gone
+
+    def test_29_F02_a_fabricated_prediction_is_labelled_as_a_demo(self):
+        """F02 (change 0044, D1): the vector is still built from three placeholder constants because nothing writes the
+        homework / communication tables yet, so the block must say so, must not call itself a prediction and must not
+        print the internal dict to the principal. The real-data TARGET stays pinned by test_29b."""
+        post = self.predict()
+        response = self.client.get(self.detail_url())
+        self.assertContains(response, 'نمایشی / داده‌های تکمیلی موجود نیست')
+        self.assertContains(response, 'احتمال ریسک (نمایشی)')
+        self.assertContains(response, 'این خروجی مبنای تصمیم نیست')
+        self.assertNotContains(response, 'نتیجه‌ی پیش‌بینی')
+        self.assertNotContains(response, 'داده‌های ارسال‌شده به هوش مصنوعی')
+        self.assertNotContains(response, 'avg_completion_rate')
+        self.assertEqual(post.call_count, 1, 'the hard-coded logic was kept (D1), so the call must still happen')
+        print(f'[E2E] F02: labelled as a demo; features still sent: {post.call_args.kwargs["json"]}')
 
     @unittest.expectedFailure
-    def test_29_F02_the_prediction_is_computed_from_the_students_real_numbers(self):
-        """F02: dashboard/views.py:142-155 hard-codes avg_completion_rate=0.8, total_communications=3 and
-        completed_homework=12 (and 1 - absences/(days+1) for attendance), then shows those numbers to the admin as
-        'the data sent to the AI'. Two students with different histories get the same vector.
-        TARGET: every feature comes from a real, auditable source, or the prediction is labelled as a demo."""
+    def test_29b_F02_the_prediction_must_eventually_use_the_students_real_numbers(self):
+        """F02 TARGET (DEFERRED as F02b in change 0044): dashboard/views.py hard-codes avg_completion_rate=0.8,
+        total_communications=3 and completed_homework=12, so two students with different histories get the same vector.
+        Until real homework/communication rows exist and are read, this stays expected to fail; the demo label
+        (test_29) is what the owner chose in the meantime."""
         post = self.predict()
         self.client.get(self.detail_url())
         sent = post.call_args.kwargs['json']
-        print(f'[E2E] F02: features sent for a student with no homework records: {sent}')
-        self.assertNotEqual(sent['total_communications'], 3, 'F02: total_communications is a constant in views.py')
-        self.assertNotEqual(sent['completed_homework'], 12, 'F02: completed_homework is a constant in views.py')
-        self.assertNotEqual(sent['avg_completion_rate'], 0.8, 'F02: avg_completion_rate is a constant in views.py')
+        print(f'[E2E] F02b: features sent for a student with no homework records: {sent}')
+        self.assertNotEqual(sent['total_communications'], 3, 'F02b: total_communications is a constant in views.py')
+        self.assertNotEqual(sent['completed_homework'], 12, 'F02b: completed_homework is a constant in views.py')
+        self.assertNotEqual(sent['avg_completion_rate'], 0.8, 'F02b: avg_completion_rate is a constant in views.py')
 
     @unittest.expectedFailure
     def test_30_F04_a_refresh_does_not_repeat_the_prediction_call(self):
@@ -513,9 +536,9 @@ class PredictionJourneyTests(E2EUserJourney):
                 self.client.force_login(user)
                 response = self.client.get(self.detail_url())
                 self.assertEqual(post.call_count, 0)
-                self.assertNotContains(response, 'پیش‌بینی وضعیت با هوش مصنوعی')
+                self.assertNotContains(response, 'نمایش آزمایشی وضعیت')
         self.client.force_login(self.admin)
-        self.assertContains(self.client.get(self.detail_url(predict=False)), 'پیش‌بینی وضعیت با هوش مصنوعی')
+        self.assertContains(self.client.get(self.detail_url(predict=False)), 'نمایش آزمایشی وضعیت')
 
     def test_33_a_provider_error_is_shown_in_the_page_with_its_http_code(self):
         """CHARACTERISATION (F19): the failure message carries the upstream HTTP status into the school admin's page

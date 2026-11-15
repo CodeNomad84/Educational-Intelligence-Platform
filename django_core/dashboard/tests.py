@@ -365,3 +365,34 @@ class AIErrorLeakTests(TestCase):
         self.assertNotContains(resp, 'secret-upload-detail')
         self.assertContains(resp, 'خطا در ارتباط با سرویس هوش مصنوعی.')
 
+
+class PersianDigitFilterTests(TestCase):
+    """Change 0044 / E2E F01: probabilities are displayed as whole Persian-digit percentages. The filters are display
+    only - they touch no model and must never raise inside a template."""
+
+    def test_fa_digits_turns_ascii_into_persian_digits_only(self):
+        from dashboard.templatetags.eip_ui import fa_digits
+
+        self.assertEqual(fa_digits(12), '۱۲')
+        self.assertEqual(fa_digits(1405), '۱۴۰۵')
+        self.assertEqual(fa_digits(None), '')
+        self.assertEqual(fa_digits('a-1'), 'a-۱')          # non-digits are left alone
+        self.assertEqual(fa_digits('۷۰'), '۷۰')            # idempotent for digits that are already Persian
+
+    def test_fa_percent_converts_a_0_to_1_risk_into_a_whole_persian_percentage(self):
+        from dashboard.templatetags.eip_ui import fa_percent
+
+        self.assertEqual(fa_percent(0.7), '۷۰')
+        self.assertEqual(fa_percent(0.7000000000000001), '۷۰')  # round() absorbs the float noise of 0.7*100
+        self.assertEqual(fa_percent(1.0), '۱۰۰')
+        self.assertEqual(fa_percent(0), '۰')
+        self.assertEqual(fa_percent(0.04), '۴')
+        self.assertEqual(fa_percent(0.995), '۱۰۰')         # rounded, never a fraction
+
+    def test_a_non_numeric_probability_renders_empty_instead_of_raising(self):
+        from dashboard.templatetags.eip_ui import fa_percent
+
+        for bad in (None, '', 'unknown', object()):
+            with self.subTest(value=bad):
+                self.assertEqual(fa_percent(bad), '')
+
