@@ -2,6 +2,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ArrowUp, Sparkles } from "lucide-react";
 import { useEffect } from "react";
 
+import { faNum } from "@/lib/dashboard";
 import { useDashboard } from "./dashboard-context";
 import { Mascot, STATE_LABEL } from "./Mascot";
 
@@ -30,7 +31,7 @@ const CHIPS = [
     emoji: "💡",
     label: "پیشنهاد برنامه رشد انفرادی",
     prompt:
-      "برای محمدرضا کاظمی یک برنامه رشد انفرادی ۶ هفته‌ای پیشنهاد بده که از علاقه او به فیزیک برای بهبود ریاضی استفاده کند.",
+      "برای یک دانش‌آموز نیازمند توجه، یک برنامه رشد انفرادی ۶ هفته‌ای پیشنهاد بده که از علاقه او به یک درس برای بهبود درس ضعیف‌تر استفاده کند.",
     mood: "thinking" as const,
   },
 ];
@@ -43,7 +44,12 @@ const BUBBLE: Record<string, string> = {
 };
 
 export function HeroCompanion() {
-  const { mascot, openChat, flashMascot } = useDashboard();
+  const { mascot, openChat, flashMascot, me, students, summary } = useDashboard();
+  const attentionCount = students.filter(
+    (s) => s.status === "risk" || s.status === "attention",
+  ).length;
+  const excellentCount = students.filter((s) => s.status === "excellent").length;
+  const firstName = me?.display_name.split(" ")[0] ?? "همکار";
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -113,18 +119,25 @@ export function HeroCompanion() {
         {/* Greeting + command bar */}
         <div className="min-w-0">
           <p className="mb-2 text-sm font-medium text-primary-glow">
-            سه‌شنبه، هفته سوم آبان · پایه نهم
+            {summary?.meta.academic_year
+              ? `سال تحصیلی ${summary.meta.academic_year}`
+              : "داشبورد رشد و شکوفایی"}
           </p>
           <h1
             id="hero-title"
             className="text-3xl font-black leading-[1.35] tracking-tight sm:text-4xl lg:text-[2.75rem]"
           >
-            <span className="text-gradient">سلام خانم رضایی، امروز کدام نهال را آبیاری کنیم؟</span>
+            <span className="text-gradient">سلام {firstName}، امروز کدام نهال را آبیاری کنیم؟</span>
           </h1>
           <p className="mt-3 max-w-2xl text-base leading-8 text-muted-foreground">
-            <strong className="font-semibold text-warning">۳ دانش‌آموز</strong> نیازمند توجه‌اند و{" "}
-            <strong className="font-semibold text-success">۲ دستاورد تازه</strong> برای جشن گرفتن
-            داریم.
+            <strong className="font-semibold text-warning">
+              {faNum(attentionCount)} دانش‌آموز
+            </strong>{" "}
+            نیازمند توجه‌اند و{" "}
+            <strong className="font-semibold text-success">
+              {faNum(excellentCount)} دانش‌آموز درخشان
+            </strong>{" "}
+            برای جشن گرفتن داریم.
           </p>
 
           <button

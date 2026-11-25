@@ -11,7 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import type { Observation, Student } from "@/data/school";
+import type { Observation, StudentRow } from "@/lib/dashboard";
 import { cn } from "@/lib/utils";
 import { useDashboard } from "./dashboard-context";
 
@@ -45,10 +45,10 @@ export function FeedbackDialog({
   student,
   onOpenChange,
 }: {
-  student: Student | null;
+  student: StudentRow | null;
   onOpenChange: (o: boolean) => void;
 }) {
-  const { addObservation } = useDashboard();
+  const { addObservation, me } = useDashboard();
   const [kind, setKind] = useState<Observation["kind"]>("kudos");
   const [text, setText] = useState("");
 
@@ -61,9 +61,14 @@ export function FeedbackDialog({
 
   const submit = () => {
     if (!student || text.trim().length < 8) return;
-    addObservation(student.id, { kind, text: text.trim(), mentor: "خانم رضایی", date: "امروز" });
+    addObservation(student.id, {
+      kind,
+      text: text.trim(),
+      mentor: me?.display_name ?? "مربی",
+      date: null,
+    });
     toast.success("بازخورد ثبت شد 🌱", {
-      description: `در کارنامه ۳۶۰ ${student.name} و تابلوی رشد نمایش داده می‌شود.`,
+      description: `در تابلوی رشد نمایش داده می‌شود.`,
     });
     onOpenChange(false);
   };
@@ -116,7 +121,7 @@ export function FeedbackDialog({
                 {text.trim().length < 8 ? "حداقل ۸ نویسه" : "آماده ثبت"}
               </span>
               <Button variant="hero" size="pill" disabled={text.trim().length < 8} onClick={submit}>
-                <Send className="rtl:-scale-x-100" /> ثبت در کارنامه
+                <Send className="rtl:-scale-x-100" /> ثبت بازخورد
               </Button>
             </div>
           </>

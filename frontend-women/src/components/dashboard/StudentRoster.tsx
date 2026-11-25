@@ -20,12 +20,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  GRADES,
-  MISSION_TRACKS,
+  faNum,
+  formatPersianDate,
   STATUS_META,
   type AcademicStatus,
-  type Student,
-} from "@/data/school";
+  type StudentRow,
+} from "@/lib/dashboard";
 import { cn } from "@/lib/utils";
 import { useDashboard } from "./dashboard-context";
 import { FeedbackDialog } from "./FeedbackDialog";
@@ -38,27 +38,24 @@ const TONE_TO_BADGE = {
   destructive: "danger",
 } as const;
 
-export const TRACK_COLOR: Record<string, string> = {
-  "فناوری و نوآوری": "bg-info/20 text-info",
-  "سلامت و زیست‌بوم": "bg-success/20 text-success",
-  "هنر و رسانه": "bg-mascot-cheek/20 text-mascot-cheek",
-  "کارآفرینی اجتماعی": "bg-warning/20 text-warning",
-  "پژوهش علوم پایه": "bg-primary/20 text-primary-glow",
-};
-
 export function StatusBadge({ status }: { status: AcademicStatus }) {
   const meta = STATUS_META[status];
   return <Badge variant={TONE_TO_BADGE[meta.tone]}>{meta.label}</Badge>;
 }
 
-export function StudentAvatar({ student, size = "md" }: { student: Student; size?: "md" | "lg" }) {
+export function StudentAvatar({
+  student,
+  size = "md",
+}: {
+  student: StudentRow;
+  size?: "md" | "lg";
+}) {
   return (
     <span
       aria-hidden
       className={cn(
-        "grid shrink-0 place-items-center rounded-full font-bold",
+        "grid shrink-0 place-items-center rounded-full font-bold bg-primary/20 text-primary-glow",
         size === "lg" ? "size-14 text-xl" : "size-9 text-sm",
-        TRACK_COLOR[student.track],
       )}
     >
       {student.name.charAt(0)}
@@ -67,26 +64,26 @@ export function StudentAvatar({ student, size = "md" }: { student: Student; size
 }
 
 export function StudentRoster() {
-  const { students } = useDashboard();
+  const { students, summary } = useDashboard();
   const [query, setQuery] = useState("");
   const [grade, setGrade] = useState<string>("all");
-  const [track, setTrack] = useState<string>("all");
   const [status, setStatus] = useState<"all" | AcademicStatus>("all");
-  const [profileId, setProfileId] = useState<string | null>(null);
-  const [feedbackId, setFeedbackId] = useState<string | null>(null);
+  const [profileId, setProfileId] = useState<number | null>(null);
+  const [feedbackId, setFeedbackId] = useState<number | null>(null);
+
+  const grades = summary?.grades_present ?? [];
 
   const filtered = useMemo(
     () =>
       students.filter(
         (s) =>
-          (grade === "all" || s.grade === grade) &&
-          (track === "all" || s.track === track) &&
+          (grade === "all" || String(s.grade) === grade) &&
           (status === "all" || s.status === status) &&
           (query.trim() === "" ||
             s.name.includes(query.trim()) ||
             s.classroom.includes(query.trim())),
       ),
-    [students, grade, track, status, query],
+    [students, grade, status, query],
   );
 
   const profile = students.find((s) => s.id === profileId) ?? null;
@@ -104,8 +101,7 @@ export function StudentRoster() {
             <Users className="size-5 text-primary-glow" /> فهرست متربیان
           </h2>
           <p className="text-sm text-muted-foreground">
-            {filtered.length.toLocaleString("fa-IR")} از {students.length.toLocaleString("fa-IR")}{" "}
-            دانش‌آموز
+            {faNum(filtered.length)} از {faNum(students.length)} دانش‌آموز
           </p>
         </div>
         <div className="flex w-full flex-wrap gap-2 lg:w-auto">
@@ -128,25 +124,9 @@ export function StudentRoster() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">همه پایه‌ها</SelectItem>
-              {GRADES.map((g) => (
-                <SelectItem key={g} value={g}>
-                  پایه {g}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={track} onValueChange={setTrack}>
-            <SelectTrigger
-              aria-label="فیلتر مسیر مأموریتی"
-              className="h-10 w-[170px] rounded-full bg-surface/70"
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">همه مسیرها</SelectItem>
-              {MISSION_TRACKS.map((t) => (
-                <SelectItem key={t} value={t}>
-                  {t}
+              {grades.map((g) => (
+                <SelectItem key={g} value={String(g)}>
+                  پایه {faNum(g)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -178,7 +158,6 @@ export function StudentRoster() {
             <TableRow className="bg-surface/80 hover:bg-surface/80">
               <TableHead className="ps-4">نام دانش‌آموز</TableHead>
               <TableHead>پایه / کلاس</TableHead>
-              <TableHead>مسیر مأموریتی</TableHead>
               <TableHead>وضعیت تحصیلی</TableHead>
               <TableHead>آخرین مشاهده مربی</TableHead>
               <TableHead className="pe-4 text-end">اقدامات</TableHead>
@@ -195,23 +174,13 @@ export function StudentRoster() {
                       <div>
                         <p className="font-semibold">{s.name}</p>
                         <p className="text-xs text-muted-foreground">
-                          معدل {s.gpa.toLocaleString("fa-IR")}
+                          {s.gpa === null ? "بدون نمره" : `معدل ${faNum(s.gpa)}`}
                         </p>
                       </div>
                     </div>
                   </TableCell>
                   <TableCell className="text-muted-foreground">
-                    {s.grade} · <span className="text-foreground">{s.classroom}</span>
-                  </TableCell>
-                  <TableCell>
-                    <span
-                      className={cn(
-                        "rounded-full px-2.5 py-1 text-xs font-medium",
-                        TRACK_COLOR[s.track],
-                      )}
-                    >
-                      {s.track}
-                    </span>
+                    {faNum(s.grade)} · <span className="text-foreground">{s.classroom}</span>
                   </TableCell>
                   <TableCell>
                     <StatusBadge status={s.status} />
@@ -222,7 +191,7 @@ export function StudentRoster() {
                     </p>
                     {obs && (
                       <p className="text-xs text-muted-foreground">
-                        {obs.mentor} · {obs.date}
+                        {obs.mentor} · {formatPersianDate(obs.date)}
                       </p>
                     )}
                   </TableCell>
@@ -241,7 +210,7 @@ export function StudentRoster() {
             })}
             {filtered.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
+                <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
                   دانش‌آموزی با این فیلترها پیدا نشد.
                 </TableCell>
               </TableRow>

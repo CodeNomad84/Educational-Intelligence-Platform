@@ -3,19 +3,19 @@ import {
   Sparkles,
   Send,
   Users,
-  Rocket,
   ShieldCheck,
   FileText,
   Trophy,
   Zap,
-  Handshake,
   TrendingUp,
+  AlertTriangle,
 } from "lucide-react";
 import {
   Radar,
   RadarChart,
   PolarGrid,
   PolarAngleAxis,
+  PolarRadiusAxis,
   ResponsiveContainer,
   LineChart,
   Line,
@@ -24,9 +24,10 @@ import {
   CartesianGrid,
   Tooltip,
 } from "recharts";
-import { useState } from "react";
-import { AreaChart, Area } from "recharts";
+import { useEffect, useState } from "react";
 import { MascotAssistant, type MascotMood } from "@/components/MascotAssistant";
+import { ApiError } from "@/lib/api";
+import { faNum, fetchDashboardSummary, type DashboardSummary } from "@/lib/dashboard";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -45,40 +46,6 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-const kpis = [
-  { t: "دانش‌آموزان فعال", v: "۱,۲۴۸", d: "+۱۲٪", I: Users },
-  { t: "پروژه‌های مأموریتی", v: "۸۶", d: "+۸ پروژه", I: Rocket },
-  { t: "شاخص رشد و تاب‌آوری", v: "۷۸٪", d: "+۵.۴٪", I: ShieldCheck },
-  { t: "گزارش‌های مداخله و مشاوره", v: "۲۱۴", d: "این ماه", I: FileText },
-];
-const radar = [
-  { k: "رشد تحصیلی", v: 82 },
-  { k: "تاب‌آوری", v: 74 },
-  { k: "تعامل اجتماعی", v: 68 },
-  { k: "انگیزه یادگیری", v: 88 },
-  { k: "مهارت‌های زندگی", v: 71 },
-];
-const line = ["مهر", "آبان", "آذر", "دی", "بهمن", "اسفند"].map((m, i) => ({
-  m,
-  a: [52, 58, 63, 67, 74, 81][i],
-  b: [45, 50, 57, 61, 66, 72][i],
-}));
-const students = [
-  { n: "امیرحسین رضایی", c: "پایه دهم", s: 96, b: "قهرمان مأموریت" },
-  { n: "محمد کریمی", c: "پایه یازدهم", s: 93, b: "رهبر تیم" },
-  { n: "علی احمدی", c: "پایه نهم", s: 90, b: "نوآور" },
-  { n: "رضا محمدی", c: "پایه دهم", s: 88, b: "پرتلاش" },
-  { n: "سینا حسینی", c: "پایه دوازدهم", s: 85, b: "تاب‌آور" },
-];
-const badges = [
-  { t: "پیشرفت ممتاز در یادگیری", d: "۴۲ دانش‌آموز این ماه", I: Zap },
-  { t: "رشد چشمگیر در تاب‌آوری", d: "افزایش ۱۸٪ نسبت به ترم قبل", I: TrendingUp },
-  { t: "همکاری برتر در پروژه مأموریتی", d: "تیم رباتیک پایه یازدهم", I: Handshake },
-];
-const spark = (seed: string) =>
-  Array.from({ length: 8 }, (_, i) => ({
-    v: 40 + i * 6 + ((seed.charCodeAt(i % seed.length) * (i + 3)) % 18),
-  }));
 const tip = {
   contentStyle: {
     background: "var(--background)",
@@ -87,9 +54,69 @@ const tip = {
   },
 };
 
+function useDashboardSummary() {
+  const [summary, setSummary] = useState<DashboardSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchDashboardSummary()
+      .then((s) => {
+        if (!cancelled) setSummary(s);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        if (err instanceof ApiError && err.status === 401 && typeof window !== "undefined") {
+          window.location.assign(`/login/?next=${encodeURIComponent(window.location.pathname)}`);
+          return;
+        }
+        setError(err instanceof Error ? err.message : "خطا در دریافت داده‌ها");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return { summary, loading, error };
+}
+
 function Index() {
+  const { summary, loading, error } = useDashboardSummary();
   const [mood, setMood] = useState<MascotMood>("idle");
   const [q, setQ] = useState("");
+
+  const kpis = summary?.kpis ?? [];
+  const kpi = (key: string) => kpis.find((x) => x.key === key);
+  const students = summary?.students ?? [];
+  const alerts = summary?.alerts ?? [];
+  const interventions = (kpi("alerts_open")?.value ?? 0) + (kpi("plans_open")?.value ?? 0);
+
+  const cards = [
+    { t: "دانش‌آموزان فعال", v: kpi("students")?.value ?? null, d: null, I: Users },
+    { t: "میانگین نمرات", v: kpi("average")?.value ?? null, d: "از ۲۰", I: TrendingUp },
+    { t: "نرخ حضور", v: kpi("attendance")?.value ?? null, d: "٪", I: ShieldCheck },
+    { t: "مداخلات و هشدارها", v: interventions, d: "باز", I: FileText },
+  ];
+
+  const radar = (summary?.subjects ?? []).map((s) => ({ k: s.label, v: s.average }));
+  const line = (summary?.average_trend ?? []).map((t) => ({ m: t.label, a: t.value }));
+  const top = [...students]
+    .filter((s) => s.gpa !== null)
+    .sort((a, b) => (b.gpa ?? 0) - (a.gpa ?? 0))
+    .slice(0, 5);
+
+  const excellent = students.filter((s) => s.status === "excellent").length;
+  const attention = students.filter((s) => s.status === "attention" || s.status === "risk").length;
+  const badges = [
+    { t: "دانش‌آموزان ممتاز", d: `${faNum(excellent)} دانش‌آموز این ماه`, I: Zap },
+    { t: "نیازمند توجه", d: `${faNum(attention)} دانش‌آموز در پایش اخیر`, I: TrendingUp },
+    { t: "هشدارهای باز", d: `${faNum(alerts.length)} هشدار در انتظار بررسی`, I: AlertTriangle },
+  ];
+
   const run = () => {
     setMood("thinking");
     setTimeout(() => {
@@ -101,6 +128,7 @@ function Index() {
     if (!q.trim()) return;
     run();
   };
+
   return (
     <div className="min-h-screen grid-bg">
       <div className="hero-bg min-h-screen">
@@ -115,9 +143,17 @@ function Index() {
               </p>
             </div>
             <span className="rounded-full border border-gold/40 bg-gold/10 px-3 py-1 text-xs font-bold text-gold">
-              سال تحصیلی ۱۴۰۵
+              {summary?.meta.academic_year ? `سال تحصیلی ${summary.meta.academic_year}` : "—"}
             </span>
           </header>
+
+          {(loading || error) && (
+            <p className="rounded-2xl border border-border bg-card px-4 py-3 text-center text-sm text-muted-foreground">
+              {loading
+                ? "در حال دریافت داده‌های زنده از سامانه…"
+                : `دریافت داده‌ها ممکن نشد: ${error}`}
+            </p>
+          )}
 
           <section className="glass relative overflow-hidden p-6 md:p-10">
             <div className="grid items-center gap-6 md:grid-cols-[1fr_260px]">
@@ -168,7 +204,7 @@ function Index() {
           </section>
 
           <section className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            {kpis.map(({ t, v, d, I }) => (
+            {cards.map(({ t, v, d, I }) => (
               <div key={t} className="glass p-5">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">{t}</span>
@@ -176,24 +212,9 @@ function Index() {
                     <I className="size-5" />
                   </span>
                 </div>
-                <div className="mt-3 text-3xl font-extrabold">{v}</div>
+                <div className="mt-3 text-3xl font-extrabold">{v === null ? "—" : faNum(v)}</div>
                 <div className="mt-1 flex items-end justify-between gap-2">
-                  <span className="text-xs text-gold">{d}</span>
-                  <div className="h-8 w-20" dir="ltr">
-                    <ResponsiveContainer>
-                      <AreaChart data={spark(t)}>
-                        <Area
-                          dataKey="v"
-                          stroke="var(--primary)"
-                          fill="var(--primary)"
-                          fillOpacity={0.2}
-                          strokeWidth={2}
-                          dot={false}
-                          isAnimationActive
-                        />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
+                  <span className="text-xs text-gold">{d ?? ""}</span>
                 </div>
               </div>
             ))}
@@ -201,86 +222,94 @@ function Index() {
 
           <section className="grid gap-4 lg:grid-cols-3">
             <div className="glass p-5">
-              <h3 className="mb-2 font-bold">وضعیت رشد چندبعدی</h3>
+              <h3 className="mb-2 font-bold">عملکرد دروس</h3>
               <div className="h-72">
-                <ResponsiveContainer>
-                  <RadarChart data={radar} outerRadius="70%">
-                    <PolarGrid stroke="var(--border)" />
-                    <PolarAngleAxis
-                      dataKey="k"
-                      tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
-                    />
-                    <Tooltip {...tip} />
-                    <Radar
-                      name="امتیاز"
-                      dataKey="v"
-                      stroke="var(--primary)"
-                      fill="var(--primary)"
-                      fillOpacity={0.35}
-                    />
-                  </RadarChart>
-                </ResponsiveContainer>
+                {radar.length === 0 ? (
+                  <div className="grid h-full place-items-center text-sm text-muted-foreground">
+                    هنوز نمره‌ای ثبت نشده است.
+                  </div>
+                ) : (
+                  <ResponsiveContainer>
+                    <RadarChart data={radar} outerRadius="70%">
+                      <PolarGrid stroke="var(--border)" />
+                      <PolarAngleAxis
+                        dataKey="k"
+                        tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
+                      />
+                      <PolarRadiusAxis domain={[0, 20]} tick={false} axisLine={false} />
+                      <Tooltip {...tip} />
+                      <Radar
+                        name="میانگین"
+                        dataKey="v"
+                        stroke="var(--primary)"
+                        fill="var(--primary)"
+                        fillOpacity={0.35}
+                      />
+                    </RadarChart>
+                  </ResponsiveContainer>
+                )}
               </div>
             </div>
             <div className="glass p-5">
-              <h3 className="mb-2 font-bold">روند رشد در طول زمان</h3>
+              <h3 className="mb-2 font-bold">روند میانگین نمرات</h3>
               <div className="h-72" dir="ltr">
-                <ResponsiveContainer>
-                  <LineChart data={line} margin={{ left: -20, right: 10 }}>
-                    <CartesianGrid stroke="var(--border)" vertical={false} />
-                    <XAxis
-                      dataKey="m"
-                      reversed
-                      tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
-                    />
-                    <YAxis
-                      orientation="right"
-                      tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
-                    />
-                    <Tooltip {...tip} />
-                    <Line
-                      dataKey="a"
-                      name="رشد کلی"
-                      stroke="var(--primary)"
-                      strokeWidth={3}
-                      dot={{ r: 4 }}
-                    />
-                    <Line
-                      dataKey="b"
-                      name="تاب‌آوری"
-                      stroke="var(--gold)"
-                      strokeWidth={2}
-                      strokeDasharray="5 4"
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
+                {line.length === 0 ? (
+                  <div className="grid h-full place-items-center text-sm text-muted-foreground">
+                    داده‌ای برای نمودار موجود نیست.
+                  </div>
+                ) : (
+                  <ResponsiveContainer>
+                    <LineChart data={line} margin={{ left: -20, right: 10 }}>
+                      <CartesianGrid stroke="var(--border)" vertical={false} />
+                      <XAxis
+                        dataKey="m"
+                        reversed
+                        tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
+                      />
+                      <YAxis
+                        orientation="right"
+                        domain={[0, 20]}
+                        tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
+                      />
+                      <Tooltip {...tip} />
+                      <Line
+                        dataKey="a"
+                        name="میانگین نمرات"
+                        stroke="var(--primary)"
+                        strokeWidth={3}
+                        dot={{ r: 4 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                )}
               </div>
             </div>
             <div className="glass p-5">
               <h3 className="mb-3 flex items-center gap-2 font-bold">
                 <Trophy className="size-4 text-gold" /> دانش‌آموزان برتر
               </h3>
-              <ul className="space-y-3">
-                {students.map((s, i) => (
-                  <li key={s.n} className="flex items-center gap-3 rounded-xl bg-muted/50 p-2.5">
-                    <span
-                      className={`grid size-8 place-items-center rounded-lg text-sm font-bold ${i === 0 ? "bg-gold text-background" : "bg-indigo-deep text-primary"}`}
-                    >
-                      {(i + 1).toLocaleString("fa")}
-                    </span>
-                    <div className="flex-1">
-                      <div className="text-sm font-bold">{s.n}</div>
-                      <div className="text-xs text-muted-foreground">{s.c}</div>
-                    </div>
-                    <span className="rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-[10px] text-primary">
-                      {s.b}
-                    </span>
-                    <span className="w-8 text-sm font-bold text-gold">
-                      {s.s.toLocaleString("fa")}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              {top.length === 0 ? (
+                <p className="text-sm text-muted-foreground">هنوز نمره‌ای ثبت نشده است.</p>
+              ) : (
+                <ul className="space-y-3">
+                  {top.map((s, i) => (
+                    <li key={s.id} className="flex items-center gap-3 rounded-xl bg-muted/50 p-2.5">
+                      <span
+                        className={`grid size-8 place-items-center rounded-lg text-sm font-bold ${i === 0 ? "bg-gold text-background" : "bg-indigo-deep text-primary"}`}
+                      >
+                        {faNum(i + 1)}
+                      </span>
+                      <div className="flex-1">
+                        <div className="text-sm font-bold">{s.name}</div>
+                        <div className="text-xs text-muted-foreground">پایه {faNum(s.grade)}</div>
+                      </div>
+                      <span className="w-8 text-sm font-bold text-gold">
+                        {s.gpa === null ? "—" : faNum(s.gpa)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           </section>
 

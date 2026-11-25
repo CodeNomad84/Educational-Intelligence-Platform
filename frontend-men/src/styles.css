@@ -1,9 +1,10 @@
 @import "tailwindcss" source(none);
 @source "../src";
 @import "tw-animate-css";
+@import "@fontsource-variable/vazirmatn";
 @custom-variant dark (&:is(.dark *));
 @theme inline {
-  --font-sans: "Vazirmatn", "IRANSansX", system-ui, sans-serif;
+  --font-sans: "Vazirmatn Variable", "Vazirmatn", "IRANSans", Tahoma, system-ui, sans-serif;
   --radius-lg: var(--radius); --radius-xl: calc(var(--radius) + 4px); --radius-2xl: calc(var(--radius) + 8px);
   --color-background: var(--background); --color-foreground: var(--foreground);
   --color-card: var(--card); --color-card-foreground: var(--foreground);

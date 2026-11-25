@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 
 import { ChatDrawer } from "@/components/dashboard/ChatDrawer";
 import { CompetencyRadar } from "@/components/dashboard/CompetencyRadar";
-import { DashboardProvider } from "@/components/dashboard/dashboard-context";
+import { DashboardProvider, useDashboard } from "@/components/dashboard/dashboard-context";
 import { GrowthStream } from "@/components/dashboard/GrowthStream";
 import { HeroCompanion } from "@/components/dashboard/HeroCompanion";
 import { KpiStrip } from "@/components/dashboard/KpiStrip";
@@ -31,12 +31,32 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
+function DashboardBanner() {
+  const { loading, error } = useDashboard();
+  if (loading) {
+    return (
+      <p className="rounded-2xl border border-border bg-surface/60 px-4 py-3 text-center text-sm text-muted-foreground">
+        در حال دریافت داده‌های زنده از سامانه…
+      </p>
+    );
+  }
+  if (error) {
+    return (
+      <p className="rounded-2xl border border-warning/40 bg-warning/10 px-4 py-3 text-center text-sm text-warning">
+        دریافت داده‌ها ممکن نشد: {error}
+      </p>
+    );
+  }
+  return null;
+}
+
 function Index() {
   return (
     <DashboardProvider>
       <div className="min-h-screen">
         <TopBar />
         <main className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
+          <DashboardBanner />
           <HeroCompanion />
           <KpiStrip />
           <div className="grid gap-6 lg:grid-cols-[1fr_1.15fr]">
@@ -46,8 +66,8 @@ function Index() {
           <StudentRoster />
         </main>
         <footer className="mx-auto max-w-7xl px-6 pb-10 pt-2 text-center text-xs text-muted-foreground">
-          سکوی آموزشی-تربیتی آرمان‌نو - شاخه نسیم · سامانه رشد و انتخاب مأموریت‌محور — داده‌های
-          نمایشی
+          سکوی آموزشی-تربیتی آرمان‌نو - شاخه نسیم · سامانه رشد و انتخاب مأموریت‌محور — داده‌های زنده
+          از سامانه
         </footer>
       </div>
       <ChatDrawer />

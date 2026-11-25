@@ -2,6 +2,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -9,7 +10,17 @@ import {
 } from "react";
 import { useServerFn } from "@tanstack/react-start";
 
-import { STREAM, STUDENTS, type Observation, type StreamItem, type Student } from "@/data/school";
+import { apiMe, ApiError, type MeResponse } from "@/lib/api";
+import {
+  buildStream,
+  faNum,
+  fetchDashboardSummary,
+  formatPersianDate,
+  type DashboardSummary,
+  type Observation,
+  type StreamItem,
+  type StudentRow,
+} from "@/lib/dashboard";
 import { askMentor, type Citation, type MentorRole } from "@/lib/mentor-chat.functions";
 
 export type MascotState = "idle" | "thinking" | "analytical" | "celebrate";
@@ -37,15 +48,25 @@ interface DashboardContextValue {
   send: (text: string) => Promise<void>;
   clearChat: () => void;
 
-  students: Student[];
+  summary: DashboardSummary | null;
+  loading: boolean;
+  error: string | null;
+  me: MeResponse | null;
+  students: StudentRow[];
   stream: StreamItem[];
-  addObservation: (studentId: string, obs: Observation) => void;
+  addObservation: (studentId: number, obs: Observation) => void;
 }
 
 const DashboardContext = createContext<DashboardContextValue | null>(null);
 
 let idCounter = 0;
 const uid = (p: string) => `${p}-${Date.now().toString(36)}-${(idCounter++).toString(36)}`;
+
+const OBS_KIND_LABEL: Record<Observation["kind"], string> = {
+  kudos: "تشویق",
+  suggestion: "پیشنهاد رشد",
+  alert: "هشدار",
+};
 
 export function DashboardProvider({ children }: { children: ReactNode }) {
   const ask = useServerFn(askMentor);
@@ -59,9 +80,36 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const [pending, setPending] = useState(false);
   const [role, setRole] = useState<MentorRole>("teacher");
 
-  const [students, setStudents] = useState<Student[]>(STUDENTS);
-  const [stream, setStream] = useState<StreamItem[]>(STREAM);
+  const [summary, setSummary] = useState<DashboardSummary | null>(null);
+  const [me, setMe] = useState<MeResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [localStream, setLocalStream] = useState<StreamItem[]>([]);
   const [notes, setNotes] = useState<string[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const [nextSummary, nextMe] = await Promise.all([fetchDashboardSummary(), apiMe()]);
+        if (cancelled) return;
+        setSummary(nextSummary);
+        setMe(nextMe);
+      } catch (err) {
+        if (cancelled) return;
+        if (err instanceof ApiError && err.status === 401 && typeof window !== "undefined") {
+          window.location.assign(`/login/?next=${encodeURIComponent(window.location.pathname)}`);
+          return;
+        }
+        setError(err instanceof Error ? err.message : "خطا در دریافت داده‌ها");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const flashMascot = useCallback((state: MascotState, ms = 2600) => {
     if (flashTimer.current) clearTimeout(flashTimer.current);
@@ -124,31 +172,26 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     [send],
   );
 
+  const students = useMemo<StudentRow[]>(() => summary?.students ?? [], [summary]);
+
   const addObservation = useCallback(
-    (studentId: string, obs: Observation) => {
-      setStudents((prev) =>
-        prev.map((s) =>
-          s.id === studentId ? { ...s, observations: [obs, ...s.observations] } : s,
-        ),
-      );
+    (studentId: number, obs: Observation) => {
       const student = students.find((s) => s.id === studentId);
-      if (!student) return;
-      const kindLabel =
-        obs.kind === "kudos" ? "تشویق" : obs.kind === "alert" ? "هشدار" : "پیشنهاد رشد";
+      const kind = obs.kind === "alert" ? "alert" : obs.kind === "kudos" ? "kudos" : "milestone";
       setNotes((prev) => [
         ...prev,
-        `- ${student.name} (${kindLabel}، ${obs.mentor}، ${obs.date}): ${obs.text}`,
+        `- ${student?.name ?? "دانش‌آموز"} (${OBS_KIND_LABEL[obs.kind]}، ${obs.mentor}، ${formatPersianDate(obs.date)}): ${obs.text}`,
       ]);
-      setStream((prev) => [
+      setLocalStream((prev) => [
         {
           id: uid("st"),
-          kind: obs.kind === "alert" ? "alert" : obs.kind === "kudos" ? "kudos" : "milestone",
-          title: `${kindLabel} تازه برای ${student.name}`,
+          kind,
+          title: `${student?.name ?? "دانش‌آموز"} — ${OBS_KIND_LABEL[obs.kind]}`,
           body: obs.text,
           studentId,
           author: obs.mentor,
           time: "همین حالا",
-          tag: student.track,
+          tag: student ? `پایه ${faNum(student.grade)}` : "—",
         },
         ...prev,
       ]);
@@ -156,6 +199,11 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     },
     [students, flashMascot],
   );
+
+  const stream = useMemo<StreamItem[]>(() => {
+    const base = summary ? buildStream(summary) : [];
+    return [...localStream, ...base];
+  }, [summary, localStream]);
 
   const value = useMemo<DashboardContextValue>(
     () => ({
@@ -171,6 +219,10 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       setRole,
       send,
       clearChat: () => setMessages([]),
+      summary,
+      loading,
+      error,
+      me,
       students,
       stream,
       addObservation,
@@ -184,6 +236,10 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       pending,
       role,
       send,
+      summary,
+      loading,
+      error,
+      me,
       students,
       stream,
       addObservation,

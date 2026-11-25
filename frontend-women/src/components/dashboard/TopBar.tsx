@@ -1,5 +1,16 @@
 import { Bell, Sprout } from "lucide-react";
 
+import { useDashboard } from "./dashboard-context";
+
+const ROLE_LABELS: Record<string, string> = {
+  SchoolAdmin: "مدیر مدرسه",
+  Teacher: "معلم",
+  GradeLead: "مربی پایه",
+  Counselor: "مشاور",
+  Parent: "والدین",
+  Student: "دانش‌آموز",
+};
+
 const NAV = [
   { href: "#pulse", label: "نبض مدرسه" },
   { href: "#radar", label: "رادار شایستگی" },
@@ -8,6 +19,11 @@ const NAV = [
 ];
 
 export function TopBar() {
+  const { me } = useDashboard();
+  const displayName = me?.display_name ?? "کاربر";
+  const roleLabel = me?.role
+    ? (ROLE_LABELS[me.role] ?? "سکوی آموزشی-تربیتی")
+    : "سکوی آموزشی-تربیتی";
   return (
     <header className="sticky top-0 z-30 border-b border-border/60 bg-background/70 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4 sm:px-6">
@@ -49,11 +65,11 @@ export function TopBar() {
           </button>
           <div className="flex items-center gap-2 rounded-full border border-border bg-surface/60 py-1 pe-1 ps-3">
             <span className="hidden text-end leading-tight sm:block">
-              <span className="block text-sm font-semibold">خانم رضایی</span>
-              <span className="block text-[11px] text-muted-foreground">مربی پایه نهم</span>
+              <span className="block text-sm font-semibold">{displayName}</span>
+              <span className="block text-[11px] text-muted-foreground">{roleLabel}</span>
             </span>
             <span className="grid size-8 place-items-center rounded-full bg-gradient-growth text-sm font-bold text-success-foreground">
-              ر
+              {displayName.charAt(0)}
             </span>
           </div>
         </div>

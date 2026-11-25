@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from students.views import StudentViewSet
+from dashboard.summary_api import DashboardSummaryView
 from dashboard.throttle import ThrottledTokenObtainPairView, throttled_admin_login
 from rest_framework_simplejwt.views import TokenRefreshView
 
@@ -21,6 +22,8 @@ urlpatterns = [
     # JSON session auth for the presentation frontends (ADR-0014, docs/changes/0040): csrf/, login/, logout/, me/.
     # Additive: /api/token/ above is unchanged and keeps working for machine clients.
     path('api/auth/', include('dashboard.auth_api')),
+    # JSON dashboard summary for the two presentation frontends (Phase 3): /api/dashboard/.
+    path('api/dashboard/', DashboardSummaryView.as_view(), name='api_dashboard_summary'),
     path('mission/', include('missions.urls')),
     path('exams/', include('exams.urls')),
     path('rules/', include('risk.urls')),

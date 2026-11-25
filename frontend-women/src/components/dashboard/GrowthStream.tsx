@@ -13,7 +13,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import type { StreamItem, StreamKind } from "@/data/school";
+import type { StreamItem, StreamKind } from "@/lib/dashboard";
 import { cn } from "@/lib/utils";
 import { useDashboard } from "./dashboard-context";
 

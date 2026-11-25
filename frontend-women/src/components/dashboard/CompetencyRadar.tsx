@@ -11,30 +11,31 @@ import {
 } from "recharts";
 
 import { Button } from "@/components/ui/button";
-import { COMPETENCY_AXES, GRADES, RADAR_BY_GRADE, RADAR_TARGET, type Grade } from "@/data/school";
+import { faNum, type SubjectAverage } from "@/lib/dashboard";
 import { cn } from "@/lib/utils";
 import { useDashboard } from "./dashboard-context";
 
-const fa = (n: number) => n.toLocaleString("fa-IR");
-
-type Scope = "all" | Grade;
-
 export function CompetencyRadar() {
-  const { openChat, setMascotHold, flashMascot } = useDashboard();
-  const [scope, setScope] = useState<Scope>("all");
-  const values = RADAR_BY_GRADE[scope];
+  const { summary, openChat, setMascotHold, flashMascot } = useDashboard();
+  const [scope, setScope] = useState<string>("all");
 
-  const data = COMPETENCY_AXES.map((a) => ({
-    axis: a.label,
-    current: values[a.key],
-    target: RADAR_TARGET[a.key],
-  }));
-  const { weakest, strongest } = useMemo(() => {
+  const grades = summary?.grades_present ?? [];
+  const subjects: SubjectAverage[] = useMemo(() => {
+    if (!summary) return [];
+    if (scope === "all") return summary.subjects;
+    const row = summary.subjects_by_grade.find((r) => String(r.grade) === scope);
+    return row?.subjects ?? [];
+  }, [summary, scope]);
+
+  const data = subjects.map((s) => ({ axis: s.label, current: s.average }));
+  const { strongest, weakest } = useMemo(() => {
+    if (data.length === 0) return { strongest: null, weakest: null };
     const sorted = [...data].sort((a, b) => a.current - b.current);
-    return { weakest: sorted[0], strongest: sorted[sorted.length - 1] };
+    return { strongest: sorted[sorted.length - 1] ?? null, weakest: sorted[0] ?? null };
   }, [data]);
 
-  const scopeLabel = scope === "all" ? "کل مدرسه" : `پایه ${scope}`;
+  const scopeLabel = scope === "all" ? "کل مدرسه" : `پایه ${faNum(Number(scope))}`;
+  const scopes = ["all", ...grades.map(String)];
 
   return (
     <section
@@ -47,18 +48,16 @@ export function CompetencyRadar() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 id="radar-title" className="text-lg font-extrabold">
-            رادار شایستگی‌های شش‌گانه
+            عملکرد دروس
           </h2>
-          <p className="text-sm text-muted-foreground">
-            میانگین شش محور تربیتی در برابر هدف مأموریت
-          </p>
+          <p className="text-sm text-muted-foreground">میانگین نمرات هر درس (از ۲۰)</p>
         </div>
         <div
           role="tablist"
           aria-label="انتخاب پایه"
           className="flex flex-wrap gap-1 rounded-full border border-border bg-surface/60 p-1"
         >
-          {(["all", ...GRADES] as Scope[]).map((g) => (
+          {scopes.map((g) => (
             <button
               key={g}
               role="tab"
@@ -71,99 +70,84 @@ export function CompetencyRadar() {
                   : "text-muted-foreground hover:text-foreground",
               )}
             >
-              {g === "all" ? "همه" : g}
+              {g === "all" ? "همه" : faNum(Number(g))}
             </button>
           ))}
         </div>
       </div>
 
-      <div className="mt-2 h-[300px]">
-        <ResponsiveContainer width="100%" height="100%">
-          <RadarChart data={data} outerRadius="72%">
-            <defs>
-              <linearGradient id="radar-fill" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.6} />
-                <stop offset="100%" stopColor="var(--primary-glow)" stopOpacity={0.35} />
-              </linearGradient>
-            </defs>
-            <PolarGrid stroke="var(--border)" />
-            <PolarAngleAxis
-              dataKey="axis"
-              tick={{
-                fill: "var(--foreground)",
-                fontSize: 13,
-                fontWeight: 600,
-                fontFamily: "inherit",
-              }}
-            />
-            <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} />
-            <Radar
-              name="هدف مأموریت"
-              dataKey="target"
-              stroke="var(--success)"
-              strokeDasharray="5 4"
-              strokeWidth={2}
-              fill="var(--success)"
-              fillOpacity={0.06}
-            />
-            <Radar
-              name={scopeLabel}
-              dataKey="current"
-              stroke="var(--primary-glow)"
-              strokeWidth={2.5}
-              fill="url(#radar-fill)"
-              dot={{ r: 3.5, fill: "var(--primary-glow)" }}
-            />
-            <Tooltip
-              contentStyle={{
-                background: "var(--popover)",
-                border: "1px solid var(--border)",
-                borderRadius: 12,
-                direction: "rtl",
-                fontFamily: "inherit",
-              }}
-              labelStyle={{ color: "var(--foreground)", fontWeight: 700 }}
-              itemStyle={{ color: "var(--muted-foreground)" }}
-              formatter={(v: number, name: string) => [fa(v), name]}
-            />
-          </RadarChart>
-        </ResponsiveContainer>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-        <span className="inline-flex items-center gap-2">
-          <span className="h-2 w-5 rounded-full bg-gradient-primary" />
-          {scopeLabel}
-        </span>
-        <span className="inline-flex items-center gap-2">
-          <span className="h-0 w-5 border-t-2 border-dashed border-success" />
-          هدف مأموریت
-        </span>
-      </div>
-
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <div className="rounded-2xl border border-success/25 bg-success/10 p-3">
-          <p className="flex items-center gap-1.5 text-xs text-success">
-            <TrendingUp className="size-3.5" />
-            قوی‌ترین محور
-          </p>
-          <p className="mt-1 font-bold">
-            {strongest?.axis} · {fa(strongest?.current ?? 0)}
-          </p>
+      {data.length === 0 ? (
+        <div className="mt-2 grid h-[300px] place-items-center text-sm text-muted-foreground">
+          هنوز نمره‌ای برای این بازه ثبت نشده است.
         </div>
-        <div className="rounded-2xl border border-warning/25 bg-warning/10 p-3">
-          <p className="flex items-center gap-1.5 text-xs text-warning">
-            <Target className="size-3.5" />
-            فرصت رشد
-          </p>
-          <p className="mt-1 font-bold">
-            {weakest?.axis} · {fa(weakest?.current ?? 0)}{" "}
-            <span className="text-xs font-normal text-muted-foreground">
-              (فاصله تا هدف {fa((weakest?.target ?? 0) - (weakest?.current ?? 0))})
-            </span>
-          </p>
+      ) : (
+        <div className="mt-2 h-[300px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <RadarChart data={data} outerRadius="72%">
+              <defs>
+                <linearGradient id="radar-fill" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.6} />
+                  <stop offset="100%" stopColor="var(--primary-glow)" stopOpacity={0.35} />
+                </linearGradient>
+              </defs>
+              <PolarGrid stroke="var(--border)" />
+              <PolarAngleAxis
+                dataKey="axis"
+                tick={{
+                  fill: "var(--foreground)",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  fontFamily: "inherit",
+                }}
+              />
+              <PolarRadiusAxis domain={[0, 20]} tick={false} axisLine={false} />
+              <Radar
+                name={scopeLabel}
+                dataKey="current"
+                stroke="var(--primary-glow)"
+                strokeWidth={2.5}
+                fill="url(#radar-fill)"
+                dot={{ r: 3.5, fill: "var(--primary-glow)" }}
+              />
+              <Tooltip
+                contentStyle={{
+                  background: "var(--popover)",
+                  border: "1px solid var(--border)",
+                  borderRadius: 12,
+                  direction: "rtl",
+                  fontFamily: "inherit",
+                }}
+                labelStyle={{ color: "var(--foreground)", fontWeight: 700 }}
+                itemStyle={{ color: "var(--muted-foreground)" }}
+                formatter={(v: number, name: string) => [faNum(v), name]}
+              />
+            </RadarChart>
+          </ResponsiveContainer>
         </div>
-      </div>
+      )}
+
+      {data.length > 0 && (
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <div className="rounded-2xl border border-success/25 bg-success/10 p-3">
+            <p className="flex items-center gap-1.5 text-xs text-success">
+              <TrendingUp className="size-3.5" />
+              قوی‌ترین درس
+            </p>
+            <p className="mt-1 font-bold">
+              {strongest?.axis} · {strongest ? faNum(strongest.current) : "—"}
+            </p>
+          </div>
+          <div className="rounded-2xl border border-warning/25 bg-warning/10 p-3">
+            <p className="flex items-center gap-1.5 text-xs text-warning">
+              <Target className="size-3.5" />
+              نیازمند توجه
+            </p>
+            <p className="mt-1 font-bold">
+              {weakest?.axis} · {weakest ? faNum(weakest.current) : "—"}
+            </p>
+          </div>
+        </div>
+      )}
 
       <Button
         variant="soft"
@@ -172,7 +156,7 @@ export function CompetencyRadar() {
         onClick={() => {
           flashMascot("analytical");
           openChat(
-            `رادار شایستگی ${scopeLabel} را تحلیل کن. محور «${weakest?.axis}» با ${weakest?.current} کمترین امتیاز را دارد. چه مأموریت‌ها و اقداماتی برای رسیدن به هدف پیشنهاد می‌کنی؟`,
+            `عملکرد دروس ${scopeLabel} را تحلیل کن. قوی‌ترین درس «${strongest?.axis ?? "—"}» و ضعیف‌ترین «${weakest?.axis ?? "—"}» است. چه اقداماتی پیشنهاد می‌کنی؟`,
           );
         }}
       >
