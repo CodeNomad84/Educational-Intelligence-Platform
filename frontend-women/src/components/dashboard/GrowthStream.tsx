@@ -204,8 +204,8 @@ export function GrowthStream() {
                             onClick={() =>
                               openChat(
                                 item.kind === "alert"
-                                  ? `برای این هشدار چه مداخله‌ای پیشنهاد می‌کنی؟ «${item.title}: ${item.body}»`
-                                  : `چطور این دستاورد را به گام بعدی رشد تبدیل کنیم؟ «${item.title}: ${item.body}»`,
+                                  ? `برای هشداری در ${item.tag} چه مداخله‌ای پیشنهاد می‌کنی؟`
+                                  : `چطور این دستاورد در ${item.tag} را به گام بعدی رشد تبدیل کنیم؟`,
                               )
                             }
                           >

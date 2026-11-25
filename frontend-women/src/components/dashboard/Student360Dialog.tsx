@@ -126,7 +126,7 @@ export function Student360Dialog({ student, onOpenChange, onFeedback }: Props) {
                 onClick={() => {
                   onOpenChange(false);
                   openChat(
-                    `کارنامه ۳۶۰ ${student.name} را تحلیل کن: نقاط قوت، فرصت‌های رشد و یک برنامه رشد انفرادی کوتاه پیشنهاد بده.`,
+                    "برای یک کارنامه ۳۶۰، نقاط قوت و فرصت‌های رشد را چگونه شناسایی کنم و یک برنامه رشد انفرادی کوتاه پیشنهاد بده.",
                   );
                 }}
               >

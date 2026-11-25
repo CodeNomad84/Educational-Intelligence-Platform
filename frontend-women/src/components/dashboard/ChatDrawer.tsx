@@ -2,7 +2,6 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowUp,
-  BookOpen,
   Building2,
   Check,
   Copy,
@@ -11,86 +10,41 @@ import {
   RotateCcw,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState, type ComponentPropsWithoutRef } from "react";
+import { useEffect, useMemo, useRef, useState, type ComponentPropsWithoutRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
-import type { Citation, MentorRole } from "@/lib/mentor-chat.functions";
+import { MENTOR_ROLES, mentorRolesFor, type MentorRole } from "@/lib/mentor-chat";
 import { cn } from "@/lib/utils";
 import { useDashboard, type ChatMessage } from "./dashboard-context";
 import { Mascot, STATE_LABEL } from "./Mascot";
 
-const ROLES: { id: MentorRole; label: string; icon: typeof GraduationCap }[] = [
-  { id: "teacher", label: "معلم", icon: GraduationCap },
-  { id: "counselor", label: "مشاور", icon: HeartHandshake },
-  { id: "principal", label: "مدیر", icon: Building2 },
-];
+const ROLE_ICONS: Record<MentorRole, typeof GraduationCap> = {
+  teacher: GraduationCap,
+  counselor: HeartHandshake,
+  principal: Building2,
+};
 
 const SUGGESTIONS: Record<MentorRole, string[]> = {
   teacher: [
-    "دانش‌آموزان نیازمند توجه در درس ریاضی چه کسانی هستند و چه کنم؟",
-    "برای تقویت کار گروهی در پایه هفتم یک فعالیت بازی‌وار پیشنهاد بده",
-    "کدام دانش‌آموزان آماده نقش منتور همتا هستند؟",
+    "برای تقویت کار گروهی در کلاس یک فعالیت بازی‌وار پیشنهاد بده",
+    "چطور می‌توانم بازخورد روزانه مؤثرتری به دانش‌آموزان بدهم؟",
+    "یک قالب مشاهده عینی برای ثبت رفتار در کلاس به من بده",
   ],
   counselor: [
-    "یاسین عباسی در کدام سطح مداخله است و جلسه با خانواده را چطور طراحی کنم؟",
-    "برای هلیا جعفری که اعتمادبه‌نفسش پایین آمده چه برنامه‌ای پیشنهاد می‌کنی؟",
-    "نسبت تشویق به هشدار در مشاهدات اخیر چطور است؟",
+    "برای یک جلسه گفت‌وگو با خانواده چه ساختاری پیشنهاد می‌کنی؟",
+    "برای تقویت اعتمادبه‌نفس یک دانش‌آموز چه برنامه‌ای پیشنهاد می‌کنی؟",
+    "نسبت تشویق به هشدار در مشاهدات باید چقدر باشد؟",
   ],
   principal: [
-    "گزارش اجرایی این هفته را با اولویت‌های تصمیم‌گیری خلاصه کن",
-    "محور کارآفرینی چرا ضعیف‌ترین است و چه سرمایه‌گذاری لازم است؟",
-    "مقایسه پایه‌ها در شش محور شایستگی را در یک جدول بده",
+    "اولویت‌های تصمیم‌گیری این هفته را چطور تعیین کنم؟",
+    "برای تقویت محور کارآفرینی چه سرمایه‌گذاری‌هایی لازم است؟",
+    "یک گزارش اجرایی هفتگی را چطور خلاصه کنم؟",
   ],
 };
 
-const toLatin = (s: string) => s.replace(/[۰-۹]/g, (d) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d)));
-
-function prepareMarkdown(text: string) {
-  return text.replace(
-    /\[([0-9۰-۹]{1,2})\](?!\()/g,
-    (_, n: string) => `[${toLatin(n)}](#cite-${toLatin(n)})`,
-  );
-}
-
-function citedIndexes(text: string) {
-  const set = new Set<number>();
-  for (const m of text.matchAll(/\[([0-9۰-۹]{1,2})\]/g)) set.add(Number(toLatin(m[1] ?? "")));
-  return set;
-}
-
-function CitationBadge({ citation, n }: { citation: Citation | undefined; n: string }) {
-  const label = Number(n).toLocaleString("fa-IR");
-  if (!citation) return <sup className="mx-0.5 text-primary-glow">[{label}]</sup>;
-  return (
-    <HoverCard openDelay={120}>
-      <HoverCardTrigger asChild>
-        <button
-          type="button"
-          className="mx-0.5 inline-grid size-5 translate-y-[-2px] place-items-center rounded-md bg-primary/25 align-middle text-[11px] font-bold text-primary-glow transition-colors hover:bg-primary/45"
-          aria-label={`منبع ${label}: ${citation.title}`}
-        >
-          {label}
-        </button>
-      </HoverCardTrigger>
-      <HoverCardContent
-        dir="rtl"
-        className="w-72 rounded-2xl border-border glass-strong text-start"
-      >
-        <p className="text-sm font-bold">{citation.title}</p>
-        <p className="mt-0.5 text-xs text-primary-glow">{citation.source}</p>
-        <p className="mt-2 text-xs leading-6 text-muted-foreground">{citation.snippet}</p>
-      </HoverCardContent>
-    </HoverCard>
-  );
-}
-
 function AssistantMessage({ message }: { message: ChatMessage }) {
   const [copied, setCopied] = useState(false);
-  const citations = message.citations ?? [];
-  const used = citedIndexes(message.content);
-  const shown = citations.filter((c) => used.has(c.index));
 
   if (message.error) {
     return (
@@ -106,50 +60,23 @@ function AssistantMessage({ message }: { message: ChatMessage }) {
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
           components={{
-            a: ({ href, children, ...rest }: ComponentPropsWithoutRef<"a">) => {
-              if (href?.startsWith("#cite-")) {
-                const n = href.slice(6);
-                return (
-                  <CitationBadge n={n} citation={citations.find((c) => c.index === Number(n))} />
-                );
-              }
-              return (
-                <a
-                  href={href}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-primary-glow underline underline-offset-4"
-                  {...rest}
-                >
-                  {children}
-                </a>
-              );
-            },
+            a: ({ href, children, ...rest }: ComponentPropsWithoutRef<"a">) => (
+              <a
+                href={href}
+                target="_blank"
+                rel="noreferrer"
+                className="text-primary-glow underline underline-offset-4"
+                {...rest}
+              >
+                {children}
+              </a>
+            ),
           }}
         >
-          {prepareMarkdown(message.content)}
+          {message.content}
         </ReactMarkdown>
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
-        {shown.length > 0 && (
-          <>
-            <span className="flex items-center gap-1 text-xs text-muted-foreground">
-              <BookOpen className="size-3.5" />
-              منابع:
-            </span>
-            {shown.map((c) => (
-              <span
-                key={c.index}
-                className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/60 px-2 py-0.5 text-[11px] text-muted-foreground"
-              >
-                <span className="font-bold text-primary-glow">
-                  {c.index.toLocaleString("fa-IR")}
-                </span>
-                {c.title}
-              </span>
-            ))}
-          </>
-        )}
         <button
           type="button"
           onClick={() => {
@@ -168,18 +95,44 @@ function AssistantMessage({ message }: { message: ChatMessage }) {
 }
 
 export function ChatDrawer() {
-  const { chatOpen, setChatOpen, messages, pending, role, setRole, send, clearChat, mascot } =
-    useDashboard();
+  const {
+    chatOpen,
+    setChatOpen,
+    messages,
+    pending,
+    role,
+    setRole,
+    send,
+    clearChat,
+    mascot,
+    aiStatus,
+    me,
+  } = useDashboard();
   const [draft, setDraft] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  const availableRoles = useMemo<MentorRole[]>(() => mentorRolesFor(me?.roles ?? []), [me]);
+  const visibleRoles = useMemo(
+    () => MENTOR_ROLES.filter((r) => availableRoles.includes(r.id)),
+    [availableRoles],
+  );
+  const aiDisabled = aiStatus !== null && !aiStatus.enabled;
+  const noRoles = availableRoles.length === 0;
+  const roleLabel = MENTOR_ROLES.find((r) => r.id === role)?.label ?? "";
+  const roleGridCols =
+    visibleRoles.length === 1
+      ? "grid-cols-1"
+      : visibleRoles.length === 2
+        ? "grid-cols-2"
+        : "grid-cols-3";
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, pending]);
 
   const submit = () => {
-    if (!draft.trim() || pending) return;
+    if (!draft.trim() || pending || aiDisabled || noRoles) return;
     void send(draft);
     setDraft("");
   };
@@ -209,7 +162,7 @@ export function ChatDrawer() {
                   رهنما · دستیار مربیگری و رشد
                 </DialogPrimitive.Title>
                 <DialogPrimitive.Description className="text-xs text-muted-foreground">
-                  {STATE_LABEL[mascot]} · پاسخ‌ها از اسناد مدرسه و کارنامه ۳۶۰ با ارجاع
+                  {STATE_LABEL[mascot]} · دستیار هوشمند مربیگری و رشد
                 </DialogPrimitive.Description>
               </div>
               {messages.length > 0 && (
@@ -230,52 +183,63 @@ export function ChatDrawer() {
               </DialogPrimitive.Close>
             </div>
 
-            <div
-              role="radiogroup"
-              aria-label="نقش شما"
-              className="relative mt-4 grid grid-cols-3 gap-1 rounded-2xl border border-border bg-surface/70 p-1"
-            >
-              {ROLES.map((r) => {
-                const Icon = r.icon;
-                const active = role === r.id;
-                return (
-                  <button
-                    key={r.id}
-                    role="radio"
-                    aria-checked={active}
-                    onClick={() => setRole(r.id)}
-                    className={cn(
-                      "relative flex items-center justify-center gap-2 rounded-xl py-2 text-sm font-medium transition-colors",
-                      active
-                        ? "text-primary-foreground"
-                        : "text-muted-foreground hover:text-foreground",
-                    )}
-                  >
-                    {active && (
-                      <motion.span
-                        layoutId="role-pill"
-                        className="absolute inset-0 rounded-xl bg-gradient-primary shadow-glow"
-                        transition={{ type: "spring", stiffness: 400, damping: 32 }}
-                      />
-                    )}
-                    <Icon className="relative size-4" />
-                    <span className="relative">{r.label}</span>
-                  </button>
-                );
-              })}
-            </div>
+            {visibleRoles.length > 0 && (
+              <div
+                role="radiogroup"
+                aria-label="نقش شما"
+                className={cn(
+                  "relative mt-4 grid gap-1 rounded-2xl border border-border bg-surface/70 p-1",
+                  roleGridCols,
+                )}
+              >
+                {visibleRoles.map((r) => {
+                  const Icon = ROLE_ICONS[r.id];
+                  const active = role === r.id;
+                  return (
+                    <button
+                      key={r.id}
+                      role="radio"
+                      aria-checked={active}
+                      onClick={() => setRole(r.id)}
+                      className={cn(
+                        "relative flex items-center justify-center gap-2 rounded-xl py-2 text-sm font-medium transition-colors",
+                        active
+                          ? "text-primary-foreground"
+                          : "text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      {active && (
+                        <motion.span
+                          layoutId="role-pill"
+                          className="absolute inset-0 rounded-xl bg-gradient-primary shadow-glow"
+                          transition={{ type: "spring", stiffness: 400, damping: 32 }}
+                        />
+                      )}
+                      <Icon className="relative size-4" />
+                      <span className="relative">{r.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
+
+          {aiStatus && !aiStatus.enabled && (
+            <div className="border-b border-border bg-warning/10 px-5 py-3">
+              <p className="text-sm leading-7 text-warning">
+                <strong>ابزار هوش مصنوعی فعال نیست.</strong> {aiStatus.detail}
+              </p>
+            </div>
+          )}
 
           {/* Messages */}
           <div
             ref={scrollRef}
             className="scrollbar-thin flex-1 space-y-4 overflow-y-auto px-5 py-5"
           >
-            {messages.length === 0 && !pending && (
+            {messages.length === 0 && !pending && !aiDisabled && !noRoles && (
               <div className="space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  پیشنهادهایی برای نقش «{ROLES.find((r) => r.id === role)?.label}»:
-                </p>
+                <p className="text-sm text-muted-foreground">پیشنهادهایی برای نقش «{roleLabel}»:</p>
                 {SUGGESTIONS[role].map((s, i) => (
                   <motion.button
                     key={s}
@@ -324,7 +288,7 @@ export function ChatDrawer() {
                       />
                     ))}
                   </span>
-                  در حال جست‌وجو در اسناد و کارنامه‌ها…
+                  در حال دریافت پاسخ…
                 </div>
               </div>
             )}
@@ -344,14 +308,17 @@ export function ChatDrawer() {
                   }
                 }}
                 rows={1}
-                placeholder="سؤال خود را بنویسید…"
+                disabled={aiDisabled || noRoles}
+                placeholder={
+                  aiDisabled || noRoles ? "ابزار هوش مصنوعی در دسترس نیست" : "سؤال خود را بنویسید…"
+                }
                 aria-label="پیام به دستیار"
-                className="max-h-36 min-h-[40px] flex-1 resize-none bg-transparent py-2 text-sm leading-7 outline-none placeholder:text-muted-foreground"
+                className="max-h-36 min-h-[40px] flex-1 resize-none bg-transparent py-2 text-sm leading-7 outline-none placeholder:text-muted-foreground disabled:opacity-50"
               />
               <button
                 type="button"
                 onClick={submit}
-                disabled={!draft.trim() || pending}
+                disabled={!draft.trim() || pending || aiDisabled || noRoles}
                 aria-label="ارسال"
                 className="grid size-10 shrink-0 place-items-center rounded-full bg-gradient-primary text-primary-foreground shadow-glow transition-all hover:brightness-110 disabled:opacity-40 disabled:shadow-none"
               >

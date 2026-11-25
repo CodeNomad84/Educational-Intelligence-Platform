@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { LogIn } from "lucide-react";
 
 import { ChatDrawer } from "@/components/dashboard/ChatDrawer";
 import { CompetencyRadar } from "@/components/dashboard/CompetencyRadar";
@@ -32,7 +33,7 @@ export const Route = createFileRoute("/")({
 });
 
 function DashboardBanner() {
-  const { loading, error } = useDashboard();
+  const { loading, error, me } = useDashboard();
   if (loading) {
     return (
       <p className="rounded-2xl border border-border bg-surface/60 px-4 py-3 text-center text-sm text-muted-foreground">
@@ -45,6 +46,26 @@ function DashboardBanner() {
       <p className="rounded-2xl border border-warning/40 bg-warning/10 px-4 py-3 text-center text-sm text-warning">
         دریافت داده‌ها ممکن نشد: {error}
       </p>
+    );
+  }
+  if (!me) {
+    return (
+      <section className="rounded-[2rem] glass p-6 text-center sm:p-8">
+        <h2 className="text-xl font-black">
+          <span className="text-gradient">برای مشاهده تابلوی رشد وارد شوید</span>
+        </h2>
+        <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
+          داده‌های زنده، تابلوی رشد متربیان و دستیار هوشمند مربیگری پس از ورود به حساب کاربری نمایش
+          داده می‌شود.
+        </p>
+        <a
+          href="/login"
+          className="mt-5 inline-flex items-center gap-2 rounded-full bg-gradient-primary px-5 py-2.5 font-bold text-primary-foreground shadow-glow transition hover:brightness-110"
+        >
+          <LogIn className="size-4" aria-hidden />
+          ورود به سامانه
+        </a>
+      </section>
     );
   }
   return null;

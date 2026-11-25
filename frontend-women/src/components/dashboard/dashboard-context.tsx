@@ -8,20 +8,24 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { useServerFn } from "@tanstack/react-start";
 
 import { apiMe, ApiError, type MeResponse } from "@/lib/api";
 import {
   buildStream,
   faNum,
   fetchDashboardSummary,
-  formatPersianDate,
   type DashboardSummary,
   type Observation,
   type StreamItem,
   type StudentRow,
 } from "@/lib/dashboard";
-import { askMentor, type Citation, type MentorRole } from "@/lib/mentor-chat.functions";
+import {
+  askMentor,
+  fetchAiStatus,
+  mentorRolesFor,
+  type AiStatus,
+  type MentorRole,
+} from "@/lib/mentor-chat";
 
 export type MascotState = "idle" | "thinking" | "analytical" | "celebrate";
 
@@ -29,7 +33,6 @@ export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
-  citations?: Citation[];
   error?: boolean;
 }
 
@@ -52,6 +55,7 @@ interface DashboardContextValue {
   loading: boolean;
   error: string | null;
   me: MeResponse | null;
+  aiStatus: AiStatus | null;
   students: StudentRow[];
   stream: StreamItem[];
   addObservation: (studentId: number, obs: Observation) => void;
@@ -69,8 +73,6 @@ const OBS_KIND_LABEL: Record<Observation["kind"], string> = {
 };
 
 export function DashboardProvider({ children }: { children: ReactNode }) {
-  const ask = useServerFn(askMentor);
-
   const [flash, setFlash] = useState<MascotState | null>(null);
   const [hold, setMascotHold] = useState<MascotState | null>(null);
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -82,10 +84,11 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
 
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [me, setMe] = useState<MeResponse | null>(null);
+  const [aiStatus, setAiStatus] = useState<AiStatus | null>(null);
+  const statusLoaded = useRef(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [localStream, setLocalStream] = useState<StreamItem[]>([]);
-  const [notes, setNotes] = useState<string[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -97,8 +100,9 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         setMe(nextMe);
       } catch (err) {
         if (cancelled) return;
-        if (err instanceof ApiError && err.status === 401 && typeof window !== "undefined") {
-          window.location.assign(`/login/?next=${encodeURIComponent(window.location.pathname)}`);
+        if (err instanceof ApiError && err.status === 401) {
+          // Anonymous visitor: keep the landing visible (me stays null) with a login
+          // entry in the top bar instead of a hard redirect (ADR-0014 Phase 3 login UI).
           return;
         }
         setError(err instanceof Error ? err.message : "خطا در دریافت داده‌ها");
@@ -119,57 +123,74 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
 
   const mascot: MascotState = pending ? "thinking" : (flash ?? hold ?? "idle");
 
+  const availableRoles = useMemo<MentorRole[]>(() => (me ? mentorRolesFor(me.roles) : []), [me]);
+
+  // Keep the selected persona inside what the account actually holds.
+  useEffect(() => {
+    const first = availableRoles[0];
+    if (first && !availableRoles.includes(role)) {
+      setRole(first);
+    }
+  }, [availableRoles, role]);
+
   const send = useCallback(
     async (text: string) => {
       const content = text.trim();
-      if (!content || pending) return;
+      if (!content || pending || (aiStatus !== null && !aiStatus.enabled)) return;
       const userMsg: ChatMessage = { id: uid("u"), role: "user", content };
       const history = [...messages.filter((m) => !m.error), userMsg].slice(-12);
       setMessages((prev) => [...prev, userMsg]);
       setPending(true);
       try {
-        const reply = await ask({
-          data: {
-            role,
-            messages: history.map((m) => ({ role: m.role, content: m.content })),
-            ...(notes.length ? { recentNotes: notes.join("\n").slice(-3800) } : {}),
-          },
-        });
-        if (reply.ok) {
-          setMessages((prev) => [
-            ...prev,
-            { id: uid("a"), role: "assistant", content: reply.text, citations: reply.citations },
-          ]);
-          flashMascot("analytical", 2400);
-        } else {
-          setMessages((prev) => [
-            ...prev,
-            { id: uid("e"), role: "assistant", content: reply.error, error: true },
-          ]);
-        }
-      } catch {
+        const reply = await askMentor(
+          role,
+          history.map((m) => ({ role: m.role, content: m.content })),
+        );
+        setMessages((prev) => [...prev, { id: uid("a"), role: "assistant", content: reply.text }]);
+        flashMascot("analytical", 2400);
+      } catch (err) {
+        const content2 =
+          err instanceof ApiError && err.message
+            ? err.message
+            : "ارتباط با دستیار قطع شد. دوباره تلاش کنید.";
         setMessages((prev) => [
           ...prev,
-          {
-            id: uid("e"),
-            role: "assistant",
-            content: "ارتباط با دستیار قطع شد. دوباره تلاش کنید.",
-            error: true,
-          },
+          { id: uid("e"), role: "assistant", content: content2, error: true },
         ]);
       } finally {
         setPending(false);
       }
     },
-    [ask, messages, notes, pending, role, flashMascot],
+    [messages, pending, role, flashMascot, aiStatus],
   );
 
   const openChat = useCallback(
     (prompt?: string) => {
       setChatOpen(true);
-      if (prompt) void send(prompt);
+      const load: Promise<AiStatus> =
+        statusLoaded.current && aiStatus
+          ? Promise.resolve(aiStatus)
+          : fetchAiStatus()
+              .then((status) => {
+                setAiStatus(status);
+                return status;
+              })
+              .catch((): AiStatus => {
+                const fallback: AiStatus = {
+                  enabled: false,
+                  reason: "service_unavailable",
+                  detail: "سرویس هوش مصنوعی در دسترس نیست.",
+                  roles: availableRoles,
+                };
+                setAiStatus(fallback);
+                return fallback;
+              });
+      void load.then((status) => {
+        statusLoaded.current = true;
+        if (prompt && status.enabled) void send(prompt);
+      });
     },
-    [send],
+    [send, aiStatus, availableRoles],
   );
 
   const students = useMemo<StudentRow[]>(() => summary?.students ?? [], [summary]);
@@ -178,10 +199,6 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     (studentId: number, obs: Observation) => {
       const student = students.find((s) => s.id === studentId);
       const kind = obs.kind === "alert" ? "alert" : obs.kind === "kudos" ? "kudos" : "milestone";
-      setNotes((prev) => [
-        ...prev,
-        `- ${student?.name ?? "دانش‌آموز"} (${OBS_KIND_LABEL[obs.kind]}، ${obs.mentor}، ${formatPersianDate(obs.date)}): ${obs.text}`,
-      ]);
       setLocalStream((prev) => [
         {
           id: uid("st"),
@@ -223,6 +240,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       loading,
       error,
       me,
+      aiStatus,
       students,
       stream,
       addObservation,
@@ -240,6 +258,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       loading,
       error,
       me,
+      aiStatus,
       students,
       stream,
       addObservation,

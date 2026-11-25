@@ -9,6 +9,8 @@ import {
   Zap,
   TrendingUp,
   AlertTriangle,
+  LogIn,
+  UserRound,
 } from "lucide-react";
 import {
   Radar,
@@ -58,17 +60,22 @@ function useDashboardSummary() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [authed, setAuthed] = useState<boolean | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     fetchDashboardSummary()
       .then((s) => {
-        if (!cancelled) setSummary(s);
+        if (cancelled) return;
+        setSummary(s);
+        setAuthed(true);
       })
       .catch((err: unknown) => {
         if (cancelled) return;
-        if (err instanceof ApiError && err.status === 401 && typeof window !== "undefined") {
-          window.location.assign(`/login/?next=${encodeURIComponent(window.location.pathname)}`);
+        if (err instanceof ApiError && err.status === 401) {
+          // Anonymous visitor: keep the landing page visible with a login entry
+          // instead of a hard redirect (ADR-0014 Phase 3 login UI).
+          setAuthed(false);
           return;
         }
         setError(err instanceof Error ? err.message : "خطا در دریافت داده‌ها");
@@ -81,11 +88,11 @@ function useDashboardSummary() {
     };
   }, []);
 
-  return { summary, loading, error };
+  return { summary, loading, error, authed };
 }
 
 function Index() {
-  const { summary, loading, error } = useDashboardSummary();
+  const { summary, loading, error, authed } = useDashboardSummary();
   const [mood, setMood] = useState<MascotMood>("idle");
   const [q, setQ] = useState("");
 
@@ -133,7 +140,7 @@ function Index() {
     <div className="min-h-screen grid-bg">
       <div className="hero-bg min-h-screen">
         <main className="mx-auto max-w-7xl space-y-6 px-4 py-8">
-          <header className="flex items-center justify-between">
+          <header className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h1 className="text-xl font-extrabold md:text-2xl">
                 سکوی آموزشی-تربیتی <span className="text-primary">آرمان نو</span>
@@ -142,10 +149,46 @@ function Index() {
                 سامانه هوشمند رشد، مربیگری و انتخاب مأموریت‌محور
               </p>
             </div>
-            <span className="rounded-full border border-gold/40 bg-gold/10 px-3 py-1 text-xs font-bold text-gold">
-              {summary?.meta.academic_year ? `سال تحصیلی ${summary.meta.academic_year}` : "—"}
-            </span>
+            <div className="flex items-center gap-3">
+              {authed === false ? (
+                <a
+                  href="/login"
+                  className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-bold text-primary-foreground transition hover:brightness-110"
+                >
+                  <LogIn className="size-4" aria-hidden />
+                  ورود به سامانه
+                </a>
+              ) : authed === true ? (
+                <a
+                  href="/account/"
+                  className="inline-flex items-center gap-2 rounded-full border border-border bg-accent/60 px-4 py-2 text-sm font-bold transition hover:border-primary hover:text-primary"
+                >
+                  <UserRound className="size-4" aria-hidden />
+                  پروفایل کاربری
+                </a>
+              ) : null}
+              <span className="rounded-full border border-gold/40 bg-gold/10 px-3 py-1 text-xs font-bold text-gold">
+                {summary?.meta.academic_year ? `سال تحصیلی ${summary.meta.academic_year}` : "—"}
+              </span>
+            </div>
           </header>
+
+          {authed === false && (
+            <section className="glass flex flex-col items-center gap-3 p-6 text-center">
+              <h2 className="text-lg font-extrabold">برای مشاهده داشبورد وارد شوید</h2>
+              <p className="max-w-xl text-sm leading-6 text-muted-foreground">
+                داده‌های زنده سامانه، پایش رشد دانش‌آموزان و گزارش‌ها پس از ورود به حساب کاربری
+                نمایش داده می‌شود.
+              </p>
+              <a
+                href="/login"
+                className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 font-bold text-primary-foreground transition hover:brightness-110"
+              >
+                <LogIn className="size-4" aria-hidden />
+                ورود به سامانه
+              </a>
+            </section>
+          )}
 
           {(loading || error) && (
             <p className="rounded-2xl border border-border bg-card px-4 py-3 text-center text-sm text-muted-foreground">

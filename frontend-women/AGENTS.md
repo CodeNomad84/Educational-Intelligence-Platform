@@ -32,6 +32,6 @@ use the editor.
 ## Project rules
 
 - The UI is RTL-first Persian: `<html dir="rtl">` plus Radix `DirectionProvider`; use logical utilities (`ps-`, `pe-`, `start-`, `end-`, `text-start`) instead of left/right so layouts mirror correctly.
-- Demo school data lives in `src/data/school.ts` and is browser-safe; the assistant server function reads the same module for retrieval context so UI and answers never drift.
-- The mentor assistant runs in a `createServerFn` (`src/lib/mentor-chat.functions.ts`) that loads the AI Gateway SDK via dynamic import inside the handler, keeping it out of the client bundle.
+- The mentor assistant («رهنما») is a client of Django's JSON endpoints (`GET /api/ai/status/`, `POST /api/ai/chat/`) in `src/lib/mentor-chat.ts`; no model call, school data or counselling note leaves the browser in frontend code.
+- Chat tabs follow the caller's real roles (`MeResponse.roles` → `mentorRolesFor`); the server re-checks the requested persona and answers 403 on a mismatch.
 - Dashboard state (mascot mood, chat, roster edits) is shared through `DashboardProvider`; components read it with `useDashboard()` rather than prop drilling.

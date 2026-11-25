@@ -9,6 +9,8 @@ COPY package.json bun.lock bunfig.toml ./
 RUN bun install --frozen-lockfile
 
 FROM deps AS build
+# VPS is 2 vCPU / 4 GB: cap the Node heap so the nitro/vite build never OOMs the host.
+ENV NODE_OPTIONS=--max-old-space-size=1024
 COPY . .
 # D6: a lint/type/test failure fails the image, so a broken frontend cannot be deployed.
 RUN bun run lint && bunx tsc --noEmit && bun run test && bun run build

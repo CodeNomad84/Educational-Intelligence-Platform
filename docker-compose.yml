@@ -38,6 +38,7 @@ services:
       - ./django_core:/app
       - ./data/static:/app/staticfiles
       - ./data/media:/app/media
+      - ./data/backups:/backups   # `manage.py backup_db` output survives container recreation
     env_file:
       - .env
       - .env.service   # SERVICE_JWT_SECRET (gitignored); shared with FastAPI only
@@ -204,6 +205,7 @@ services:
     volumes:
       - ./deploy/nginx/frontends.conf:/etc/nginx/templates/frontends.conf.template:ro
       - ./deploy/nginx/eip_proxy.conf:/etc/nginx/eip_proxy.conf:ro
+      - ./data/static:/srv/static:ro    # collectstatic output, served by the gateway's /static/ alias
     depends_on:
       frontend_men:
         condition: service_healthy
